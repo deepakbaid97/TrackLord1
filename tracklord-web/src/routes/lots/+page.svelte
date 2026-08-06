@@ -37,7 +37,17 @@
     'PACK': 'inventory_2'
   };
 
+  import { page } from '$app/stores';
+
   onMount(async () => {
+    // Read URL query parameters for pre-selected step or client filters
+    const urlParams = $page.url.searchParams;
+    const stepParam = urlParams.get('step');
+    const clientParam = urlParams.get('client');
+
+    if (stepParam) selectedStepId = stepParam;
+    if (clientParam) selectedClientId = clientParam;
+
     await refreshData();
   });
 

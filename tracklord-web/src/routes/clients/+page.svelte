@@ -5,7 +5,7 @@
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
 
-  import { getClients, createClient } from '$lib/api.js';
+  import { getClients, createClient, getProductionLots, getLotJourney } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -30,8 +30,65 @@
     loading = true;
     errorMessage = '';
     try {
-      const clientData = await getClients();
-      clients = clientData || [];
+      const [clientData, rawLots] = await Promise.all([
+        getClients(),
+        getProductionLots()
+      ]);
+
+      const baseClients = clientData || [];
+      const lots = rawLots || [];
+
+      // Map client stats: active lots count and active WIP quantity
+      // Key: clientId, Value: { activeLotIds: Set, totalWip: number }
+      /** @type {Map<string, { activeLotIds: Set<string>, totalWip: number }>} */
+      const clientStats = new Map();
+      baseClients.forEach((/** @type {any} */ c) => {
+        clientStats.set(c.id, { activeLotIds: new Set(), totalWip: 0 });
+      });
+
+      // Fetch journey for each lot to trace active WIP step balances and associated clients
+      await Promise.all(
+        lots.map(async (/** @type {any} */ lot) => {
+          try {
+            const journey = await getLotJourney(lot.id);
+            if (!journey) return;
+
+            const activeSteps = journey.activeBalances
+              ? journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0)
+              : [];
+
+            if (activeSteps.length === 0 || !journey.movementHistory) return;
+
+            const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+
+            // Trace movements into active WIP steps to calculate client active lots & WIP quantity
+            journey.movementHistory.forEach((/** @type {any} */ m) => {
+              if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
+                const stats = clientStats.get(m.clientId);
+                if (stats) {
+                  stats.activeLotIds.add(lot.id);
+                  // Find step quantity
+                  const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
+                  if (stepObj) {
+                    stats.totalWip += stepObj.quantity;
+                  }
+                }
+              }
+            });
+          } catch {
+            // Ignore single lot fetch error
+          }
+        })
+      );
+
+      clients = baseClients.map((/** @type {any} */ c) => {
+        const stats = clientStats.get(c.id) || { activeLotIds: new Set(), totalWip: 0 };
+        return {
+          ...c,
+          activeLotsCount: stats.activeLotIds.size,
+          totalWipQuantity: stats.totalWip
+        };
+      });
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to fetch clients';
     } finally {
@@ -208,13 +265,20 @@
               <th class="px-6 py-3">Client Name</th>
               <th class="px-6 py-3">Phone Number</th>
               <th class="px-6 py-3">Client Type</th>
+              <th class="px-6 py-3 text-right">Active Lots</th>
+              <th class="px-6 py-3 text-right">Total Active Qty</th>
               <th class="px-6 py-3">Registered Date</th>
+              <th class="px-6 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant">
             {#each filteredClients as client}
-              <tr class="hover:bg-surface-container-low/50 transition-colors">
-                <td class="px-6 py-4 font-bold text-primary flex items-center gap-2">
+              <tr
+                onclick={() => window.location.href = `/lots?client=${client.id}`}
+                class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
+                title="View active lots for {client.name}"
+              >
+                <td class="px-6 py-4 font-bold text-primary flex items-center gap-2 group-hover:underline">
                   <span class="material-symbols-outlined text-[20px] text-primary/70">badge</span>
                   {client.name}
                 </td>
@@ -233,14 +297,30 @@
                     {client.clientType}
                   </span>
                 </td>
+                <td class="px-6 py-4 text-right font-mono font-bold text-on-surface">
+                  {client.activeLotsCount}
+                </td>
+                <td class="px-6 py-4 text-right font-mono font-bold text-primary">
+                  {client.totalWipQuantity.toLocaleString()} Pcs
+                </td>
                 <td class="px-6 py-4 text-xs text-on-surface-variant font-mono">
                   {new Date(client.createdAtUtc).toLocaleDateString()}
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <a
+                    href="/lots?client={client.id}"
+                    onclick={(e) => e.stopPropagation()}
+                    class="px-3 py-1.5 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg font-bold transition-colors inline-flex items-center gap-1"
+                  >
+                    <span class="material-symbols-outlined text-[14px]">reorder</span>
+                    View Lots
+                  </a>
                 </td>
               </tr>
             {/each}
             {#if clients.length === 0}
               <tr>
-                <td colspan="4" class="p-8 text-center text-on-surface-variant text-sm">
+                <td colspan="7" class="p-8 text-center text-on-surface-variant text-sm">
                   No clients registered yet. Click "Add New Client" above to create your first client.
                 </td>
               </tr>

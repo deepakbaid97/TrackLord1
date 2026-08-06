@@ -101,15 +101,19 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <!-- Active Lots -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
+      <a
+        href="/lots"
+        class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50"
+        title="View all lots in directory"
+      >
         <div class="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors">
           <span class="material-symbols-outlined text-[28px]">inventory_2</span>
         </div>
         <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Lots</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveLots}</div>
+          <div class="text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider">Active Lots</div>
+          <div class="text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight">{overview.totalActiveLots}</div>
         </div>
-      </div>
+      </a>
 
       <!-- Total WIP Quantity -->
       <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
@@ -168,11 +172,15 @@
             {#each overview.stepSummaries as step}
               {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
               {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
-              <div class="group">
+              <a
+                href="/lots?step={step.stepId}"
+                class="group block p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                title="View {step.stepName} lots in directory"
+              >
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant">{stepIconMap[step.stepCode] || 'work'}</span>
-                    <span class="font-bold text-sm text-on-surface">{step.stepName}</span>
+                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
+                    <span class="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
                     <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
                   </div>
                   <div class="flex items-center gap-3">
@@ -186,7 +194,7 @@
                     style="width: {Math.max(barPercent, step.totalWipQuantity > 0 ? 2 : 0)}%"
                   ></div>
                 </div>
-              </div>
+              </a>
             {/each}
           </div>
         {:else}
@@ -223,11 +231,15 @@
               </thead>
               <tbody class="divide-y divide-outline-variant/50">
                 {#each overview.clientSummaries as client}
-                  <tr class="hover:bg-surface-container-low/50 transition-colors">
+                  <tr
+                    onclick={() => window.location.href = `/lots?client=${client.clientId}`}
+                    class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
+                    title="View lots associated with {client.clientName}"
+                  >
                     <td class="py-3 pr-4">
                       <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-[18px] text-primary/70">badge</span>
-                        <span class="font-bold text-on-surface">{client.clientName}</span>
+                        <span class="material-symbols-outlined text-[18px] text-primary/70 group-hover:text-primary transition-colors">badge</span>
+                        <span class="font-bold text-on-surface group-hover:text-primary transition-colors">{client.clientName}</span>
                       </div>
                     </td>
                     <td class="py-3 pr-4">
