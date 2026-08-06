@@ -1,0 +1,43 @@
+using System;
+using TrackLord.Domain.Common;
+using TrackLord.Domain.Exceptions;
+
+namespace TrackLord.Domain.Aggregates.StepAggregate;
+
+public class ManufacturingStep : AggregateRoot<Guid>
+{
+    public string Code { get; private set; } = default!;
+    public string Name { get; private set; } = default!;
+    public int SequenceOrder { get; private set; }
+    public bool IsActive { get; private set; }
+    public Guid FactoryId { get; private set; }
+
+    private ManufacturingStep() { } // EF Core
+
+    public ManufacturingStep(Guid id, string code, string name, int sequenceOrder, Guid factoryId)
+    {
+        if (id == Guid.Empty) throw new DomainException("Step Id cannot be empty.");
+        if (string.IsNullOrWhiteSpace(code)) throw new DomainException("Step code cannot be empty.");
+        if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Step name cannot be empty.");
+        if (sequenceOrder < 0) throw new DomainException("Sequence order must be non-negative.");
+
+        Id = id;
+        Code = code.Trim().ToUpperInvariant();
+        Name = name.Trim();
+        SequenceOrder = sequenceOrder;
+        FactoryId = factoryId;
+        IsActive = true;
+    }
+
+    public void UpdateDetails(string name, int sequenceOrder)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Step name cannot be empty.");
+        if (sequenceOrder < 0) throw new DomainException("Sequence order must be non-negative.");
+
+        Name = name.Trim();
+        SequenceOrder = sequenceOrder;
+    }
+
+    public void Deactivate() => IsActive = false;
+    public void Activate() => IsActive = true;
+}
