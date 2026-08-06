@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
@@ -246,3 +247,40 @@ public class RejectionRecordRepository : IRejectionRecordRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
+
+public class ClientRepository : IClientRepository
+{
+    private readonly TrackLordDbContext _dbContext;
+
+    public ClientRepository(TrackLordDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Client?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Clients.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Client>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Clients
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(Client client, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Clients.AddAsync(client, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(Client client, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Clients.Update(client);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+

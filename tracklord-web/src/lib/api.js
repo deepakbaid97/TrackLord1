@@ -144,3 +144,21 @@ export async function editMaterialConsumption(consumptionId, data) {
   });
   return await handleResponse(response);
 }
+
+// 14. Fetch All Clients
+export async function getClients() {
+  const response = await fetch(`${API_BASE_URL}/Clients`);
+  return await handleResponse(response);
+}
+
+// 15. Create New Client
+/** @param {any} data */
+export async function createClient(data) {
+  const response = await fetch(`${API_BASE_URL}/Clients`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+

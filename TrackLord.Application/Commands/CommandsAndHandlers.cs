@@ -140,6 +140,7 @@ public record MoveLotCommand(
     Guid ToStepId,
     decimal Quantity,
     DateTime MovementDate,
+    Guid? ClientId = null,
     string? ClientName = null,
     string? CreatedBy = null,
     string? Remarks = null,
@@ -150,6 +151,7 @@ public class MoveLotCommandHandler : IRequestHandler<MoveLotCommand, Guid>
     private readonly IProductionLotRepository _lotRepository;
     private readonly IManufacturingStepRepository _stepRepository;
     private readonly IManufacturingMovementRepository _movementRepository;
+    private readonly IClientRepository _clientRepository;
     private readonly ILedgerReplayEngine _replayEngine;
 
     public MoveLotCommandHandler(
@@ -157,10 +159,21 @@ public class MoveLotCommandHandler : IRequestHandler<MoveLotCommand, Guid>
         IManufacturingStepRepository stepRepository,
         IManufacturingMovementRepository movementRepository,
         ILedgerReplayEngine replayEngine)
+        : this(lotRepository, stepRepository, movementRepository, null!, replayEngine)
+    {
+    }
+
+    public MoveLotCommandHandler(
+        IProductionLotRepository lotRepository,
+        IManufacturingStepRepository stepRepository,
+        IManufacturingMovementRepository movementRepository,
+        IClientRepository clientRepository,
+        ILedgerReplayEngine replayEngine)
     {
         _lotRepository = lotRepository;
         _stepRepository = stepRepository;
         _movementRepository = movementRepository;
+        _clientRepository = clientRepository;
         _replayEngine = replayEngine;
     }
 
@@ -184,6 +197,16 @@ public class MoveLotCommandHandler : IRequestHandler<MoveLotCommand, Guid>
             throw new DomainException($"Movement quantity must be positive. Provided: {request.Quantity}");
         }
 
+        string? clientName = request.ClientName;
+        if (_clientRepository != null && request.ClientId.HasValue && request.ClientId.Value != Guid.Empty)
+        {
+            var client = await _clientRepository.GetByIdAsync(request.ClientId.Value, cancellationToken);
+            if (client != null)
+            {
+                clientName = client.Name;
+            }
+        }
+
         var existingMovements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
 
         var newMovement = ManufacturingMovement.Create(
@@ -194,7 +217,8 @@ public class MoveLotCommandHandler : IRequestHandler<MoveLotCommand, Guid>
             request.Quantity,
             MovementType.StepTransfer,
             request.MovementDate,
-            request.ClientName,
+            request.ClientId,
+            clientName,
             request.CreatedBy,
             request.Remarks,
             request.ReferenceNumber);

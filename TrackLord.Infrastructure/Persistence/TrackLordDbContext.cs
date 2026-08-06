@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
@@ -20,6 +21,7 @@ public class TrackLordDbContext : DbContext
     public DbSet<ManufacturingStep> ManufacturingSteps => Set<ManufacturingStep>();
     public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
     public DbSet<RejectionRecord> RejectionRecords => Set<RejectionRecord>();
+    public DbSet<Client> Clients => Set<Client>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -16,6 +16,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>
     public DateTime MovementDate { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime UpdatedAtUtc { get; private set; }
+    public Guid? ClientId { get; private set; }
     public string? ClientName { get; private set; }
     public string? CreatedBy { get; private set; }
     public string? Remarks { get; private set; }
@@ -34,6 +35,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>
         decimal quantity,
         MovementType type,
         DateTime movementDate,
+        Guid? clientId = null,
         string? clientName = null,
         string? createdBy = null,
         string? remarks = null,
@@ -60,6 +62,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>
             MovementDate = movementDate,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
+            ClientId = clientId,
             ClientName = clientName,
             CreatedBy = createdBy,
             Remarks = remarks,

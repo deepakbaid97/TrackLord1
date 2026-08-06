@@ -17,6 +17,8 @@
     getMaterialLots,
     getLotJourney,
     getMaterialTraceability,
+    getClients,
+    createClient,
     createProductionLot,
     moveLot,
     createMaterialLot,
@@ -39,7 +41,10 @@
   let productionLots = $state([]);
   /** @type {Array<any>} */
   let materialLots = $state([]);
+  /** @type {Array<any>} */
+  let clients = $state([]);
   let selectedLotId = $state('');
+  let clientSearchQuery = $state('');
 
   // Selected Lot Details
   /** @type {any} */
@@ -53,6 +58,7 @@
   let isCreateMaterialModalOpen = $state(false);
   let isConsumeMaterialModalOpen = $state(false);
   let isRejectModalOpen = $state(false);
+  let isCreateClientModalOpen = $state(false);
 
   // Form States
   let createLotForm = $state({
@@ -68,9 +74,16 @@
     fromStepId: '',
     toStepId: '',
     quantity: 10,
-    clientName: 'ABC Garments',
+    clientId: '',
+    clientName: '',
     remarks: '',
     referenceNumber: ''
+  });
+
+  let createClientForm = $state({
+    name: '',
+    phoneNumber: '',
+    clientType: 'Buyer'
   });
 
   let createMaterialForm = $state({
@@ -155,6 +168,14 @@
       materialLots = matLots || [];
       if (materialLots.length > 0 && !consumeMaterialForm.materialLotId) {
         consumeMaterialForm.materialLotId = materialLots[0].id;
+      }
+
+      // 4. Fetch Clients
+      const clientData = await getClients();
+      clients = clientData || [];
+      if (clients.length > 0 && !moveForm.clientId) {
+        moveForm.clientId = clients[0].id;
+        moveForm.clientName = clients[0].name;
       }
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to connect to backend server at http://localhost:5217';
@@ -290,13 +311,15 @@
     e.preventDefault();
     errorMessage = '';
     try {
+      const selectedClient = clients.find((/** @type {any} */ c) => c.id === moveForm.clientId);
       const payload = {
         productionLotId: selectedLotId,
         fromStepId: moveForm.fromStepId,
         toStepId: moveForm.toStepId,
         quantity: Number(moveForm.quantity),
         movementDate: new Date().toISOString(),
-        clientName: moveForm.clientName.trim(),
+        clientId: moveForm.clientId || null,
+        clientName: selectedClient ? selectedClient.name : (moveForm.clientName || '').trim(),
         createdBy: 'Operator',
         remarks: moveForm.remarks,
         referenceNumber: moveForm.referenceNumber || `REF-${Math.floor(Math.random() * 900 + 100)}`
@@ -311,6 +334,34 @@
       await loadSelectedLotDetails(selectedLotId);
     } catch (/** @type {any} */ err) {
       errorMessage = err.message;
+    }
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleCreateClientSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        name: createClientForm.name.trim(),
+        phoneNumber: createClientForm.phoneNumber.trim(),
+        clientType: createClientForm.clientType
+      };
+
+      const res = await createClient(payload);
+      successMessage = `Client '${createClientForm.name}' created successfully!`;
+      isCreateClientModalOpen = false;
+      
+      const newClientId = res.id;
+      createClientForm = { name: '', phoneNumber: '', clientType: 'Buyer' };
+      
+      const clientData = await getClients();
+      clients = clientData || [];
+      if (newClientId) {
+        moveForm.clientId = newClientId;
+      }
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to create client';
     }
   }
 
@@ -534,6 +585,9 @@
       <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
         Report Rejection
       </Button>
+      <Button variant="outline" icon="person_add" onclick={() => isCreateClientModalOpen = true}>
+        New Client
+      </Button>
     </div>
   </section>
 
@@ -551,6 +605,12 @@
         class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'ledger' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
         Movements Ledger ({movementsLedgerRows.length})
+      </button>
+      <button
+        onclick={() => activeTab = 'clients'}
+        class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'clients' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+      >
+        Clients Directory ({clients.length})
       </button>
     </div>
   </div>
@@ -748,6 +808,144 @@
         </table>
       </div>
     </section>
+  {:else if activeTab === 'clients'}
+    <!-- Clients Directory View -->
+    <section class="space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div>
+          <h2 class="font-headline-md text-headline-md text-primary font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined text-[28px]">groups</span>
+            Client Directory & Customer Registry
+          </h2>
+          <p class="text-sm text-on-surface-variant mt-1">
+            Manage buyers, wholesalers, suppliers, and job workers for manufacturing movements.
+          </p>
+        </div>
+        <Button variant="primary" icon="person_add" onclick={() => isCreateClientModalOpen = true}>
+          Add New Client
+        </Button>
+      </div>
+
+      <!-- Client Statistics Summary -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
+          <div class="p-3 bg-primary/10 rounded-lg text-primary">
+            <span class="material-symbols-outlined text-[24px]">group</span>
+          </div>
+          <div>
+            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Clients</div>
+            <div class="text-2xl font-bold text-on-surface">{clients.length}</div>
+          </div>
+        </div>
+
+        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
+          <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
+            <span class="material-symbols-outlined text-[24px]">shopping_bag</span>
+          </div>
+          <div>
+            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Buyers</div>
+            <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Buyer').length}</div>
+          </div>
+        </div>
+
+        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
+          <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
+            <span class="material-symbols-outlined text-[24px]">storefront</span>
+          </div>
+          <div>
+            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Wholesalers</div>
+            <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Wholesaler').length}</div>
+          </div>
+        </div>
+
+        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
+          <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
+            <span class="material-symbols-outlined text-[24px]">precision_manufacturing</span>
+          </div>
+          <div>
+            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Job Workers</div>
+            <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Job Worker').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search and Filter Bar -->
+      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
+        <div class="relative flex-1">
+          <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+          <input
+            type="text"
+            bind:value={clientSearchQuery}
+            placeholder="Search clients by name, phone, or type..."
+            class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+      </div>
+
+      <!-- Clients List Table -->
+      <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="w-full overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                <th class="px-6 py-3">Client Name</th>
+                <th class="px-6 py-3">Phone Number</th>
+                <th class="px-6 py-3">Client Type</th>
+                <th class="px-6 py-3">Registered Date</th>
+                <th class="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant">
+              {#each clients.filter(c => !clientSearchQuery || c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) || (c.phoneNumber && c.phoneNumber.includes(clientSearchQuery)) || c.clientType.toLowerCase().includes(clientSearchQuery.toLowerCase())) as client}
+                <tr class="hover:bg-surface-container-low/50 transition-colors">
+                  <td class="px-6 py-4 font-bold text-primary flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px] text-primary/70">badge</span>
+                    {client.name}
+                  </td>
+                  <td class="px-6 py-4 font-mono text-on-surface text-xs">
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px] text-on-surface-variant">call</span>
+                      {client.phoneNumber || 'N/A'}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
+                      {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
+                       client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                       client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                       'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'}">
+                      {client.clientType}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-xs text-on-surface-variant font-mono">
+                    {new Date(client.createdAtUtc).toLocaleDateString()}
+                  </td>
+                  <td class="px-6 py-4 text-right">
+                    <button
+                      onclick={() => {
+                        moveForm.clientId = client.id;
+                        isMoveModalOpen = true;
+                      }}
+                      class="px-3 py-1.5 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span class="material-symbols-outlined text-[14px]">move_item</span>
+                      Select for Movement
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+              {#if clients.length === 0}
+                <tr>
+                  <td colspan="5" class="p-8 text-center text-on-surface-variant text-sm">
+                    No clients registered yet. Click "Add New Client" above to create your first client.
+                  </td>
+                </tr>
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   {/if}
 </main>
 
@@ -832,12 +1030,26 @@
       required={true}
     />
 
-    <Input
-      label="Client / Customer Name"
-      bind:value={moveForm.clientName}
-      placeholder="e.g. ABC Garments"
-      icon="badge"
-    />
+    <div class="space-y-1">
+      <div class="flex items-center justify-between">
+        <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer</label>
+        <button
+          type="button"
+          onclick={() => isCreateClientModalOpen = true}
+          class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-[14px]">add_circle</span>
+          Add New Client
+        </button>
+      </div>
+      <Select
+        id="move-client-select"
+        bind:value={moveForm.clientId}
+        options={clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))}
+        icon="badge"
+        required={true}
+      />
+    </div>
 
     <Input
       label="Reference Number"
@@ -1040,6 +1252,53 @@
       </Button>
       <Button variant="primary" type="submit" icon="save">
         Update Consumption
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 7: Add New Client -->
+<Modal bind:isOpen={isCreateClientModalOpen} title="Register New Client">
+  <form onsubmit={handleCreateClientSubmit} class="space-y-4">
+    <Input
+      label="Client / Company Name"
+      bind:value={createClientForm.name}
+      placeholder="e.g. Apex Textiles Ltd."
+      icon="badge"
+      required={true}
+    />
+
+    <Input
+      label="Phone Number"
+      type="tel"
+      bind:value={createClientForm.phoneNumber}
+      placeholder="e.g. +91 98765 43210"
+      icon="call"
+      required={true}
+    />
+
+    <Select
+      label="Client Type"
+      bind:value={createClientForm.clientType}
+      options={[
+        { label: 'Buyer', value: 'Buyer' },
+        { label: 'Wholesaler', value: 'Wholesaler' },
+        { label: 'Job Worker', value: 'Job Worker' },
+        { label: 'Customer', value: 'Customer' },
+        { label: 'Retailer', value: 'Retailer' },
+        { label: 'Supplier', value: 'Supplier' },
+        { label: 'Self', value: 'Self'}
+      ]}
+      icon="category"
+      required={true}
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isCreateClientModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="save">
+        Save Client
       </Button>
     </div>
   </form>

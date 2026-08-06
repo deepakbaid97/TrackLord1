@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
@@ -91,6 +92,7 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
         builder.Property(m => m.MovementDate).HasColumnName("movement_date").IsRequired();
         builder.Property(m => m.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(m => m.UpdatedAtUtc).HasColumnName("updated_at_utc").IsRequired();
+        builder.Property(m => m.ClientId).HasColumnName("client_id");
         builder.Property(m => m.ClientName).HasColumnName("client_name").HasMaxLength(150);
         builder.Property(m => m.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(m => m.Remarks).HasColumnName("remarks").HasMaxLength(500);
@@ -98,6 +100,11 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
         builder.Property(m => m.IsReversed).HasColumnName("is_reversed").IsRequired();
         builder.Property(m => m.ReversalMovementId).HasColumnName("reversal_movement_id");
         builder.Property(m => m.ReversalReason).HasColumnName("reversal_reason").HasMaxLength(500);
+
+        builder.HasOne<Client>()
+            .WithMany()
+            .HasForeignKey(m => m.ClientId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Crucial index for Ledger Replay Engine deterministic sorting
         builder.HasIndex(m => new { m.ProductionLotId, m.MovementDate, m.CreatedAtUtc, m.Id })
@@ -165,3 +172,22 @@ public class RejectionRecordConfiguration : IEntityTypeConfiguration<RejectionRe
         builder.HasIndex(r => r.ProductionLotId);
     }
 }
+
+public class ClientConfiguration : IEntityTypeConfiguration<Client>
+{
+    public void Configure(EntityTypeBuilder<Client> builder)
+    {
+        builder.ToTable("clients");
+
+        builder.HasKey(c => c.Id);
+
+        builder.Property(c => c.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+        builder.Property(c => c.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();
+        builder.Property(c => c.ClientType).HasColumnName("client_type").HasMaxLength(50).IsRequired();
+        builder.Property(c => c.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(c => c.IsActive).HasColumnName("is_active").IsRequired();
+
+        builder.HasIndex(c => c.Name);
+    }
+}
+

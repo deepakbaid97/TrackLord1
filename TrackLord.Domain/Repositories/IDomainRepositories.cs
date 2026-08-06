@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
@@ -61,3 +62,12 @@ public interface IRejectionRecordRepository
     Task AddAsync(RejectionRecord rejection, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RejectionRecord>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default);
 }
+
+public interface IClientRepository
+{
+    Task<Client?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Client>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(Client client, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Client client, CancellationToken cancellationToken = default);
+}
+

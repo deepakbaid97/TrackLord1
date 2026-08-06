@@ -22,6 +22,45 @@ namespace TrackLord.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TrackLord.Domain.Aggregates.ClientAggregate.Client", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("client_type");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("phone_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("clients", (string)null);
+                });
+
             modelBuilder.Entity("TrackLord.Domain.Aggregates.ConsumptionAggregate.MaterialConsumption", b =>
                 {
                     b.Property<Guid>("Id")
@@ -115,6 +154,10 @@ namespace TrackLord.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
                     b.Property<string>("ClientName")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
@@ -182,6 +225,8 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
 
                     b.HasIndex("ProductionLotId", "MovementDate", "CreatedAtUtc", "Id")
                         .HasDatabaseName("ix_movements_lot_replay_order");
@@ -369,6 +414,14 @@ namespace TrackLord.Infrastructure.Migrations
 
                     b.Navigation("InitialQuantity")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement", b =>
+                {
+                    b.HasOne("TrackLord.Domain.Aggregates.ClientAggregate.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("TrackLord.Domain.Aggregates.ProductionLotAggregate.ProductionLot", b =>

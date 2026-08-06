@@ -5,6 +5,7 @@
   const navItems = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'lots', label: 'Lots', icon: 'reorder' },
+    { id: 'clients', label: 'Clients', icon: 'groups' },
     { id: 'steps', label: 'Steps', icon: 'settings_input_component' },
     { id: 'inventory', label: 'Inventory', icon: 'inventory_2' }
   ];
