@@ -19,6 +19,16 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets all production lots.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var lots = await _mediator.Send(new GetAllProductionLotsQuery());
+        return Ok(lots);
+    }
+
+    /// <summary>
     /// Creates a new Production Lot with an immutable Lot Number.
     /// </summary>
     [HttpPost]
@@ -121,6 +131,28 @@ public record ReverseMovementRequest(string Reason, string? User);
 
 [ApiController]
 [Route("api/[controller]")]
+public class ManufacturingStepsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public ManufacturingStepsController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    /// <summary>
+    /// Gets all manufacturing steps.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var steps = await _mediator.Send(new GetAllManufacturingStepsQuery());
+        return Ok(steps);
+    }
+}
+
+[ApiController]
+[Route("api/[controller]")]
 public class MaterialConsumptionsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -128,6 +160,16 @@ public class MaterialConsumptionsController : ControllerBase
     public MaterialConsumptionsController(IMediator mediator)
     {
         _mediator = mediator;
+    }
+
+    /// <summary>
+    /// Gets all raw material lots.
+    /// </summary>
+    [HttpGet("lots")]
+    public async Task<IActionResult> GetAllMaterialLots()
+    {
+        var lots = await _mediator.Send(new GetAllMaterialLotsQuery());
+        return Ok(lots);
     }
 
     /// <summary>

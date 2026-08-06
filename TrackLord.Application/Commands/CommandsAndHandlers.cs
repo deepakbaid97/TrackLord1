@@ -103,7 +103,8 @@ public record CreateMaterialLotCommand(
     string LotNumber,
     Guid MaterialItemId,
     decimal InitialQuantity,
-    UnitType Unit) : IRequest<Guid>;
+    UnitType Unit,
+    string? MaterialName = null) : IRequest<Guid>;
 
 public class CreateMaterialLotCommandHandler : IRequestHandler<CreateMaterialLotCommand, Guid>
 {
@@ -125,7 +126,7 @@ public class CreateMaterialLotCommandHandler : IRequestHandler<CreateMaterialLot
         var lotNumberObj = MaterialLotNumber.Create(request.LotNumber);
         var initialQtyObj = new Quantity(request.InitialQuantity, request.Unit);
 
-        var lot = MaterialLot.Create(lotId, lotNumberObj, request.MaterialItemId, initialQtyObj);
+        var lot = MaterialLot.Create(lotId, lotNumberObj, request.MaterialItemId, initialQtyObj, request.MaterialName);
 
         await _materialLotRepository.AddAsync(lot, cancellationToken);
         return lotId;

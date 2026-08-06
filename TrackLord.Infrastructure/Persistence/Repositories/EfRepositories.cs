@@ -11,6 +11,7 @@ using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Entities;
 using TrackLord.Domain.Repositories;
+using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Infrastructure.Persistence.Repositories;
 
@@ -30,14 +31,14 @@ public class ProductionLotRepository : IProductionLotRepository
 
     public async Task<ProductionLot?> GetByLotNumberAsync(string lotNumber, CancellationToken cancellationToken = default)
     {
-        var trimmed = lotNumber.Trim();
-        return await _dbContext.ProductionLots.FirstOrDefaultAsync(p => p.LotNumber.Value == trimmed, cancellationToken);
+        var targetNumber = ProductionLotNumber.Create(lotNumber.Trim());
+        return await _dbContext.ProductionLots.FirstOrDefaultAsync(p => p.LotNumber == targetNumber, cancellationToken);
     }
 
     public async Task<bool> ExistsAsync(string lotNumber, CancellationToken cancellationToken = default)
     {
-        var trimmed = lotNumber.Trim();
-        return await _dbContext.ProductionLots.AnyAsync(p => p.LotNumber.Value == trimmed, cancellationToken);
+        var targetNumber = ProductionLotNumber.Create(lotNumber.Trim());
+        return await _dbContext.ProductionLots.AnyAsync(p => p.LotNumber == targetNumber, cancellationToken);
     }
 
     public async Task AddAsync(ProductionLot lot, CancellationToken cancellationToken = default)
@@ -74,14 +75,14 @@ public class MaterialLotRepository : IMaterialLotRepository
 
     public async Task<MaterialLot?> GetByLotNumberAsync(string lotNumber, CancellationToken cancellationToken = default)
     {
-        var trimmed = lotNumber.Trim();
-        return await _dbContext.MaterialLots.FirstOrDefaultAsync(m => m.LotNumber.Value == trimmed, cancellationToken);
+        var targetNumber = MaterialLotNumber.Create(lotNumber.Trim());
+        return await _dbContext.MaterialLots.FirstOrDefaultAsync(m => m.LotNumber == targetNumber, cancellationToken);
     }
 
     public async Task<bool> ExistsAsync(string lotNumber, CancellationToken cancellationToken = default)
     {
-        var trimmed = lotNumber.Trim();
-        return await _dbContext.MaterialLots.AnyAsync(m => m.LotNumber.Value == trimmed, cancellationToken);
+        var targetNumber = MaterialLotNumber.Create(lotNumber.Trim());
+        return await _dbContext.MaterialLots.AnyAsync(m => m.LotNumber == targetNumber, cancellationToken);
     }
 
     public async Task AddAsync(MaterialLot lot, CancellationToken cancellationToken = default)
@@ -94,6 +95,11 @@ public class MaterialLotRepository : IMaterialLotRepository
     {
         _dbContext.MaterialLots.Update(lot);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MaterialLot>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.MaterialLots.AsNoTracking().ToListAsync(cancellationToken);
     }
 }
 
@@ -114,6 +120,7 @@ public class ManufacturingMovementRepository : IManufacturingMovementRepository
     public async Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotAsync(Guid productionLotId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.ManufacturingMovements
+            .AsNoTracking()
             .Where(m => m.ProductionLotId == productionLotId)
             .OrderBy(m => m.MovementDate)
             .ThenBy(m => m.CreatedAtUtc)
@@ -150,13 +157,16 @@ public class ManufacturingStepRepository : IManufacturingStepRepository
 
     public async Task<ManufacturingStep?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
-        var upperCode = code.Trim().ToUpperInvariant();
-        return await _dbContext.ManufacturingSteps.FirstOrDefaultAsync(s => s.Code == upperCode, cancellationToken);
+        var trimmed = code.Trim().ToUpper();
+        return await _dbContext.ManufacturingSteps.FirstOrDefaultAsync(s => s.Code == trimmed, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ManufacturingStep>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.ManufacturingSteps.OrderBy(s => s.SequenceOrder).ToListAsync(cancellationToken);
+        return await _dbContext.ManufacturingSteps
+            .AsNoTracking()
+            .OrderBy(s => s.SequenceOrder)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(ManufacturingStep step, CancellationToken cancellationToken = default)
@@ -175,15 +185,10 @@ public class MaterialConsumptionRepository : IMaterialConsumptionRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default)
-    {
-        await _dbContext.MaterialConsumptions.AddAsync(consumption, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyList<MaterialConsumption>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.MaterialConsumptions
+            .AsNoTracking()
             .Where(c => c.ProductionLotId == productionLotId)
             .OrderBy(c => c.ConsumptionDate)
             .ToListAsync(cancellationToken);
@@ -192,9 +197,16 @@ public class MaterialConsumptionRepository : IMaterialConsumptionRepository
     public async Task<IReadOnlyList<MaterialConsumption>> GetByMaterialLotIdAsync(Guid materialLotId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.MaterialConsumptions
+            .AsNoTracking()
             .Where(c => c.MaterialLotId == materialLotId)
             .OrderBy(c => c.ConsumptionDate)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.MaterialConsumptions.AddAsync(consumption, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
 
@@ -207,17 +219,18 @@ public class RejectionRecordRepository : IRejectionRecordRepository
         _dbContext = dbContext;
     }
 
+    public async Task<IReadOnlyList<RejectionRecord>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.RejectionRecords
+            .AsNoTracking()
+            .Where(r => r.ProductionLotId == productionLotId)
+            .OrderBy(r => r.RejectionDate)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(RejectionRecord rejection, CancellationToken cancellationToken = default)
     {
         await _dbContext.RejectionRecords.AddAsync(rejection, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<RejectionRecord>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.RejectionRecords
-            .Where(r => r.ProductionLotId == productionLotId)
-            .OrderBy(r => r.RejectionDate)
-            .ToListAsync(cancellationToken);
     }
 }

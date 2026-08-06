@@ -80,6 +80,29 @@ public record FactoryDashboardDto(
     decimal TotalFactoryWip,
     IReadOnlyList<FactoryStepSummaryDto> Steps);
 
+public record ProductionLotSummaryDto(
+    Guid Id,
+    string LotNumber,
+    decimal InitialQuantity,
+    string Status,
+    DateTime CreatedAtUtc);
+
+public record ManufacturingStepDto(
+    Guid Id,
+    string Code,
+    string Name,
+    int SequenceOrder,
+    Guid FactoryId);
+
+public record MaterialLotDto(
+    Guid Id,
+    string LotNumber,
+    Guid MaterialItemId,
+    string? MaterialName,
+    decimal InitialQuantity,
+    decimal RemainingQuantity,
+    string Unit);
+
 
 // 2. Queries & Handlers
 
@@ -352,5 +375,82 @@ public class GetFactoryDashboardQueryHandler : IRequestHandler<GetFactoryDashboa
         var totalFactoryWip = stepSummaries.Sum(s => s.TotalWipQuantity);
 
         return new FactoryDashboardDto(request.FactoryId, totalFactoryWip, stepSummaries);
+    }
+}
+
+// GetAllProductionLotsQuery
+public record GetAllProductionLotsQuery : IRequest<IReadOnlyList<ProductionLotSummaryDto>>;
+
+public class GetAllProductionLotsQueryHandler : IRequestHandler<GetAllProductionLotsQuery, IReadOnlyList<ProductionLotSummaryDto>>
+{
+    private readonly IProductionLotRepository _lotRepository;
+
+    public GetAllProductionLotsQueryHandler(IProductionLotRepository lotRepository)
+    {
+        _lotRepository = lotRepository;
+    }
+
+    public async Task<IReadOnlyList<ProductionLotSummaryDto>> Handle(GetAllProductionLotsQuery request, CancellationToken cancellationToken)
+    {
+        var lots = await _lotRepository.GetAllAsync(cancellationToken);
+        return lots.Select(l => new ProductionLotSummaryDto(
+            l.Id,
+            l.LotNumber.Value,
+            l.InitialQuantity.Value,
+            l.Status.ToString(),
+            l.CreatedAtUtc
+        )).OrderByDescending(l => l.CreatedAtUtc).ToList();
+    }
+}
+
+// GetAllManufacturingStepsQuery
+public record GetAllManufacturingStepsQuery : IRequest<IReadOnlyList<ManufacturingStepDto>>;
+
+public class GetAllManufacturingStepsQueryHandler : IRequestHandler<GetAllManufacturingStepsQuery, IReadOnlyList<ManufacturingStepDto>>
+{
+    private readonly IManufacturingStepRepository _stepRepository;
+
+    public GetAllManufacturingStepsQueryHandler(IManufacturingStepRepository stepRepository)
+    {
+        _stepRepository = stepRepository;
+    }
+
+    public async Task<IReadOnlyList<ManufacturingStepDto>> Handle(GetAllManufacturingStepsQuery request, CancellationToken cancellationToken)
+    {
+        var steps = await _stepRepository.GetAllAsync(cancellationToken);
+        return steps.Select(s => new ManufacturingStepDto(
+            s.Id,
+            s.Code,
+            s.Name,
+            s.SequenceOrder,
+            s.FactoryId
+        )).OrderBy(s => s.SequenceOrder).ToList();
+    }
+}
+
+// GetAllMaterialLotsQuery
+public record GetAllMaterialLotsQuery : IRequest<IReadOnlyList<MaterialLotDto>>;
+
+public class GetAllMaterialLotsQueryHandler : IRequestHandler<GetAllMaterialLotsQuery, IReadOnlyList<MaterialLotDto>>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+
+    public GetAllMaterialLotsQueryHandler(IMaterialLotRepository materialLotRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+    }
+
+    public async Task<IReadOnlyList<MaterialLotDto>> Handle(GetAllMaterialLotsQuery request, CancellationToken cancellationToken)
+    {
+        var lots = await _materialLotRepository.GetAllAsync(cancellationToken);
+        return lots.Select(m => new MaterialLotDto(
+            m.Id,
+            m.LotNumber.Value,
+            m.MaterialItemId,
+            m.MaterialName,
+            m.InitialQuantity.Value,
+            m.CurrentQuantity.Value,
+            m.InitialQuantity.Unit.ToString()
+        )).OrderByDescending(m => m.Id).ToList();
     }
 }

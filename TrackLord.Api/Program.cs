@@ -75,15 +75,58 @@ using (var scope = app.Services.CreateScope())
         if (!dbContext.ManufacturingSteps.Any())
         {
             var factoryId = Guid.NewGuid();
-            dbContext.ManufacturingSteps.AddRange(
-                new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, factoryId),
-                new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "STITCH", "Stitching", 2, factoryId),
-                new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "WASH", "Washing", 3, factoryId),
-                new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "FIN", "Finishing", 4, factoryId),
-                new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "PACK", "Packing", 5, factoryId)
-            );
+            var stepCut = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, factoryId);
+            var stepStitch = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "STITCH", "Stitching", 2, factoryId);
+            var stepWash = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "WASH", "Washing", 3, factoryId);
+            var stepFin = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "FIN", "Finishing", 4, factoryId);
+            var stepPack = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "PACK", "Packing", 5, factoryId);
+
+            dbContext.ManufacturingSteps.AddRange(stepCut, stepStitch, stepWash, stepFin, stepPack);
             dbContext.SaveChanges();
-            logger.LogInformation("Database initialized and default manufacturing steps seeded.");
+
+            // Seed sample material lot
+            var matLotId = Guid.NewGuid();
+            var matLot = TrackLord.Domain.Aggregates.MaterialLotAggregate.MaterialLot.Create(
+                matLotId,
+                TrackLord.Domain.ValueObjects.MaterialLotNumber.Create("MAT-101"),
+                Guid.NewGuid(),
+                new TrackLord.Domain.ValueObjects.Quantity(500, TrackLord.Domain.Enums.UnitType.Meters),
+                "Denim Grey Cloth 300GSM");
+            dbContext.MaterialLots.Add(matLot);
+
+            // Seed sample production lot
+            var lotId = Guid.NewGuid();
+            var prodLot = TrackLord.Domain.Aggregates.ProductionLotAggregate.ProductionLot.Create(
+                lotId,
+                TrackLord.Domain.ValueObjects.ProductionLotNumber.Create("Lot-101"),
+                Guid.NewGuid(),
+                new TrackLord.Domain.ValueObjects.Quantity(95, TrackLord.Domain.Enums.UnitType.Pieces),
+                stepCut.Id,
+                "Operator1",
+                "ABC Garments Summer Order");
+            dbContext.ProductionLots.Add(prodLot);
+
+            // Seed movements
+            var now = DateTime.UtcNow;
+            dbContext.ManufacturingMovements.AddRange(
+                TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
+                    Guid.NewGuid(), lotId, null, stepCut.Id, 95, TrackLord.Domain.Enums.MovementType.InitialProduction, now.AddDays(-3), "System", "Initial Lot Creation"),
+                TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
+                    Guid.NewGuid(), lotId, stepCut.Id, stepStitch.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-2), "Operator1", "Moved to Stitching"),
+                TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
+                    Guid.NewGuid(), lotId, stepStitch.Id, stepWash.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-1), "Operator2", "Moved to Washing"),
+                TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
+                    Guid.NewGuid(), lotId, stepWash.Id, stepFin.Id, 80, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddHours(-4), "Supervisor", "Partial move to Finishing")
+            );
+
+            // Seed material consumption
+            dbContext.MaterialConsumptions.Add(
+                TrackLord.Domain.Aggregates.ConsumptionAggregate.MaterialConsumption.Create(
+                    Guid.NewGuid(), matLotId, lotId, stepCut.Id, 30, TrackLord.Domain.Enums.UnitType.Meters, now.AddDays(-3), "Operator1")
+            );
+
+            dbContext.SaveChanges();
+            logger.LogInformation("Database initialized and default manufacturing steps, production lot, and material lots seeded.");
         }
     }
     catch (Exception ex)

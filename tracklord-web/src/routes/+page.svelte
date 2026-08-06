@@ -1,264 +1,741 @@
 <script>
+  import { onMount } from 'svelte';
   import Header from '$lib/components/ui/Header.svelte';
   import Navbar from '$lib/components/ui/Navbar.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import Timeline from '$lib/components/ui/Timeline.svelte';
-  import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Table from '$lib/components/ui/Table.svelte';
 
-  // Active view tab (lots, ledger)
+  import {
+    getManufacturingSteps,
+    getProductionLots,
+    getMaterialLots,
+    getLotJourney,
+    getMaterialTraceability,
+    createProductionLot,
+    moveLot,
+    createMaterialLot,
+    consumeMaterial,
+    rejectItems,
+    reverseMovement
+  } from '$lib/api.js';
+
+  // App State
   let activeTab = $state('lots');
+  let loading = $state(true);
+  let errorMessage = $state('');
+  let successMessage = $state('');
+
+  // Data Collections
+  /** @type {Array<any>} */
+  let manufacturingSteps = $state([]);
+  /** @type {Array<any>} */
+  let productionLots = $state([]);
+  /** @type {Array<any>} */
+  let materialLots = $state([]);
+  let selectedLotId = $state('');
+
+  // Selected Lot Details
+  /** @type {any} */
+  let currentLotJourney = $state(null);
+  /** @type {any} */
+  let currentMaterialTraceability = $state(null);
+
+  // Modals state
+  let isCreateLotModalOpen = $state(false);
   let isMoveModalOpen = $state(false);
+  let isCreateMaterialModalOpen = $state(false);
+  let isConsumeMaterialModalOpen = $state(false);
+  let isRejectModalOpen = $state(false);
 
-  // Dynamic state for Lot-101
-  let lotInfo = $state({
-    lotNumber: 'Lot-101',
-    customer: 'ABC Garments',
-    currentStep: 'Washing',
-    age: '3 Days',
-    totalQuantity: 95
+  // Form States
+  let createLotForm = $state({
+    lotNumber: '',
+    initialQuantity: 100,
+    unit: 1, // Pieces
+    initialStepId: '',
+    createdBy: 'Operator',
+    remarks: ''
   });
 
-  // Step balances state (Lot-101 split inventory)
-  let inventoryDistribution = $state([
-    { label: 'Washing (Current)', value: 15, total: 95, color: 'primary' },
-    { label: 'Finishing (Queued)', value: 80, total: 95, color: 'outline' },
-    { label: 'Completed', value: 5, total: 95, color: 'secondary' }
-  ]);
-
-  // Timeline steps state
-  let timelineSteps = $state([
-    { id: '1', name: 'Cutting', status: 'completed', subtitle: 'Completed (1 Day)', icon: 'content_cut' },
-    { id: '2', name: 'Stitching', status: 'completed', subtitle: 'Completed (2 Days)', icon: 'webhook' },
-    { id: '3', name: 'Washing', status: 'in-progress', subtitle: 'In Progress', icon: 'local_laundry_service' },
-    { id: '4', name: 'Finishing', status: 'pending', subtitle: 'Pending', icon: 'iron' },
-    { id: '5', name: 'Packing', status: 'pending', subtitle: 'Pending', icon: 'inventory_2' }
-  ]);
-
-  // Raw Material Consumptions state
-  let materials = $state([
-    { name: 'Grey Cloth', value: '30m', icon: 'texture' },
-    { name: 'Buttons', value: '100', icon: 'radio_button_checked' },
-    { name: 'Labels', value: '95', icon: 'label' }
-  ]);
-
-  // Movements Audit Ledger state
-  let movementsLedger = $state([
-    { id: 'MOV-101', date: '2026-08-04 09:30', from: 'Initial Creation', to: 'Cutting', qty: '95 Pcs', user: 'Operator1', ref: 'INIT-Lot-101' },
-    { id: 'MOV-102', date: '2026-08-05 14:00', from: 'Cutting', to: 'Stitching', qty: '95 Pcs', user: 'Operator2', ref: 'STITCH-001' },
-    { id: 'MOV-103', date: '2026-08-06 10:15', from: 'Stitching', to: 'Washing', qty: '95 Pcs', user: 'Operator3', ref: 'WASH-001' },
-    { id: 'MOV-104', date: '2026-08-06 16:45', from: 'Washing', to: 'Finishing', qty: '80 Pcs', user: 'Supervisor', ref: 'FIN-001' }
-  ]);
-
-  const movementTableColumns = [
-    { key: 'id', label: 'Movement ID' },
-    { key: 'date', label: 'Movement Date' },
-    { key: 'from', label: 'From Step' },
-    { key: 'to', label: 'To Step' },
-    { key: 'qty', label: 'Quantity' },
-    { key: 'user', label: 'User' },
-    { key: 'ref', label: 'Reference' }
-  ];
-
-  // Move Lot Modal Form state
   let moveForm = $state({
-    fromStep: 'Washing',
-    toStep: 'Finishing',
-    quantity: 15,
-    remarks: 'Transfer remaining WIP to Finishing'
+    fromStepId: '',
+    toStepId: '',
+    quantity: 10,
+    remarks: '',
+    referenceNumber: ''
   });
 
-  function handleMoveSubmit(e) {
-    e.preventDefault();
-    const qty = Number(moveForm.quantity);
-    if (qty <= 0) return alert('Quantity must be greater than 0');
-    if (qty > inventoryDistribution[0].value) return alert('Cannot move more than available balance in Washing!');
+  let createMaterialForm = $state({
+    lotNumber: '',
+    materialName: '',
+    initialQuantity: 500,
+    unit: 2 // Meters
+  });
 
-    // Deduct from Washing, add to Finishing
-    inventoryDistribution[0].value -= qty;
-    inventoryDistribution[1].value += qty;
+  let consumeMaterialForm = $state({
+    materialLotId: '',
+    stepId: '',
+    quantityConsumed: 25,
+    unit: 2, // Meters
+    recordedBy: 'Operator'
+  });
 
-    // Add new movement to audit ledger
-    const now = new Date();
-    const formattedDate = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0].substring(0, 5)}`;
-    movementsLedger = [
-      {
-        id: `MOV-${105 + movementsLedger.length}`,
-        date: formattedDate,
-        from: moveForm.fromStep,
-        to: moveForm.toStep,
-        qty: `${qty} Pcs`,
-        user: 'Current User',
-        ref: `REF-${Math.floor(Math.random() * 900 + 100)}`
-      },
-      ...movementsLedger
-    ];
+  let rejectForm = $state({
+    stepId: '',
+    quantityRejected: 1,
+    reason: 'Damaged during operation',
+    createdBy: 'Inspector'
+  });
 
-    // If washing reaches 0 balance, update timeline status
-    if (inventoryDistribution[0].value === 0) {
-      timelineSteps[2].status = 'completed';
-      timelineSteps[2].subtitle = 'Completed';
-      timelineSteps[3].status = 'in-progress';
-      timelineSteps[3].subtitle = 'In Progress';
-      lotInfo.currentStep = 'Finishing';
+  // Step Icon mapping helper
+  /** @type {Record<string, string>} */
+  const stepIconMap = {
+    'CUT': 'content_cut',
+    'STITCH': 'webhook',
+    'WASH': 'local_laundry_service',
+    'FIN': 'iron',
+    'PACK': 'inventory_2'
+  };
+
+  onMount(async () => {
+    await refreshAllData();
+  });
+
+  async function refreshAllData() {
+    loading = true;
+    errorMessage = '';
+    try {
+      // 1. Fetch Steps
+      const steps = await getManufacturingSteps();
+      manufacturingSteps = steps || [];
+
+      // Set default step ID for forms if available
+      if (manufacturingSteps.length > 0) {
+        if (!createLotForm.initialStepId) createLotForm.initialStepId = manufacturingSteps[0].id;
+        if (!moveForm.fromStepId) moveForm.fromStepId = manufacturingSteps[0].id;
+        if (!moveForm.toStepId && manufacturingSteps.length > 1) moveForm.toStepId = manufacturingSteps[1].id;
+        if (!consumeMaterialForm.stepId) consumeMaterialForm.stepId = manufacturingSteps[0].id;
+        if (!rejectForm.stepId) rejectForm.stepId = manufacturingSteps[0].id;
+      }
+
+      // 2. Fetch Lots
+      const lots = await getProductionLots();
+      productionLots = lots || [];
+
+      if (productionLots.length > 0) {
+        if (!selectedLotId || !productionLots.some((/** @type {any} */ l) => l.id === selectedLotId)) {
+          selectedLotId = productionLots[0].id;
+        }
+        await loadSelectedLotDetails(selectedLotId);
+      } else {
+        selectedLotId = '';
+        currentLotJourney = null;
+        currentMaterialTraceability = null;
+      }
+
+      // 3. Fetch Raw Material Lots
+      const matLots = await getMaterialLots();
+      materialLots = matLots || [];
+      if (materialLots.length > 0 && !consumeMaterialForm.materialLotId) {
+        consumeMaterialForm.materialLotId = materialLots[0].id;
+      }
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to connect to backend server at http://localhost:5217';
+    } finally {
+      loading = false;
+    }
+  }
+
+  /** @param {string} lotId */
+  async function loadSelectedLotDetails(lotId) {
+    if (!lotId) return;
+    try {
+      const journey = await getLotJourney(lotId);
+      currentLotJourney = journey;
+
+      const trace = await getMaterialTraceability(lotId);
+      currentMaterialTraceability = trace;
+    } catch (/** @type {any} */ err) {
+      errorMessage = `Failed to load details for lot: ${err.message}`;
+    }
+  }
+
+  /** @param {string} newLotId */
+  async function handleLotChange(newLotId) {
+    selectedLotId = newLotId;
+    await loadSelectedLotDetails(newLotId);
+  }
+
+  // Calculated properties from real API data
+  let activeWipBalances = $derived.by(() => {
+    if (!currentLotJourney || !currentLotJourney.activeBalances) return [];
+    return currentLotJourney.activeBalances;
+  });
+
+  let timelineSteps = $derived.by(() => {
+    if (!manufacturingSteps || manufacturingSteps.length === 0) return [];
+    const stepBalancesMap = new Map();
+    if (activeWipBalances) {
+      activeWipBalances.forEach((/** @type {any} */ b) => stepBalancesMap.set(b.stepId, b.quantity));
     }
 
-    isMoveModalOpen = false;
+    // Find the latest step that has quantity
+    let activeStepIndex = -1;
+    manufacturingSteps.forEach((s, idx) => {
+      if (stepBalancesMap.has(s.id) && stepBalancesMap.get(s.id) > 0) {
+        activeStepIndex = idx;
+      }
+    });
+
+    return manufacturingSteps.map((step, idx) => {
+      const qty = stepBalancesMap.get(step.id) || 0;
+      /** @type {'completed' | 'in-progress' | 'pending'} */
+      let status = 'pending';
+      let subtitle = 'Pending';
+
+      if (qty > 0) {
+        status = 'in-progress';
+        subtitle = `${qty} Units In Progress`;
+      } else if (activeStepIndex >= 0 && idx < activeStepIndex) {
+        status = 'completed';
+        subtitle = 'Completed';
+      }
+
+      return {
+        id: step.id,
+        name: step.name,
+        status: status,
+        subtitle: subtitle,
+        icon: stepIconMap[step.code] || 'work'
+      };
+    });
+  });
+
+  let movementsLedgerRows = $derived.by(() => {
+    if (!currentLotJourney || !currentLotJourney.movementHistory) return [];
+    return currentLotJourney.movementHistory.map((/** @type {any} */ m) => ({
+      id: m.movementId,
+      date: new Date(m.movementDate).toLocaleString(),
+      from: m.fromStepName || 'Initial Creation',
+      to: m.toStepName,
+      qty: `${m.quantity} Pcs`,
+      type: m.movementType,
+      user: m.createdBy || 'System',
+      remarks: m.remarks || '-',
+      isReversed: m.isReversed
+    }));
+  });
+
+  // Form Handlers
+  /** @param {SubmitEvent} e */
+  async function handleCreateLotSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        lotNumber: createLotForm.lotNumber.trim(),
+        itemId: '00000000-0000-0000-0000-000000000001',
+        initialQuantity: Number(createLotForm.initialQuantity),
+        unit: Number(createLotForm.unit),
+        initialStepId: createLotForm.initialStepId,
+        createdBy: createLotForm.createdBy,
+        remarks: createLotForm.remarks
+      };
+
+      const res = await createProductionLot(payload);
+      successMessage = `Production Lot '${createLotForm.lotNumber}' created successfully!`;
+      isCreateLotModalOpen = false;
+      createLotForm.lotNumber = '';
+
+      await refreshAllData();
+      if (res && res.id) {
+        selectedLotId = res.id;
+        await loadSelectedLotDetails(res.id);
+      }
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleMoveSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        productionLotId: selectedLotId,
+        fromStepId: moveForm.fromStepId,
+        toStepId: moveForm.toStepId,
+        quantity: Number(moveForm.quantity),
+        movementDate: new Date().toISOString(),
+        createdBy: 'Operator',
+        remarks: moveForm.remarks,
+        referenceNumber: moveForm.referenceNumber || `REF-${Math.floor(Math.random() * 900 + 100)}`
+      };
+
+      await moveLot(payload);
+      successMessage = 'Movement recorded successfully!';
+      isMoveModalOpen = false;
+      moveForm.remarks = '';
+      moveForm.referenceNumber = '';
+
+      await loadSelectedLotDetails(selectedLotId);
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleCreateMaterialSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        lotNumber: createMaterialForm.lotNumber.trim(),
+        materialItemId: '00000000-0000-0000-0000-000000000002',
+        materialName: createMaterialForm.materialName.trim(),
+        initialQuantity: Number(createMaterialForm.initialQuantity),
+        unit: Number(createMaterialForm.unit)
+      };
+
+      await createMaterialLot(payload);
+      successMessage = `Raw Material Lot '${createMaterialForm.lotNumber}' registered successfully!`;
+      isCreateMaterialModalOpen = false;
+      createMaterialForm.lotNumber = '';
+      createMaterialForm.materialName = '';
+
+      const matLots = await getMaterialLots();
+      materialLots = matLots || [];
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleConsumeMaterialSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        productionLotId: selectedLotId,
+        materialLotId: consumeMaterialForm.materialLotId,
+        stepId: consumeMaterialForm.stepId,
+        quantityConsumed: Number(consumeMaterialForm.quantityConsumed),
+        unit: Number(consumeMaterialForm.unit),
+        consumptionDate: new Date().toISOString(),
+        createdBy: consumeMaterialForm.recordedBy
+      };
+
+      await consumeMaterial(payload);
+      successMessage = 'Material consumption recorded successfully!';
+      isConsumeMaterialModalOpen = false;
+
+      await loadSelectedLotDetails(selectedLotId);
+      const matLots = await getMaterialLots();
+      materialLots = matLots || [];
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleRejectSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        stepId: rejectForm.stepId,
+        quantityRejected: Number(rejectForm.quantityRejected),
+        reason: rejectForm.reason,
+        rejectionDate: new Date().toISOString(),
+        createdBy: rejectForm.createdBy
+      };
+
+      await rejectItems(selectedLotId, payload);
+      successMessage = 'Item rejection recorded successfully!';
+      isRejectModalOpen = false;
+
+      await loadSelectedLotDetails(selectedLotId);
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {string} movementId */
+  async function handleReverseMovement(movementId) {
+    if (!confirm('Are you sure you want to reverse this movement transaction?')) return;
+    errorMessage = '';
+    try {
+      await reverseMovement(movementId, {
+        reason: 'Reversal initiated from audit ledger UI',
+        user: 'Supervisor'
+      });
+      successMessage = 'Movement transaction reversed successfully!';
+      await loadSelectedLotDetails(selectedLotId);
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
   }
 </script>
 
 <!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-margin-mobile h-touch-target-min border-b border-outline-variant">
-  <div class="flex items-center gap-2 cursor-pointer hover:bg-surface-container-high transition-colors p-2 rounded-full active:opacity-80">
-    <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
+<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
+  <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
+      <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
+    </div>
+    <div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="text-xs text-on-surface-variant">Garment Manufacturing WIP Traceability</div>
+    </div>
   </div>
-  <div class="font-headline-md text-headline-md font-bold text-primary">PRO-FAB ERP</div>
-  <div class="flex items-center gap-2 cursor-pointer hover:bg-surface-container-high transition-colors p-2 rounded-full active:opacity-80">
-    <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+
+  <div class="flex items-center gap-2">
+    <button
+      onclick={() => refreshAllData()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+    >
+      <span class="material-symbols-outlined text-[16px]">refresh</span>
+      Refresh Data
+    </button>
   </div>
 </header>
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-margin-mobile md:p-margin-desktop space-y-8 pt-16 pb-24 md:pb-8">
-  <!-- View Mode Sub-tabs -->
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20 pb-24 md:pb-8">
+
+  <!-- Notification Banner -->
+  {#if errorMessage}
+    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-red-500">error</span>
+        <span>{errorMessage}</span>
+      </div>
+      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+  {/if}
+
+  {#if successMessage}
+    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-emerald-500">check_circle</span>
+        <span>{successMessage}</span>
+      </div>
+      <button onclick={() => successMessage = ''} class="text-emerald-500 hover:text-emerald-700">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+  {/if}
+
+  <!-- Action Bar & Lot Selector -->
+  <section class="bg-surface-container-low p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+      <label for="lot-select-dropdown" class="text-xs font-bold uppercase tracking-wider text-on-surface-variant font-mono">Select Lot:</label>
+      <select
+        id="lot-select-dropdown"
+        value={selectedLotId}
+        onchange={(e) => handleLotChange(/** @type {HTMLSelectElement} */ (e.target).value)}
+        class="bg-surface border border-outline-variant rounded-lg px-4 py-2 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20 min-w-[220px] cursor-pointer"
+      >
+        {#each productionLots as lot}
+          <option value={lot.id}>
+            {lot.lotNumber} ({lot.initialQuantity} Pcs - {lot.status})
+          </option>
+        {/each}
+        {#if productionLots.length === 0}
+          <option value="">No lots available</option>
+        {/if}
+      </select>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex flex-wrap gap-2 w-full md:w-auto">
+      <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
+        New Production Lot
+      </Button>
+      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={() => isMoveModalOpen = true}>
+        Move Quantity
+      </Button>
+      <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
+        Register Material
+      </Button>
+      <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
+        Log Consumption
+      </Button>
+      <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
+        Report Rejection
+      </Button>
+    </div>
+  </section>
+
+  <!-- View Mode Tabs -->
   <div class="flex items-center justify-between border-b border-outline-variant pb-2">
     <div class="flex gap-2">
       <button
         onclick={() => activeTab = 'lots'}
         class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'lots' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        Lot Details
+        Lot Journey & WIP
       </button>
       <button
         onclick={() => activeTab = 'ledger'}
         class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'ledger' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        Movements Ledger ({movementsLedger.length})
+        Movements Ledger ({movementsLedgerRows.length})
       </button>
     </div>
-
-    <button
-      onclick={() => location.reload()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Reset
-    </button>
   </div>
 
-  {#if activeTab === 'lots'}
-    <!-- Header Info -->
-    <section class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 bg-surface-container-low p-card-padding rounded-xl border border-outline-variant shadow-sm">
-      <div>
-        <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">{lotInfo.lotNumber}</h1>
-        <p class="font-body-md text-body-md text-on-surface-variant mt-1">Customer: <span class="font-semibold text-on-surface">{lotInfo.customer}</span></p>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        <div class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-stat-label text-stat-label flex items-center gap-1">
-          <span class="material-symbols-outlined text-[16px]">local_laundry_service</span>
-          Current Step: {lotInfo.currentStep}
+  {#if loading}
+    <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
+      <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
+      <span>Fetching live data from backend API...</span>
+    </div>
+  {:else if activeTab === 'lots'}
+    {#if currentLotJourney}
+      <!-- Header Info -->
+      <section class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div>
+          <div class="flex items-center gap-3">
+            <h1 class="font-headline-lg text-headline-lg text-primary font-bold">{currentLotJourney.lotNumber}</h1>
+            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
+              {currentLotJourney.status}
+            </span>
+          </div>
+          <p class="text-sm text-on-surface-variant mt-1">
+            Lot ID: <span class="font-mono text-xs">{currentLotJourney.lotId}</span>
+          </p>
         </div>
-        <div class="bg-surface-variant text-on-surface-variant px-3 py-1 rounded-full font-stat-label text-stat-label flex items-center gap-1">
-          <span class="material-symbols-outlined text-[16px]">schedule</span>
-          Age: {lotInfo.age}
-        </div>
-      </div>
-    </section>
 
-    <!-- Grid Content -->
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-      <!-- Journey Timeline -->
-      <section class="md:col-span-4 bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
-        <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">Journey Timeline</h2>
-        <Timeline steps={timelineSteps} />
+        <div class="flex flex-wrap gap-3">
+          <div class="bg-surface-container-low border border-outline-variant px-4 py-2 rounded-lg text-center">
+            <div class="text-xs text-on-surface-variant font-mono uppercase">Total WIP Qty</div>
+            <div class="text-xl font-bold text-on-surface">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</div>
+          </div>
+          <div class="bg-surface-container-low border border-outline-variant px-4 py-2 rounded-lg text-center">
+            <div class="text-xs text-on-surface-variant font-mono uppercase">Created At</div>
+            <div class="text-sm font-semibold text-on-surface">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</div>
+          </div>
+        </div>
       </section>
 
-      <div class="md:col-span-8 space-y-6">
-        <!-- Current Inventory Distribution -->
-        <section class="bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
-          <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">Inventory Distribution</h2>
-          <div class="space-y-4">
-            {#each inventoryDistribution as dist}
-              <div>
-                <div class="flex justify-between font-stat-label text-stat-label mb-1">
-                  <span>{dist.label}</span>
-                  <span>{dist.value} Units</span>
-                </div>
-                <div class="w-full bg-surface-variant rounded-full h-2">
-                  <div
-                    class="{dist.color === 'primary' ? 'bg-primary' : dist.color === 'secondary' ? 'bg-secondary' : 'bg-outline'} h-2 rounded-full transition-all duration-500"
-                    style="width: {dist.total > 0 ? (dist.value / dist.total) * 100 : 0}%"
-                  ></div>
-                </div>
-              </div>
-            {/each}
-          </div>
+      <!-- Grid Content -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <!-- Journey Timeline -->
+        <section class="md:col-span-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+          <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">Journey Timeline</h2>
+          <Timeline steps={timelineSteps} />
         </section>
 
-        <!-- Material Consumption -->
-        <section class="bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
-          <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">Material Consumption</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {#each materials as mat}
-              <div class="bg-surface-container-low p-4 rounded-lg border border-outline-variant flex flex-col items-center justify-center text-center">
-                <span class="material-symbols-outlined text-[32px] text-tertiary mb-2">{mat.icon}</span>
-                <div class="font-display-metrics text-display-metrics text-on-surface">{mat.value}</div>
-                <div class="font-label-caps text-label-caps text-on-surface-variant uppercase">{mat.name}</div>
+        <div class="md:col-span-8 space-y-6">
+          <!-- Current Inventory Distribution -->
+          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">WIP Distribution Across Steps</h2>
+            <div class="space-y-4">
+              {#each manufacturingSteps as step}
+                {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
+                {@const qty = balanceObj ? balanceObj.quantity : 0}
+                {@const totalActive = activeWipBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0)}
+                <div>
+                  <div class="flex justify-between font-stat-label text-stat-label mb-1">
+                    <span class="font-bold text-on-surface">{step.name} ({step.code})</span>
+                    <span class="font-mono text-primary">{qty} Pcs</span>
+                  </div>
+                  <div class="w-full bg-surface-variant rounded-full h-2.5">
+                    <div
+                      class="bg-primary h-2.5 rounded-full transition-all duration-500"
+                      style="width: {totalActive > 0 ? (qty / totalActive) * 100 : 0}%"
+                    ></div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <!-- Raw Material Traceability -->
+          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+            <div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-4">
+              <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+              <button
+                onclick={() => isConsumeMaterialModalOpen = true}
+                class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[16px]">add</span>
+                Log Material
+              </button>
+            </div>
+
+            {#if currentMaterialTraceability && currentMaterialTraceability.consumptions && currentMaterialTraceability.consumptions.length > 0}
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {#each currentMaterialTraceability.consumptions as mat}
+                  <div class="bg-surface-container-low p-4 rounded-lg border border-outline-variant flex flex-col justify-between">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="material-symbols-outlined text-tertiary">texture</span>
+                      <span class="font-bold text-sm text-on-surface">{mat.materialLotNumber}</span>
+                    </div>
+                    <div class="text-2xl font-bold text-primary">{mat.quantityConsumed} {mat.unit}</div>
+                    <div class="text-xs text-on-surface-variant mt-2 font-mono">
+                      Step: {mat.stepName}<br/>
+                      Date: {new Date(mat.consumptionDate).toLocaleDateString()}
+                    </div>
+                  </div>
+                {/each}
               </div>
-            {/each}
-          </div>
-        </section>
+            {:else}
+              <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-lg border border-dashed border-outline-variant text-sm">
+                No raw material consumptions logged for this production lot yet.
+              </div>
+            {/if}
+          </section>
+        </div>
       </div>
-    </div>
-
-    <!-- Sticky Bottom Action -->
-    <div class="fixed bottom-0 md:bottom-auto md:relative left-0 w-full md:w-auto p-4 md:p-0 bg-surface md:bg-transparent border-t md:border-t-0 border-outline-variant flex justify-end z-40 mb-16 md:mb-0">
-      <button
-        onclick={() => isMoveModalOpen = true}
-        class="w-full md:w-auto h-touch-target-min px-8 bg-[#2563EB] text-white font-stat-label text-stat-label rounded-lg flex items-center justify-center gap-2 hover:bg-primary-fixed hover:text-on-primary-fixed transition-colors shadow-sm cursor-pointer"
-      >
-        <span class="material-symbols-outlined">iron</span>
-        Move to Finishing
-      </button>
-    </div>
+    {:else}
+      <div class="p-12 text-center text-on-surface-variant bg-surface rounded-xl border border-outline-variant">
+        No lot selected or no production lots found. Click "New Production Lot" above to create one.
+      </div>
+    {/if}
   {:else if activeTab === 'ledger'}
     <!-- Ledger Table -->
-    <section class="bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm space-y-4">
-      <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2">Inventory Movement Ledger</h2>
-      <Table columns={movementTableColumns} rows={movementsLedger} />
+    <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b border-outline-variant pb-2">
+        <h2 class="font-headline-md text-headline-md">Inventory Movement Ledger</h2>
+        <span class="text-xs text-on-surface-variant font-mono">Total Transactions: {movementsLedgerRows.length}</span>
+      </div>
+
+      <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+              <th class="px-4 py-3">Movement Date</th>
+              <th class="px-4 py-3">Type</th>
+              <th class="px-4 py-3">From Step</th>
+              <th class="px-4 py-3">To Step</th>
+              <th class="px-4 py-3">Quantity</th>
+              <th class="px-4 py-3">User</th>
+              <th class="px-4 py-3">Remarks</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+            {#if movementsLedgerRows.length === 0}
+              <tr>
+                <td colspan="8" class="px-4 py-8 text-center text-on-surface-variant">
+                  No movements recorded for this production lot.
+                </td>
+              </tr>
+            {:else}
+              {#each movementsLedgerRows as m}
+                <tr class="hover:bg-surface-container-low/60 transition-colors {m.isReversed ? 'line-through opacity-50 bg-red-50/20' : ''}">
+                  <td class="px-4 py-3 whitespace-nowrap text-xs font-mono">{m.date}</td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-primary-container text-on-primary-container">
+                      {m.type}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">{m.from}</td>
+                  <td class="px-4 py-3 whitespace-nowrap">{m.to}</td>
+                  <td class="px-4 py-3 whitespace-nowrap font-bold text-primary">{m.qty}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-xs">{m.user}</td>
+                  <td class="px-4 py-3">{m.remarks}</td>
+                  <td class="px-4 py-3 text-right whitespace-nowrap">
+                    {#if !m.isReversed && m.type !== 'InitialProduction'}
+                      <button
+                        onclick={() => handleReverseMovement(m.id)}
+                        class="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300 rounded font-semibold transition-colors cursor-pointer"
+                      >
+                        Reverse
+                      </button>
+                    {:else if m.isReversed}
+                      <span class="text-xs text-red-500 font-bold">REVERSED</span>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            {/if}
+          </tbody>
+        </table>
+      </div>
     </section>
   {/if}
 </main>
 
-<!-- Interactive Move Lot Modal -->
-<Modal bind:isOpen={isMoveModalOpen} title="Move Production Lot Quantity">
-  <form onsubmit={handleMoveSubmit} class="space-y-4">
-    <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant text-xs font-label-caps space-y-1">
-      <div>Lot Identity: <span class="font-bold text-primary">Lot-101 (IMMUTABLE)</span></div>
-      <div>Current Washing Balance: <span class="font-bold text-secondary">{inventoryDistribution[0].value} Pcs</span></div>
-    </div>
+<!-- Modal 1: Create Production Lot -->
+<Modal bind:isOpen={isCreateLotModalOpen} title="Create New Production Lot">
+  <form onsubmit={handleCreateLotSubmit} class="space-y-4">
+    <Input
+      label="Production Lot Number"
+      bind:value={createLotForm.lotNumber}
+      placeholder="e.g. LOT-2026-002"
+      icon="tag"
+      required={true}
+    />
 
     <Input
-      label="Source Step"
-      value={moveForm.fromStep}
-      disabled={true}
-      icon="local_laundry_service"
+      label="Initial Quantity (Pcs)"
+      type="number"
+      bind:value={createLotForm.initialQuantity}
+      placeholder="e.g. 100"
+      icon="numbers"
+      required={true}
     />
 
     <Select
-      label="Destination Step"
-      bind:value={moveForm.toStep}
-      options={[
-        { label: 'Finishing', value: 'Finishing' },
-        { label: 'Packing', value: 'Packing' }
-      ]}
-      icon="iron"
+      label="Initial Manufacturing Step"
+      bind:value={createLotForm.initialStepId}
+      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="factory"
+      required={true}
+    />
+
+    <Input
+      label="Created By"
+      bind:value={createLotForm.createdBy}
+      placeholder="e.g. Production Manager"
+      icon="person"
+    />
+
+    <Input
+      label="Remarks / Notes"
+      bind:value={createLotForm.remarks}
+      placeholder="Optional notes..."
+      icon="notes"
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isCreateLotModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="send">
+        Create Lot
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 2: Move Production Lot Quantity -->
+<Modal bind:isOpen={isMoveModalOpen} title="Move Production Lot Quantity">
+  <form onsubmit={handleMoveSubmit} class="space-y-4">
+    <Select
+      label="Source Step (From)"
+      bind:value={moveForm.fromStepId}
+      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="logout"
+      required={true}
+    />
+
+    <Select
+      label="Destination Step (To)"
+      bind:value={moveForm.toStepId}
+      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="login"
       required={true}
     />
 
@@ -266,15 +743,22 @@
       label="Movement Quantity (Pcs)"
       type="number"
       bind:value={moveForm.quantity}
-      placeholder="Enter quantity..."
-      icon="tag"
+      placeholder="Quantity to move..."
+      icon="numbers"
       required={true}
     />
 
     <Input
-      label="Remarks / Ref Number"
+      label="Reference Number"
+      bind:value={moveForm.referenceNumber}
+      placeholder="e.g. CHIT-901"
+      icon="tag"
+    />
+
+    <Input
+      label="Remarks / Notes"
       bind:value={moveForm.remarks}
-      placeholder="Optional notes..."
+      placeholder="Optional movement notes..."
       icon="notes"
     />
 
@@ -284,6 +768,150 @@
       </Button>
       <Button variant="primary" type="submit" icon="send">
         Confirm Movement
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 3: Register Raw Material Lot -->
+<Modal bind:isOpen={isCreateMaterialModalOpen} title="Register Raw Material Lot">
+  <form onsubmit={handleCreateMaterialSubmit} class="space-y-4">
+    <Input
+      label="Material Lot Number"
+      bind:value={createMaterialForm.lotNumber}
+      placeholder="e.g. FAB-2026-001"
+      icon="tag"
+      required={true}
+    />
+
+    <Input
+      label="Product / Material Name"
+      bind:value={createMaterialForm.materialName}
+      placeholder="e.g. Denim Grey Cloth 300GSM"
+      icon="category"
+      required={true}
+    />
+
+    <Input
+      label="Initial Quantity"
+      type="number"
+      bind:value={createMaterialForm.initialQuantity}
+      placeholder="e.g. 500"
+      icon="numbers"
+      required={true}
+    />
+
+    <Select
+      label="Unit of Measurement"
+      bind:value={createMaterialForm.unit}
+      options={[
+        { label: 'Meters', value: 2 },
+        { label: 'Pieces', value: 1 },
+        { label: 'Kilograms', value: 3 },
+        { label: 'Yards', value: 5 }
+      ]}
+      icon="square_foot"
+      required={true}
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isCreateMaterialModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="save">
+        Register Material
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 4: Consume Raw Material -->
+<Modal bind:isOpen={isConsumeMaterialModalOpen} title="Log Raw Material Consumption">
+  <form onsubmit={handleConsumeMaterialSubmit} class="space-y-4">
+    <Select
+      label="Select Raw Material Lot"
+      bind:value={consumeMaterialForm.materialLotId}
+      options={materialLots.map(m => ({ label: `${m.lotNumber}${m.materialName ? ' (' + m.materialName + ')' : ''} - Avail: ${m.remainingQuantity} ${m.unit}`, value: m.id }))}
+      icon="texture"
+      required={true}
+    />
+
+    <Select
+      label="Consumption Step"
+      bind:value={consumeMaterialForm.stepId}
+      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="factory"
+      required={true}
+    />
+
+    <Input
+      label="Quantity Consumed"
+      type="number"
+      bind:value={consumeMaterialForm.quantityConsumed}
+      placeholder="e.g. 25"
+      icon="numbers"
+      required={true}
+    />
+
+    <Input
+      label="Recorded By"
+      bind:value={consumeMaterialForm.recordedBy}
+      placeholder="Operator name"
+      icon="person"
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isConsumeMaterialModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="local_mall">
+        Log Consumption
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 5: Report Rejection -->
+<Modal bind:isOpen={isRejectModalOpen} title="Report Item Rejection / Damage">
+  <form onsubmit={handleRejectSubmit} class="space-y-4">
+    <Select
+      label="Step Where Damage Occurred"
+      bind:value={rejectForm.stepId}
+      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="factory"
+      required={true}
+    />
+
+    <Input
+      label="Quantity Rejected"
+      type="number"
+      bind:value={rejectForm.quantityRejected}
+      placeholder="e.g. 2"
+      icon="numbers"
+      required={true}
+    />
+
+    <Input
+      label="Reason for Rejection"
+      bind:value={rejectForm.reason}
+      placeholder="e.g. Defective stitching / Fabric tear"
+      icon="report_problem"
+      required={true}
+    />
+
+    <Input
+      label="Inspector / Reporter"
+      bind:value={rejectForm.createdBy}
+      placeholder="Inspector name"
+      icon="person"
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isRejectModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="warning">
+        Submit Rejection
       </Button>
     </div>
   </form>

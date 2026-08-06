@@ -96,6 +96,11 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("material_item_id");
 
+                    b.Property<string>("MaterialName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("material_name");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LotNumber")

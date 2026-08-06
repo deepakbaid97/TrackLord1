@@ -12,6 +12,7 @@
     if (onclose) onclose();
   }
 
+  /** @param {any} event */
   function handleKeydown(event) {
     if (event.key === 'Escape') close();
   }

@@ -11,6 +11,7 @@ public class MaterialLot : AggregateRoot<Guid>
 {
     public MaterialLotNumber LotNumber { get; private set; } = default!;
     public Guid MaterialItemId { get; private set; }
+    public string? MaterialName { get; private set; }
     public Quantity InitialQuantity { get; private set; } = default!;
     public Quantity CurrentQuantity { get; private set; } = default!;
     public DateTime CreatedAtUtc { get; private set; }
@@ -21,7 +22,8 @@ public class MaterialLot : AggregateRoot<Guid>
         Guid id,
         MaterialLotNumber lotNumber,
         Guid materialItemId,
-        Quantity initialQuantity)
+        Quantity initialQuantity,
+        string? materialName = null)
     {
         if (id == Guid.Empty) throw new DomainException("MaterialLot Id cannot be empty.");
         if (lotNumber is null) throw new DomainException("MaterialLotNumber cannot be null.");
@@ -36,6 +38,7 @@ public class MaterialLot : AggregateRoot<Guid>
             Id = id,
             LotNumber = lotNumber,
             MaterialItemId = materialItemId,
+            MaterialName = materialName,
             InitialQuantity = new Quantity(initialQuantity.Value, initialQuantity.Unit),
             CurrentQuantity = new Quantity(initialQuantity.Value, initialQuantity.Unit),
             CreatedAtUtc = DateTime.UtcNow

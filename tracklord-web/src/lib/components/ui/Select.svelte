@@ -12,6 +12,7 @@
     onchange
   } = $props();
 
+  /** @param {any} event */
   function handleChange(event) {
     value = event.target.value;
     if (onchange) onchange(value);

@@ -58,6 +58,7 @@ public class MaterialLotConfiguration : IEntityTypeConfiguration<MaterialLot>
         builder.HasIndex(m => m.LotNumber).IsUnique();
 
         builder.Property(m => m.MaterialItemId).HasColumnName("material_item_id").IsRequired();
+        builder.Property(m => m.MaterialName).HasColumnName("material_name").HasMaxLength(200);
         builder.Property(m => m.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
 
         builder.OwnsOne(m => m.InitialQuantity, q =>

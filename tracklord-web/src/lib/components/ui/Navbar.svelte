@@ -9,6 +9,7 @@
     { id: 'inventory', label: 'Inventory', icon: 'inventory_2' }
   ];
 
+  /** @param {string} id */
   function selectTab(id) {
     activeTab = id;
     if (ontabchange) ontabchange(id);

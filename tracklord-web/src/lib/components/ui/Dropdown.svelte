@@ -13,14 +13,16 @@
     isOpen = !isOpen;
   }
 
+  /** @param {any} item */
   function handleSelect(item) {
     isOpen = false;
     item.action();
   }
 
+  /** @param {HTMLElement} node */
   function handleClickOutside(node) {
-    const handle = (e) => {
-      if (!node.contains(e.target)) isOpen = false;
+    const handle = (/** @type {MouseEvent} */ e) => {
+      if (!node.contains(/** @type {Node} */ (e.target))) isOpen = false;
     };
     document.addEventListener('click', handle, true);
     return {
