@@ -30,6 +30,7 @@ public record MovementTimelineDto(
     string MovementType,
     DateTime MovementDate,
     DateTime CreatedAtUtc,
+    string? ClientName,
     string? CreatedBy,
     string? Remarks,
     bool IsReversed);
@@ -197,6 +198,7 @@ public class GetLotJourneyQueryHandler : IRequestHandler<GetLotJourneyQuery, Lot
                 m.Type.ToString(),
                 m.MovementDate,
                 m.CreatedAtUtc,
+                m.ClientName,
                 m.CreatedBy,
                 m.Remarks,
                 m.IsReversed);

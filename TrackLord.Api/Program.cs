@@ -110,13 +110,13 @@ using (var scope = app.Services.CreateScope())
             var now = DateTime.UtcNow;
             dbContext.ManufacturingMovements.AddRange(
                 TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
-                    Guid.NewGuid(), lotId, null, stepCut.Id, 95, TrackLord.Domain.Enums.MovementType.InitialProduction, now.AddDays(-3), "System", "Initial Lot Creation"),
+                    Guid.NewGuid(), lotId, null, stepCut.Id, 95, TrackLord.Domain.Enums.MovementType.InitialProduction, now.AddDays(-3), "ABC Garments", "System", "Initial Lot Creation"),
                 TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
-                    Guid.NewGuid(), lotId, stepCut.Id, stepStitch.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-2), "Operator1", "Moved to Stitching"),
+                    Guid.NewGuid(), lotId, stepCut.Id, stepStitch.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-2), "ABC Garments", "Operator1", "Moved to Stitching"),
                 TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
-                    Guid.NewGuid(), lotId, stepStitch.Id, stepWash.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-1), "Operator2", "Moved to Washing"),
+                    Guid.NewGuid(), lotId, stepStitch.Id, stepWash.Id, 95, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddDays(-1), "ABC Garments", "Operator2", "Moved to Washing"),
                 TrackLord.Domain.Aggregates.MovementAggregate.ManufacturingMovement.Create(
-                    Guid.NewGuid(), lotId, stepWash.Id, stepFin.Id, 80, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddHours(-4), "Supervisor", "Partial move to Finishing")
+                    Guid.NewGuid(), lotId, stepWash.Id, stepFin.Id, 80, TrackLord.Domain.Enums.MovementType.StepTransfer, now.AddHours(-4), "ABC Garments", "Supervisor", "Partial move to Finishing")
             );
 
             // Seed material consumption

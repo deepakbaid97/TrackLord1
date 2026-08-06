@@ -67,6 +67,7 @@
     fromStepId: '',
     toStepId: '',
     quantity: 10,
+    clientName: 'ABC Garments',
     remarks: '',
     referenceNumber: ''
   });
@@ -207,11 +208,21 @@
         subtitle = 'Completed';
       }
 
+      // Find latest non-reversed movement associated with this step to extract Client Name
+      let stepClientName = '';
+      if (currentLotJourney && currentLotJourney.movementHistory) {
+        const stepMovements = currentLotJourney.movementHistory.filter((/** @type {any} */ m) => m.toStepName === step.name && !m.isReversed);
+        if (stepMovements.length > 0) {
+          stepClientName = stepMovements[stepMovements.length - 1].clientName || '';
+        }
+      }
+
       return {
         id: step.id,
         name: step.name,
         status: status,
         subtitle: subtitle,
+        clientName: stepClientName,
         icon: stepIconMap[step.code] || 'work'
       };
     });
@@ -226,6 +237,7 @@
       to: m.toStepName,
       qty: `${m.quantity} Pcs`,
       type: m.movementType,
+      clientName: m.clientName || '-',
       user: m.createdBy || 'System',
       remarks: m.remarks || '-',
       isReversed: m.isReversed
@@ -274,6 +286,7 @@
         toStepId: moveForm.toStepId,
         quantity: Number(moveForm.quantity),
         movementDate: new Date().toISOString(),
+        clientName: moveForm.clientName.trim(),
         createdBy: 'Operator',
         remarks: moveForm.remarks,
         referenceNumber: moveForm.referenceNumber || `REF-${Math.floor(Math.random() * 900 + 100)}`
@@ -616,6 +629,7 @@
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Movement Date</th>
               <th class="px-4 py-3">Type</th>
+              <th class="px-4 py-3">Client Name</th>
               <th class="px-4 py-3">From Step</th>
               <th class="px-4 py-3">To Step</th>
               <th class="px-4 py-3">Quantity</th>
@@ -640,6 +654,7 @@
                       {m.type}
                     </span>
                   </td>
+                  <td class="px-4 py-3 whitespace-nowrap font-bold text-primary">{m.clientName}</td>
                   <td class="px-4 py-3 whitespace-nowrap">{m.from}</td>
                   <td class="px-4 py-3 whitespace-nowrap">{m.to}</td>
                   <td class="px-4 py-3 whitespace-nowrap font-bold text-primary">{m.qty}</td>
@@ -746,6 +761,13 @@
       placeholder="Quantity to move..."
       icon="numbers"
       required={true}
+    />
+
+    <Input
+      label="Client / Customer Name"
+      bind:value={moveForm.clientName}
+      placeholder="e.g. ABC Garments"
+      icon="badge"
     />
 
     <Input

@@ -91,6 +91,7 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
         builder.Property(m => m.MovementDate).HasColumnName("movement_date").IsRequired();
         builder.Property(m => m.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(m => m.UpdatedAtUtc).HasColumnName("updated_at_utc").IsRequired();
+        builder.Property(m => m.ClientName).HasColumnName("client_name").HasMaxLength(150);
         builder.Property(m => m.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(m => m.Remarks).HasColumnName("remarks").HasMaxLength(500);
         builder.Property(m => m.ReferenceNumber).HasColumnName("reference_number").HasMaxLength(100);

@@ -1,6 +1,6 @@
 <script>
   /** 
-   * @type {{ steps: Array<{ id: string, name: string, status: 'completed' | 'in-progress' | 'pending', subtitle?: string, icon: string }> }} 
+   * @type {{ steps: Array<{ id: string, name: string, status: 'completed' | 'in-progress' | 'pending', subtitle?: string, clientName?: string, icon: string }> }} 
    */
   let { steps = [] } = $props();
 </script>
@@ -28,16 +28,34 @@
         <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-lg bg-[#eff4ff] border border-[#c3c6d7]/50 shadow-sm ml-4 md:ml-0">
           <h3 class="text-sm font-semibold text-[#006e2d]">{step.name}</h3>
           <p class="text-xs font-mono text-[#434655] mt-0.5">{step.subtitle || 'Completed'}</p>
+          {#if step.clientName}
+            <div class="text-[11px] font-medium text-[#434655] flex items-center gap-1 mt-1.5 bg-white/70 px-2 py-0.5 rounded border border-[#c3c6d7]/40 w-fit">
+              <span class="material-symbols-outlined text-[13px] text-[#2563eb]">badge</span>
+              <span>Client: <strong class="text-[#0b1c30]">{step.clientName}</strong></span>
+            </div>
+          {/if}
         </div>
       {:else if step.status === 'in-progress'}
         <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-lg bg-[#2563eb] text-[#eeefff] shadow-md ml-4 md:ml-0 border border-[#b4c5ff]">
           <h3 class="text-sm font-bold text-white">{step.name}</h3>
           <p class="text-xs font-mono opacity-90 mt-0.5">{step.subtitle || 'In Progress'}</p>
+          {#if step.clientName}
+            <div class="text-[11px] font-medium text-white flex items-center gap-1 mt-1.5 bg-white/20 px-2 py-0.5 rounded w-fit">
+              <span class="material-symbols-outlined text-[13px]">badge</span>
+              <span>Client: <strong>{step.clientName}</strong></span>
+            </div>
+          {/if}
         </div>
       {:else}
         <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-lg bg-white border border-[#c3c6d7] shadow-sm ml-4 md:ml-0 opacity-60">
           <h3 class="text-sm font-semibold text-[#434655]">{step.name}</h3>
           <p class="text-xs font-mono text-[#737686] mt-0.5">{step.subtitle || 'Pending'}</p>
+          {#if step.clientName}
+            <div class="text-[11px] font-medium text-[#737686] flex items-center gap-1 mt-1.5 bg-[#eff4ff] px-2 py-0.5 rounded w-fit">
+              <span class="material-symbols-outlined text-[13px]">badge</span>
+              <span>Client: <strong>{step.clientName}</strong></span>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>

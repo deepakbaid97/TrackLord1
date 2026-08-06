@@ -140,6 +140,7 @@ public record MoveLotCommand(
     Guid ToStepId,
     decimal Quantity,
     DateTime MovementDate,
+    string? ClientName = null,
     string? CreatedBy = null,
     string? Remarks = null,
     string? ReferenceNumber = null) : IRequest<Guid>;
@@ -193,6 +194,7 @@ public class MoveLotCommandHandler : IRequestHandler<MoveLotCommand, Guid>
             request.Quantity,
             MovementType.StepTransfer,
             request.MovementDate,
+            request.ClientName,
             request.CreatedBy,
             request.Remarks,
             request.ReferenceNumber);
