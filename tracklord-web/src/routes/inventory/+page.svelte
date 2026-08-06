@@ -187,7 +187,7 @@
         }
       }
     } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to connect to backend server at http://localhost:5217';
+      errorMessage = err.message || 'Failed to connect to backend server';
     } finally {
       loading = false;
     }
