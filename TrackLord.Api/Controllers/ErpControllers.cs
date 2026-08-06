@@ -235,6 +235,16 @@ public class DashboardsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets a complete dashboard overview with KPI metrics, step WIP, client distribution, and active lots.
+    /// </summary>
+    [HttpGet("overview")]
+    public async Task<IActionResult> GetDashboardOverview()
+    {
+        var overview = await _mediator.Send(new GetDashboardOverviewQuery());
+        return Ok(overview);
+    }
+
+    /// <summary>
     /// Gets step dashboard showing active lots and WIP quantities at a step.
     /// </summary>
     [HttpGet("step/{stepId:guid}")]

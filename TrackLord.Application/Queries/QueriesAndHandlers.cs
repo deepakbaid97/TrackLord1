@@ -466,3 +466,175 @@ public class GetAllMaterialLotsQueryHandler : IRequestHandler<GetAllMaterialLots
         )).OrderByDescending(m => m.Id).ToList();
     }
 }
+
+// Dashboard Overview DTOs
+public record DashboardStepSummaryDto(
+    Guid StepId,
+    string StepCode,
+    string StepName,
+    decimal TotalWipQuantity,
+    int ActiveLotsCount);
+
+public record DashboardClientSummaryDto(
+    Guid ClientId,
+    string ClientName,
+    string ClientType,
+    int TotalLotsAssociated,
+    decimal TotalQuantityMoved);
+
+public record DashboardActiveLotDto(
+    Guid LotId,
+    string LotNumber,
+    decimal InitialQuantity,
+    decimal CurrentWipQuantity,
+    string CurrentStepName,
+    DateTime CreatedAtUtc);
+
+public record DashboardOverviewDto(
+    int TotalActiveLots,
+    decimal TotalActiveQuantity,
+    int TotalClients,
+    int TotalMaterialLots,
+    IReadOnlyList<DashboardStepSummaryDto> StepSummaries,
+    IReadOnlyList<DashboardClientSummaryDto> ClientSummaries,
+    IReadOnlyList<DashboardActiveLotDto> ActiveLotSummaries);
+
+// GetDashboardOverviewQuery
+public record GetDashboardOverviewQuery : IRequest<DashboardOverviewDto>;
+
+public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOverviewQuery, DashboardOverviewDto>
+{
+    private readonly IProductionLotRepository _lotRepository;
+    private readonly IManufacturingStepRepository _stepRepository;
+    private readonly IManufacturingMovementRepository _movementRepository;
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IClientRepository _clientRepository;
+    private readonly ILedgerReplayEngine _replayEngine;
+
+    public GetDashboardOverviewQueryHandler(
+        IProductionLotRepository lotRepository,
+        IManufacturingStepRepository stepRepository,
+        IManufacturingMovementRepository movementRepository,
+        IMaterialLotRepository materialLotRepository,
+        IClientRepository clientRepository,
+        ILedgerReplayEngine replayEngine)
+    {
+        _lotRepository = lotRepository;
+        _stepRepository = stepRepository;
+        _movementRepository = movementRepository;
+        _materialLotRepository = materialLotRepository;
+        _clientRepository = clientRepository;
+        _replayEngine = replayEngine;
+    }
+
+    public async Task<DashboardOverviewDto> Handle(GetDashboardOverviewQuery request, CancellationToken cancellationToken)
+    {
+        // 1. Fetch all reference data
+        var allLots = await _lotRepository.GetAllAsync(cancellationToken);
+        var activeLots = allLots.Where(l => l.Status == LotStatus.Active).ToList();
+        var steps = (await _stepRepository.GetAllAsync(cancellationToken)).OrderBy(s => s.SequenceOrder).ToList();
+        var stepsDict = steps.ToDictionary(s => s.Id);
+        var clients = await _clientRepository.GetAllAsync(cancellationToken);
+        var clientsDict = clients.ToDictionary(c => c.Id);
+        var materialLots = await _materialLotRepository.GetAllAsync(cancellationToken);
+
+        // 2. Per-step WIP aggregation + per-lot summaries
+        var stepWipTotals = steps.ToDictionary(s => s.Id, _ => 0m);
+        var stepLotCounts = steps.ToDictionary(s => s.Id, _ => 0);
+        var activeLotSummaries = new List<DashboardActiveLotDto>();
+
+        // 3. Per-client aggregation from movements
+        // Key: ClientId, Value: (lotsSet, totalQty)
+        var clientAggregation = new Dictionary<Guid, (HashSet<Guid> lots, decimal totalQty)>();
+
+        foreach (var lot in activeLots)
+        {
+            var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
+            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements);
+
+            // Aggregate step WIP
+            decimal lotWipTotal = 0m;
+            string primaryStepName = "—";
+            decimal maxStepQty = 0m;
+
+            foreach (var (stepId, qty) in snapshot.StepBalances)
+            {
+                if (qty <= 0) continue;
+
+                lotWipTotal += qty;
+
+                if (stepWipTotals.ContainsKey(stepId))
+                {
+                    stepWipTotals[stepId] += qty;
+                    stepLotCounts[stepId]++;
+                }
+
+                if (qty > maxStepQty)
+                {
+                    maxStepQty = qty;
+                    primaryStepName = stepsDict.TryGetValue(stepId, out var s) ? s.Name : "Unknown";
+                }
+            }
+
+            activeLotSummaries.Add(new DashboardActiveLotDto(
+                lot.Id,
+                lot.LotNumber.Value,
+                lot.InitialQuantity.Value,
+                lotWipTotal,
+                primaryStepName,
+                lot.CreatedAtUtc));
+
+            // Aggregate client data from non-reversed movements
+            foreach (var m in movements.Where(m => !m.IsReversed && m.ClientId.HasValue))
+            {
+                var cid = m.ClientId!.Value;
+                if (!clientAggregation.ContainsKey(cid))
+                    clientAggregation[cid] = (new HashSet<Guid>(), 0m);
+
+                var (lots, totalQty) = clientAggregation[cid];
+                lots.Add(lot.Id);
+                clientAggregation[cid] = (lots, totalQty + m.Quantity);
+            }
+        }
+
+        // 4. Build step summaries
+        var stepSummaries = steps.Select(s => new DashboardStepSummaryDto(
+            s.Id,
+            s.Code,
+            s.Name,
+            stepWipTotals[s.Id],
+            stepLotCounts[s.Id]
+        )).ToList();
+
+        // 5. Build client summaries
+        var clientSummaries = clientAggregation
+            .Select(kvp =>
+            {
+                clientsDict.TryGetValue(kvp.Key, out var client);
+                return new DashboardClientSummaryDto(
+                    kvp.Key,
+                    client?.Name ?? "Unknown",
+                    client?.ClientType ?? "Unknown",
+                    kvp.Value.lots.Count,
+                    kvp.Value.totalQty);
+            })
+            .OrderByDescending(c => c.TotalQuantityMoved)
+            .ToList();
+
+        // 6. Sort active lots by creation date desc
+        activeLotSummaries = activeLotSummaries
+            .OrderByDescending(l => l.CreatedAtUtc)
+            .ToList();
+
+        var totalActiveQty = activeLotSummaries.Sum(l => l.CurrentWipQuantity);
+
+        return new DashboardOverviewDto(
+            activeLots.Count,
+            totalActiveQty,
+            clients.Count,
+            materialLots.Count,
+            stepSummaries,
+            clientSummaries,
+            activeLotSummaries);
+    }
+}

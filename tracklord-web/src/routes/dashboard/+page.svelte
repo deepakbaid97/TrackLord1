@@ -1,3 +1,56 @@
+<script>
+  import { onMount } from 'svelte';
+  import { getDashboardOverview } from '$lib/api.js';
+
+  let loading = $state(true);
+  let errorMessage = $state('');
+
+  /** @type {any} */
+  let overview = $state(null);
+
+  onMount(async () => {
+    await refreshDashboard();
+  });
+
+  async function refreshDashboard() {
+    loading = true;
+    errorMessage = '';
+    try {
+      overview = await getDashboardOverview();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to load dashboard data';
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Computed: max WIP across steps for bar scaling
+  let maxStepWip = $derived(
+    overview?.stepSummaries?.length > 0
+      ? Math.max(...overview.stepSummaries.map((/** @type {any} */ s) => s.totalWipQuantity), 1)
+      : 1
+  );
+
+  // Step icon mapping
+  /** @type {Record<string, string>} */
+  const stepIconMap = {
+    'CUT': 'content_cut',
+    'STITCH': 'webhook',
+    'WASH': 'local_laundry_service',
+    'FIN': 'iron',
+    'PACK': 'inventory_2'
+  };
+
+  /** @type {Record<string, string>} */
+  const stepColorMap = {
+    'CUT': 'bg-blue-500',
+    'STITCH': 'bg-violet-500',
+    'WASH': 'bg-cyan-500',
+    'FIN': 'bg-amber-500',
+    'PACK': 'bg-emerald-500'
+  };
+</script>
+
 <!-- TopAppBar -->
 <header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
   <div class="flex items-center gap-3">
@@ -6,23 +59,268 @@
     </div>
     <div>
       <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Dashboard</div>
+      <div class="text-xs text-on-surface-variant">Dashboard Overview</div>
     </div>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <button
+      onclick={() => refreshDashboard()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+    >
+      <span class="material-symbols-outlined text-[16px]">refresh</span>
+      Refresh
+    </button>
   </div>
 </header>
 
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 pt-20">
-  <div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
-    <div class="p-6 bg-primary/5 rounded-full mb-6">
-      <span class="material-symbols-outlined text-primary text-[64px]">dashboard</span>
+<!-- Main Content -->
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20">
+
+  {#if errorMessage}
+    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-red-500">error</span>
+        <span>{errorMessage}</span>
+      </div>
+      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
     </div>
-    <h1 class="font-headline-lg text-headline-lg text-on-surface font-bold mb-2">Dashboard</h1>
-    <p class="text-on-surface-variant text-body-lg max-w-md">
-      Overview analytics and insights for your manufacturing operations will appear here.
-    </p>
-    <div class="mt-8 flex items-center gap-2 px-4 py-2 bg-surface-container-low rounded-xl border border-outline-variant text-sm text-on-surface-variant">
-      <span class="material-symbols-outlined text-[18px]">construction</span>
-      Coming soon
+  {/if}
+
+  {#if loading}
+    <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
+      <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
+      <span>Loading dashboard metrics...</span>
     </div>
-  </div>
+  {:else if overview}
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET 1: KPI Summary Cards                                -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Active Lots -->
+      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
+        <div class="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors">
+          <span class="material-symbols-outlined text-[28px]">inventory_2</span>
+        </div>
+        <div>
+          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Lots</div>
+          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveLots}</div>
+        </div>
+      </div>
+
+      <!-- Total WIP Quantity -->
+      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
+        <div class="p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors">
+          <span class="material-symbols-outlined text-[28px]">stacks</span>
+        </div>
+        <div>
+          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total WIP</div>
+          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveQuantity.toLocaleString()}</div>
+          <div class="text-[11px] text-on-surface-variant font-mono">Pieces</div>
+        </div>
+      </div>
+
+      <!-- Total Clients -->
+      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
+        <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-600 group-hover:bg-emerald-500/15 transition-colors">
+          <span class="material-symbols-outlined text-[28px]">groups</span>
+        </div>
+        <div>
+          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Clients</div>
+          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalClients}</div>
+        </div>
+      </div>
+
+      <!-- Material Lots -->
+      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
+        <div class="p-3 bg-amber-500/10 rounded-xl text-amber-600 group-hover:bg-amber-500/15 transition-colors">
+          <span class="material-symbols-outlined text-[28px]">texture</span>
+        </div>
+        <div>
+          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Material Lots</div>
+          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalMaterialLots}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two Column Grid for Step WIP + Client Distribution -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- WIDGET 2: WIP by Manufacturing Step                       -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+          <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[22px]">factory</span>
+            WIP by Step
+          </h2>
+          <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+            {overview.stepSummaries?.length || 0} steps
+          </span>
+        </div>
+
+        {#if overview.stepSummaries && overview.stepSummaries.length > 0}
+          <div class="space-y-4">
+            {#each overview.stepSummaries as step}
+              {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
+              {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
+              <div class="group">
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant">{stepIconMap[step.stepCode] || 'work'}</span>
+                    <span class="font-bold text-sm text-on-surface">{step.stepName}</span>
+                    <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
+                    <span class="font-bold text-sm text-primary font-mono min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
+                  </div>
+                </div>
+                <div class="w-full bg-surface-variant/60 rounded-full h-3 overflow-hidden">
+                  <div
+                    class="{barColor} h-3 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
+                    style="width: {Math.max(barPercent, step.totalWipQuantity > 0 ? 2 : 0)}%"
+                  ></div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+            No manufacturing steps configured.
+          </div>
+        {/if}
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- WIDGET 3: Client Distribution                              -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+          <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[22px]">groups</span>
+            Client Distribution
+          </h2>
+          <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+            {overview.clientSummaries?.length || 0} active
+          </span>
+        </div>
+
+        {#if overview.clientSummaries && overview.clientSummaries.length > 0}
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                  <th class="pb-2 pr-4">Client</th>
+                  <th class="pb-2 pr-4">Type</th>
+                  <th class="pb-2 pr-4 text-right">Lots</th>
+                  <th class="pb-2 text-right">Qty Moved</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-outline-variant/50">
+                {#each overview.clientSummaries as client}
+                  <tr class="hover:bg-surface-container-low/50 transition-colors">
+                    <td class="py-3 pr-4">
+                      <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px] text-primary/70">badge</span>
+                        <span class="font-bold text-on-surface">{client.clientName}</span>
+                      </div>
+                    </td>
+                    <td class="py-3 pr-4">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                        {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800' :
+                         client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800' :
+                         client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800' :
+                         'bg-purple-100 text-purple-800'}">
+                        {client.clientType}
+                      </span>
+                    </td>
+                    <td class="py-3 pr-4 text-right font-mono text-on-surface-variant">{client.totalLotsAssociated}</td>
+                    <td class="py-3 text-right font-bold text-primary font-mono">{client.totalQuantityMoved.toLocaleString()} Pcs</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+            <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">groups</span>
+            No client activity recorded yet. Movements with assigned clients will appear here.
+          </div>
+        {/if}
+      </section>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET 4: Active Production Lots Table                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+      <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+        <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[22px]">reorder</span>
+          Active Production Lots
+        </h2>
+        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+          {overview.activeLotSummaries?.length || 0} lots
+        </span>
+      </div>
+
+      {#if overview.activeLotSummaries && overview.activeLotSummaries.length > 0}
+        <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                <th class="px-4 py-3">Lot Number</th>
+                <th class="px-4 py-3 text-right">Initial Qty</th>
+                <th class="px-4 py-3 text-right">Current WIP</th>
+                <th class="px-4 py-3">Primary Step</th>
+                <th class="px-4 py-3">Created</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+              {#each overview.activeLotSummaries as lot}
+                {@const utilizationPercent = lot.initialQuantity > 0 ? (lot.currentWipQuantity / lot.initialQuantity) * 100 : 0}
+                <tr class="hover:bg-surface-container-low/60 transition-colors group">
+                  <td class="px-4 py-3">
+                    <a href="/inventory" class="font-bold text-primary hover:underline flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px]">package_2</span>
+                      {lot.lotNumber}
+                    </a>
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-on-surface-variant">{lot.initialQuantity.toLocaleString()} Pcs</td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <div class="w-16 bg-surface-variant/60 rounded-full h-1.5 hidden sm:block">
+                        <div
+                          class="bg-primary h-1.5 rounded-full transition-all duration-500"
+                          style="width: {Math.min(utilizationPercent, 100)}%"
+                        ></div>
+                      </div>
+                      <span class="font-bold text-primary font-mono">{lot.currentWipQuantity.toLocaleString()}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-primary-container text-on-primary-container">
+                      {lot.currentStepName}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-on-surface-variant font-mono">{new Date(lot.createdAtUtc).toLocaleDateString()}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+          <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">inventory_2</span>
+          No active production lots found. Create a new lot from the Inventory page.
+        </div>
+      {/if}
+    </section>
+
+  {/if}
 </main>

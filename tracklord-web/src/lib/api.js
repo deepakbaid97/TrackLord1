@@ -162,3 +162,9 @@ export async function createClient(data) {
   return await handleResponse(response);
 }
 
+// 16. Fetch Dashboard Overview
+export async function getDashboardOverview() {
+  const response = await fetch(`${API_BASE_URL}/Dashboards/overview`);
+  return await handleResponse(response);
+}
+
