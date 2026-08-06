@@ -48,7 +48,7 @@ jobs:
         run: dotnet build --no-restore -c Release
 
       - name: Run backend tests
-        run: dotnet test TrackLord.Tests/TrackLord.Tests.csproj --no-build --verbosity normal
+        run: dotnet test TrackLord.Tests/TrackLord.Tests.csproj -c Release --no-build --verbosity normal
         env:
           ConnectionStrings__DefaultConnection: Host=localhost;Database=tracklord_test;Username=${{ secrets.DB_USER }};Password=${{ secrets.DB_PASSWORD }}
 
