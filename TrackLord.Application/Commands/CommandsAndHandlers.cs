@@ -270,6 +270,55 @@ public class ConsumeMaterialCommandHandler : IRequestHandler<ConsumeMaterialComm
     }
 }
 
+// 4b. Edit Material Consumption Command
+public record EditMaterialConsumptionCommand(
+    Guid ConsumptionId,
+    decimal NewQuantityConsumed,
+    string? Remarks = null) : IRequest<bool>;
+
+public class EditMaterialConsumptionCommandHandler : IRequestHandler<EditMaterialConsumptionCommand, bool>
+{
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+    private readonly IMaterialLotRepository _materialLotRepository;
+
+    public EditMaterialConsumptionCommandHandler(
+        IMaterialConsumptionRepository consumptionRepository,
+        IMaterialLotRepository materialLotRepository)
+    {
+        _consumptionRepository = consumptionRepository;
+        _materialLotRepository = materialLotRepository;
+    }
+
+    public async Task<bool> Handle(EditMaterialConsumptionCommand request, CancellationToken cancellationToken)
+    {
+        var consumption = await _consumptionRepository.GetByIdAsync(request.ConsumptionId, cancellationToken);
+        if (consumption is null)
+        {
+            throw new DomainException($"Material consumption with ID '{request.ConsumptionId}' not found.");
+        }
+
+        var matLot = await _materialLotRepository.GetByIdAsync(consumption.MaterialLotId, cancellationToken);
+        if (matLot is null)
+        {
+            throw new DomainException($"Material lot with ID '{consumption.MaterialLotId}' not found.");
+        }
+
+        // Restore previous consumed quantity back to material lot
+        matLot.Restore(consumption.QuantityConsumed);
+
+        // Consume new quantity (validated by material lot domain entity)
+        matLot.Consume(request.NewQuantityConsumed);
+
+        // Update consumption entity
+        consumption.Update(request.NewQuantityConsumed, request.Remarks);
+
+        await _materialLotRepository.UpdateAsync(matLot, cancellationToken);
+        await _consumptionRepository.UpdateAsync(consumption, cancellationToken);
+
+        return true;
+    }
+}
+
 // 5. Reject Items Command
 public record RejectItemsCommand(
     Guid ProductionLotId,

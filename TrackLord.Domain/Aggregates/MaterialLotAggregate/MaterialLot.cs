@@ -57,9 +57,9 @@ public class MaterialLot : AggregateRoot<Guid>
 
     public void Consume(decimal quantityToConsume)
     {
-        if (quantityToConsume <= 0)
+        if (quantityToConsume < 0)
         {
-            throw new DomainException("Material consumption quantity must be greater than zero.");
+            throw new DomainException("Material consumption quantity cannot be negative.");
         }
 
         if (CurrentQuantity.Value < quantityToConsume)
@@ -73,9 +73,9 @@ public class MaterialLot : AggregateRoot<Guid>
 
     public void Restore(decimal quantityToRestore)
     {
-        if (quantityToRestore <= 0)
+        if (quantityToRestore < 0)
         {
-            throw new DomainException("Restored material quantity must be greater than zero.");
+            throw new DomainException("Restored material quantity cannot be negative.");
         }
 
         CurrentQuantity = new Quantity(CurrentQuantity.Value + quantityToRestore, CurrentQuantity.Unit);

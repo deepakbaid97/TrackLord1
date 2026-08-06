@@ -68,4 +68,18 @@ public class MaterialConsumption : AggregateRoot<Guid>
 
         return consumption;
     }
+
+    public void Update(decimal newQuantityConsumed, string? newRemarks = null)
+    {
+        if (newQuantityConsumed < 0)
+        {
+            throw new DomainException($"Consumed quantity must be greater than zero. Provided: {newQuantityConsumed}");
+        }
+
+        QuantityConsumed = newQuantityConsumed;
+        if (newRemarks is not null)
+        {
+            Remarks = newRemarks;
+        }
+    }
 }

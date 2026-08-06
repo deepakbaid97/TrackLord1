@@ -21,6 +21,7 @@
     moveLot,
     createMaterialLot,
     consumeMaterial,
+    editMaterialConsumption,
     rejectItems,
     reverseMovement
   } from '$lib/api.js';
@@ -85,6 +86,15 @@
     quantityConsumed: 25,
     unit: 2, // Meters
     recordedBy: 'Operator'
+  });
+
+  let isEditConsumptionModalOpen = $state(false);
+  let editConsumptionForm = $state({
+    id: '',
+    materialLotNumber: '',
+    materialName: '',
+    quantityConsumed: 0,
+    remarks: ''
   });
 
   let rejectForm = $state({
@@ -346,8 +356,46 @@
       };
 
       await consumeMaterial(payload);
-      successMessage = 'Material consumption recorded successfully!';
+      successMessage = 'Raw material consumption logged successfully!';
       isConsumeMaterialModalOpen = false;
+
+      const matLots = await getMaterialLots();
+      materialLots = matLots || [];
+      await loadSelectedLotDetails(selectedLotId);
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message;
+    }
+  }
+
+  /** @param {any} c */
+  function openEditConsumptionModal(c) {
+    const rawId = c.id || c.Id || c.consumptionId || c.ConsumptionId || '';
+    editConsumptionForm.id = rawId;
+    editConsumptionForm.materialLotNumber = c.materialLotNumber || c.MaterialLotNumber || '';
+    editConsumptionForm.materialName = c.materialName || c.MaterialName || '';
+    editConsumptionForm.quantityConsumed = c.quantityConsumed ?? c.QuantityConsumed ?? 0;
+    editConsumptionForm.remarks = c.remarks || c.Remarks || '';
+    isEditConsumptionModalOpen = true;
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleEditConsumptionSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    const targetId = editConsumptionForm.id;
+    if (!targetId) {
+      errorMessage = 'Unable to edit: Material consumption ID is missing.';
+      return;
+    }
+    try {
+      const payload = {
+        quantityConsumed: Number(editConsumptionForm.quantityConsumed),
+        remarks: editConsumptionForm.remarks.trim()
+      };
+
+      await editMaterialConsumption(targetId, payload);
+      successMessage = 'Material consumption updated successfully!';
+      isEditConsumptionModalOpen = false;
 
       await loadSelectedLotDetails(selectedLotId);
       const matLots = await getMaterialLots();
@@ -589,15 +637,36 @@
             {#if currentMaterialTraceability && currentMaterialTraceability.consumptions && currentMaterialTraceability.consumptions.length > 0}
               <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {#each currentMaterialTraceability.consumptions as mat}
-                  <div class="bg-surface-container-low p-4 rounded-lg border border-outline-variant flex flex-col justify-between">
-                    <div class="flex items-center gap-2 mb-2">
-                      <span class="material-symbols-outlined text-tertiary">texture</span>
-                      <span class="font-bold text-sm text-on-surface">{mat.materialLotNumber}</span>
+                  <div class="bg-surface-container-low p-4 rounded-lg border border-outline-variant flex flex-col justify-between relative group">
+                    <div class="flex justify-between items-start mb-2">
+                      <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-tertiary">texture</span>
+                        <div>
+                          <div class="font-bold text-sm text-on-surface">{mat.materialLotNumber}</div>
+                          {#if mat.materialName}
+                            <div class="text-[11px] font-medium text-on-surface-variant">{mat.materialName}</div>
+                          {/if}
+                        </div>
+                      </div>
+                      <button
+                        onclick={() => openEditConsumptionModal(mat)}
+                        title="Edit Material Consumption"
+                        class="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors cursor-pointer"
+                      >
+                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
                     </div>
                     <div class="text-2xl font-bold text-primary">{mat.quantityConsumed} {mat.unit}</div>
-                    <div class="text-xs text-on-surface-variant mt-2 font-mono">
-                      Step: {mat.stepName}<br/>
-                      Date: {new Date(mat.consumptionDate).toLocaleDateString()}
+                    <div class="text-xs text-on-surface-variant mt-2 font-mono flex justify-between items-end">
+                      <div>
+                        Step: {mat.stepName}<br/>
+                        Date: {new Date(mat.consumptionDate).toLocaleDateString()}
+                      </div>
+                      {#if mat.remarks}
+                        <div class="text-[11px] italic text-on-surface-variant max-w-[120px] truncate" title={mat.remarks}>
+                          "{mat.remarks}"
+                        </div>
+                      {/if}
                     </div>
                   </div>
                 {/each}
@@ -933,7 +1002,44 @@
         Cancel
       </Button>
       <Button variant="primary" type="submit" icon="warning">
-        Submit Rejection
+        Report Rejection
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 6: Edit Raw Material Consumption -->
+<Modal bind:isOpen={isEditConsumptionModalOpen} title="Edit Raw Material Consumption">
+  <form onsubmit={handleEditConsumptionSubmit} class="space-y-4">
+    <div class="p-3 bg-surface-container-low rounded border border-outline-variant text-xs space-y-1">
+      <div><span class="text-on-surface-variant font-medium">Material Lot:</span> <strong class="text-on-surface">{editConsumptionForm.materialLotNumber}</strong></div>
+      {#if editConsumptionForm.materialName}
+        <div><span class="text-on-surface-variant font-medium">Item Name:</span> <strong class="text-primary">{editConsumptionForm.materialName}</strong></div>
+      {/if}
+    </div>
+
+    <Input
+      label="Quantity Consumed"
+      type="number"
+      bind:value={editConsumptionForm.quantityConsumed}
+      placeholder="e.g. 30"
+      icon="numbers"
+      required={true}
+    />
+
+    <Input
+      label="Remarks / Notes"
+      bind:value={editConsumptionForm.remarks}
+      placeholder="Optional consumption notes..."
+      icon="notes"
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isEditConsumptionModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="save">
+        Update Consumption
       </Button>
     </div>
   </form>

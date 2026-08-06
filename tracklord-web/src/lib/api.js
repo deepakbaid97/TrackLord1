@@ -127,3 +127,20 @@ export async function reverseMovement(movementId, data) {
   });
   return await handleResponse(response);
 }
+
+// 13. Edit Raw Material Consumption
+/**
+ * @param {string} consumptionId
+ * @param {any} data
+ */
+export async function editMaterialConsumption(consumptionId, data) {
+  if (!consumptionId || consumptionId === 'undefined') {
+    throw new Error('Material Consumption ID is missing or invalid.');
+  }
+  const response = await fetch(`${API_BASE_URL}/MaterialConsumptions/consume/${consumptionId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}

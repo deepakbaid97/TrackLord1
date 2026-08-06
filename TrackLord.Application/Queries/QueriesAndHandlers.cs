@@ -44,13 +44,16 @@ public record LotJourneyDto(
     IReadOnlyList<StepWipDto> ActiveBalances);
 
 public record MaterialConsumptionTraceDto(
+    Guid Id,
     Guid MaterialLotId,
     string MaterialLotNumber,
+    string? MaterialName,
     Guid StepId,
     string StepName,
     decimal QuantityConsumed,
     string Unit,
-    DateTime ConsumptionDate);
+    DateTime ConsumptionDate,
+    string? Remarks);
 
 public record MaterialTraceabilityDto(
     Guid ProductionLotId,
@@ -258,13 +261,16 @@ public class GetMaterialTraceabilityQueryHandler : IRequestHandler<GetMaterialTr
             steps.TryGetValue(c.StepId, out var step);
 
             traces.Add(new MaterialConsumptionTraceDto(
+                c.Id,
                 c.MaterialLotId,
                 matLot?.LotNumber.Value ?? "UNKNOWN",
+                matLot?.MaterialName,
                 c.StepId,
                 step?.Name ?? "Unknown Step",
                 c.QuantityConsumed,
                 c.Unit.ToString(),
-                c.ConsumptionDate));
+                c.ConsumptionDate,
+                c.Remarks));
         }
 
         return new MaterialTraceabilityDto(lot.Id, lot.LotNumber.Value, traces);

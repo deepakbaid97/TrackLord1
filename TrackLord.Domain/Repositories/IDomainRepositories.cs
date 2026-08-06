@@ -49,7 +49,9 @@ public interface IManufacturingStepRepository
 
 public interface IMaterialConsumptionRepository
 {
+    Task<MaterialConsumption?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task AddAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default);
+    Task UpdateAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialConsumption>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialConsumption>> GetByMaterialLotIdAsync(Guid materialLotId, CancellationToken cancellationToken = default);
 }

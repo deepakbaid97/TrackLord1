@@ -185,6 +185,12 @@ public class MaterialConsumptionRepository : IMaterialConsumptionRepository
         _dbContext = dbContext;
     }
 
+    public async Task<MaterialConsumption?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.MaterialConsumptions
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MaterialConsumption>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.MaterialConsumptions
@@ -206,6 +212,12 @@ public class MaterialConsumptionRepository : IMaterialConsumptionRepository
     public async Task AddAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default)
     {
         await _dbContext.MaterialConsumptions.AddAsync(consumption, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default)
+    {
+        _dbContext.MaterialConsumptions.Update(consumption);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

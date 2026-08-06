@@ -191,7 +191,21 @@ public class MaterialConsumptionsController : ControllerBase
         var consumptionId = await _mediator.Send(command);
         return Ok(new { consumptionId });
     }
+
+    /// <summary>
+    /// Edits an existing raw material consumption record.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [HttpPut("consume/{id:guid}")]
+    public async Task<IActionResult> EditMaterialConsumption(Guid id, [FromBody] EditMaterialConsumptionRequest request)
+    {
+        var command = new EditMaterialConsumptionCommand(id, request.QuantityConsumed, request.Remarks);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
 }
+
+public record EditMaterialConsumptionRequest(decimal QuantityConsumed, string? Remarks);
 
 [ApiController]
 [Route("api/[controller]")]
