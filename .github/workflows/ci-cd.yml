@@ -1,0 +1,191 @@
+name: CI/CD Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: tracklord_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Cache .NET packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore backend dependencies
+        run: dotnet restore
+
+      - name: Build backend
+        run: dotnet build --no-restore -c Release
+
+      - name: Run backend tests
+        run: dotnet test TrackLord.Tests/TrackLord.Tests.csproj --no-build --verbosity normal
+        env:
+          ConnectionStrings__DefaultConnection: Host=localhost;Database=tracklord_test;Username=${{ secrets.DB_USER }};Password=${{ secrets.DB_PASSWORD }}
+
+      - name: Install EF tools
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Publish backend
+        run: dotnet publish TrackLord.Api/TrackLord.Api.csproj -c Release -r linux-x64 --self-contained false -o ./publish
+
+      - name: Generate EF migrations bundle
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef migrations bundle \
+            --project TrackLord.Infrastructure/TrackLord.Infrastructure.csproj \
+            --startup-project TrackLord.Api/TrackLord.Api.csproj \
+            --runtime linux-x64 \
+            --self-contained \
+            -o ./publish/efbundle \
+            --force
+
+      - name: Upload backend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-publish
+          path: publish/
+          retention-days: 1
+
+  build-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: tracklord-web/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('tracklord-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: ./tracklord-web
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./tracklord-web
+        env:
+          VITE_API_BASE: /api
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: TrackLord.Api/wwwroot/
+          retention-days: 1
+
+  deploy:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-publish
+          path: deploy-package/backend/
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: deploy-package/frontend/
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy-package
+          tar -czf deploy-package.tar.gz deploy-package
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.SERVER_IP }}" >> ~/.ssh/known_hosts
+
+      - name: Copy package to server
+        run: |
+          scp deploy-package.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/tmp/deploy-package.tar.gz
+
+      - name: Deploy on server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+            set -e
+            TARGET="${{ secrets.DEPLOY_TARGET_PATH }}"
+            SERVICE="${{ secrets.DEPLOY_SERVICE_NAME }}"
+
+            mkdir -p "$TARGET"
+            rm -rf /tmp/deploy-package
+            mkdir -p /tmp/deploy-package
+            tar -xzf /tmp/deploy-package.tar.gz -C /tmp/deploy-package
+
+            rsync -a --delete /tmp/deploy-package/deploy-package/backend/ "$TARGET"/
+            rsync -a --delete /tmp/deploy-package/deploy-package/frontend/ "$TARGET"/wwwroot/
+
+            CONN=$(grep 'ConnectionStrings__DefaultConnection' /etc/systemd/system/${SERVICE}.service \
+              | sed 's/.*ConnectionStrings__DefaultConnection=//; s/[\"'\'']*$//')
+
+            if [ -z "$CONN" ]; then
+              echo 'ERROR: Could not extract connection string from systemd service file' >&2
+              exit 1
+            fi
+
+            chmod +x "$TARGET/efbundle"
+            "$TARGET/efbundle" --connection "$CONN" --verbose \
+              || { echo 'ERROR: EF migration failed' >&2; exit 1; }
+
+            rm -rf /tmp/deploy-package /tmp/deploy-package.tar.gz
+
+            if [ -n "$SERVICE" ]; then
+              sudo systemctl restart "$SERVICE"
+            fi
+          EOF
