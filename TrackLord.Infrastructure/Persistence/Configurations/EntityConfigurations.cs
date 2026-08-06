@@ -163,10 +163,12 @@ public class RejectionRecordConfiguration : IEntityTypeConfiguration<RejectionRe
 
         builder.Property(r => r.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
         builder.Property(r => r.StepId).HasColumnName("step_id").IsRequired();
+        builder.Property(r => r.TargetStepId).HasColumnName("target_step_id");
         builder.Property(r => r.QuantityRejected).HasColumnName("quantity_rejected").HasPrecision(18, 4).IsRequired();
         builder.Property(r => r.Reason).HasColumnName("reason").HasMaxLength(500).IsRequired();
         builder.Property(r => r.RejectionDate).HasColumnName("rejection_date").IsRequired();
         builder.Property(r => r.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(r => r.ClientId).HasColumnName("client_id");
         builder.Property(r => r.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
 
         builder.HasIndex(r => r.ProductionLotId);

@@ -50,9 +50,13 @@ public class LedgerReplayEngine : ILedgerReplayEngine
             }
 
             // Handle addition to target step (or rejection/wastage handling)
-            if (movement.Type == MovementType.Rejection || movement.Type == MovementType.Wastage)
+            if (movement.Type == MovementType.Wastage)
             {
-                // Rejections/Wastages reduce inventory at FromStepId without adding to ToStepId
+                // Wastage reduces inventory at FromStepId without adding to ToStepId
+            }
+            else if (movement.Type == MovementType.Rejection && movement.FromStepId.HasValue && movement.FromStepId.Value == movement.ToStepId)
+            {
+                // Legacy rejection at same step without target step reduces inventory without adding
             }
             else
             {

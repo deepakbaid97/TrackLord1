@@ -112,8 +112,10 @@
 
   let rejectForm = $state({
     stepId: '',
+    targetStepId: '',
     quantityRejected: 1,
-    reason: 'Damaged during operation',
+    reason: 'Damaged during operation - return for rework',
+    clientId: '',
     createdBy: 'Inspector'
   });
 
@@ -146,6 +148,7 @@
         if (!moveForm.toStepId && manufacturingSteps.length > 1) moveForm.toStepId = manufacturingSteps[1].id;
         if (!consumeMaterialForm.stepId) consumeMaterialForm.stepId = manufacturingSteps[0].id;
         if (!rejectForm.stepId) rejectForm.stepId = manufacturingSteps[0].id;
+        if (!rejectForm.targetStepId) rejectForm.targetStepId = manufacturingSteps[0].id;
       }
 
       // 2. Fetch Lots
@@ -173,9 +176,14 @@
       // 4. Fetch Clients
       const clientData = await getClients();
       clients = clientData || [];
-      if (clients.length > 0 && !moveForm.clientId) {
-        moveForm.clientId = clients[0].id;
-        moveForm.clientName = clients[0].name;
+      if (clients.length > 0) {
+        if (!moveForm.clientId) {
+          moveForm.clientId = clients[0].id;
+          moveForm.clientName = clients[0].name;
+        }
+        if (!rejectForm.clientId) {
+          rejectForm.clientId = clients[0].id;
+        }
       }
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to connect to backend server at http://localhost:5217';
@@ -464,14 +472,16 @@
     try {
       const payload = {
         stepId: rejectForm.stepId,
+        targetStepId: rejectForm.targetStepId || rejectForm.stepId,
         quantityRejected: Number(rejectForm.quantityRejected),
         reason: rejectForm.reason,
         rejectionDate: new Date().toISOString(),
+        clientId: rejectForm.clientId || null,
         createdBy: rejectForm.createdBy
       };
 
       await rejectItems(selectedLotId, payload);
-      successMessage = 'Item rejection recorded successfully!';
+      successMessage = 'Item rejection & return transfer recorded successfully!';
       isRejectModalOpen = false;
 
       await loadSelectedLotDetails(selectedLotId);
@@ -1178,29 +1188,60 @@
 </Modal>
 
 <!-- Modal 5: Report Rejection -->
-<Modal bind:isOpen={isRejectModalOpen} title="Report Item Rejection / Damage">
+<Modal bind:isOpen={isRejectModalOpen} title="Report Item Rejection / Return">
   <form onsubmit={handleRejectSubmit} class="space-y-4">
-    <Select
-      label="Step Where Damage Occurred"
-      bind:value={rejectForm.stepId}
-      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
-      icon="factory"
-      required={true}
-    />
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Select
+        label="Current Step (From)"
+        bind:value={rejectForm.stepId}
+        options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+        icon="factory"
+        required={true}
+      />
+
+      <Select
+        label="Return To Step (Target)"
+        bind:value={rejectForm.targetStepId}
+        options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+        icon="undo"
+        required={true}
+      />
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-xs font-medium text-on-surface-variant">Associated Client</span>
+        <button
+          type="button"
+          onclick={() => isCreateClientModalOpen = true}
+          class="text-xs text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-[14px]">add</span>
+          Add New Client
+        </button>
+      </div>
+      <Select
+        bind:value={rejectForm.clientId}
+        options={clients.length > 0
+          ? clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          : [{ label: 'No clients found - Click + Add New Client', value: '' }]}
+        icon="person"
+      />
+    </div>
 
     <Input
       label="Quantity Rejected"
       type="number"
       bind:value={rejectForm.quantityRejected}
-      placeholder="e.g. 2"
+      placeholder="e.g. 5"
       icon="numbers"
       required={true}
     />
 
     <Input
-      label="Reason for Rejection"
+      label="Reason / Defect Description"
       bind:value={rejectForm.reason}
-      placeholder="e.g. Defective stitching / Fabric tear"
+      placeholder="e.g. Defective stitching / return to washing for rework"
       icon="report_problem"
       required={true}
     />
@@ -1217,7 +1258,7 @@
         Cancel
       </Button>
       <Button variant="primary" type="submit" icon="warning">
-        Report Rejection
+        Report Rejection & Return
       </Button>
     </div>
   </form>

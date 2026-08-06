@@ -69,18 +69,34 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
-    /// Rejects a quantity of items from a step due to damage/wastage.
+    /// Rejects a quantity of items from a step due to damage/wastage and returns them to target step.
     /// </summary>
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> RejectItems(Guid id, [FromBody] RejectItemsRequest request)
     {
-        var command = new RejectItemsCommand(id, request.StepId, request.QuantityRejected, request.Reason, request.RejectionDate, request.CreatedBy);
+        var command = new RejectItemsCommand(
+            id,
+            request.StepId,
+            request.QuantityRejected,
+            request.Reason,
+            request.RejectionDate,
+            request.TargetStepId,
+            request.ClientId,
+            null,
+            request.CreatedBy);
         var rejectionId = await _mediator.Send(command);
         return Ok(new { rejectionId });
     }
 }
 
-public record RejectItemsRequest(Guid StepId, decimal QuantityRejected, string Reason, DateTime RejectionDate, string? CreatedBy);
+public record RejectItemsRequest(
+    Guid StepId,
+    Guid? TargetStepId,
+    decimal QuantityRejected,
+    string Reason,
+    DateTime RejectionDate,
+    Guid? ClientId,
+    string? CreatedBy);
 
 [ApiController]
 [Route("api/[controller]")]

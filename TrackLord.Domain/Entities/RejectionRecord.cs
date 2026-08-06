@@ -9,13 +9,13 @@ public class RejectionRecord : BaseEntity<Guid>
 {
     public Guid ProductionLotId { get; private set; }
     public Guid StepId { get; private set; }
+    public Guid? TargetStepId { get; private set; }
     public decimal QuantityRejected { get; private set; }
     public string Reason { get; private set; } = default!;
     public DateTime RejectionDate { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
+    public Guid? ClientId { get; private set; }
     public string? CreatedBy { get; private set; }
-
-    private RejectionRecord() { } // EF Core
 
     public static RejectionRecord Create(
         Guid id,
@@ -24,6 +24,20 @@ public class RejectionRecord : BaseEntity<Guid>
         decimal quantityRejected,
         string reason,
         DateTime rejectionDate,
+        string? createdBy = null)
+    {
+        return Create(id, productionLotId, stepId, stepId, quantityRejected, reason, rejectionDate, null, createdBy);
+    }
+
+    public static RejectionRecord Create(
+        Guid id,
+        Guid productionLotId,
+        Guid stepId,
+        Guid? targetStepId,
+        decimal quantityRejected,
+        string reason,
+        DateTime rejectionDate,
+        Guid? clientId = null,
         string? createdBy = null)
     {
         if (id == Guid.Empty) throw new DomainException("Rejection Id cannot be empty.");
@@ -43,10 +57,12 @@ public class RejectionRecord : BaseEntity<Guid>
             Id = id,
             ProductionLotId = productionLotId,
             StepId = stepId,
+            TargetStepId = targetStepId,
             QuantityRejected = quantityRejected,
             Reason = reason.Trim(),
             RejectionDate = rejectionDate,
             CreatedAtUtc = DateTime.UtcNow,
+            ClientId = clientId,
             CreatedBy = createdBy
         };
     }

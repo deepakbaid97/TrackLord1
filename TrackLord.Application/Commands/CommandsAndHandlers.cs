@@ -350,6 +350,9 @@ public record RejectItemsCommand(
     decimal QuantityRejected,
     string Reason,
     DateTime RejectionDate,
+    Guid? TargetStepId = null,
+    Guid? ClientId = null,
+    string? ClientName = null,
     string? CreatedBy = null) : IRequest<Guid>;
 
 public class RejectItemsCommandHandler : IRequestHandler<RejectItemsCommand, Guid>
@@ -358,6 +361,7 @@ public class RejectItemsCommandHandler : IRequestHandler<RejectItemsCommand, Gui
     private readonly IManufacturingStepRepository _stepRepository;
     private readonly IManufacturingMovementRepository _movementRepository;
     private readonly IRejectionRecordRepository _rejectionRepository;
+    private readonly IClientRepository _clientRepository;
     private readonly ILedgerReplayEngine _replayEngine;
 
     public RejectItemsCommandHandler(
@@ -366,11 +370,23 @@ public class RejectItemsCommandHandler : IRequestHandler<RejectItemsCommand, Gui
         IManufacturingMovementRepository movementRepository,
         IRejectionRecordRepository rejectionRepository,
         ILedgerReplayEngine replayEngine)
+        : this(lotRepository, stepRepository, movementRepository, rejectionRepository, null!, replayEngine)
+    {
+    }
+
+    public RejectItemsCommandHandler(
+        IProductionLotRepository lotRepository,
+        IManufacturingStepRepository stepRepository,
+        IManufacturingMovementRepository movementRepository,
+        IRejectionRecordRepository rejectionRepository,
+        IClientRepository clientRepository,
+        ILedgerReplayEngine replayEngine)
     {
         _lotRepository = lotRepository;
         _stepRepository = stepRepository;
         _movementRepository = movementRepository;
         _rejectionRepository = rejectionRepository;
+        _clientRepository = clientRepository;
         _replayEngine = replayEngine;
     }
 
@@ -382,19 +398,35 @@ public class RejectItemsCommandHandler : IRequestHandler<RejectItemsCommand, Gui
         var step = await _stepRepository.GetByIdAsync(request.StepId, cancellationToken);
         if (step is null) throw new DomainException($"Step ID '{request.StepId}' not found.");
 
+        var targetStepId = request.TargetStepId ?? request.StepId;
+        var targetStep = await _stepRepository.GetByIdAsync(targetStepId, cancellationToken);
+        if (targetStep is null) throw new DomainException($"Target return step ID '{targetStepId}' not found.");
+
+        string? clientName = request.ClientName;
+        if (_clientRepository != null && request.ClientId.HasValue && request.ClientId.Value != Guid.Empty)
+        {
+            var client = await _clientRepository.GetByIdAsync(request.ClientId.Value, cancellationToken);
+            if (client != null)
+            {
+                clientName = client.Name;
+            }
+        }
+
         var existingMovements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
 
-        // Rejection movement deducts quantity from StepId (FromStepId = StepId, ToStepId = StepId, Type = Rejection)
         var rejectionMovement = ManufacturingMovement.Create(
             Guid.NewGuid(),
             request.ProductionLotId,
             fromStepId: request.StepId,
-            toStepId: request.StepId,
+            toStepId: targetStepId,
             quantity: request.QuantityRejected,
             type: MovementType.Rejection,
             movementDate: request.RejectionDate,
+            clientId: request.ClientId,
+            clientName: clientName,
             createdBy: request.CreatedBy,
-            remarks: $"Rejection: {request.Reason}");
+            remarks: $"Rejection: {request.Reason}",
+            referenceNumber: $"REJ-{Math.Abs(Guid.NewGuid().GetHashCode()) % 10000:D4}");
 
         var allMovements = existingMovements.Concat(new[] { rejectionMovement });
         _replayEngine.ReplayLedger(request.ProductionLotId, allMovements);
@@ -403,9 +435,11 @@ public class RejectItemsCommandHandler : IRequestHandler<RejectItemsCommand, Gui
             Guid.NewGuid(),
             request.ProductionLotId,
             request.StepId,
+            targetStepId,
             request.QuantityRejected,
             request.Reason,
             request.RejectionDate,
+            request.ClientId,
             request.CreatedBy);
 
         await _movementRepository.AddAsync(rejectionMovement, cancellationToken);

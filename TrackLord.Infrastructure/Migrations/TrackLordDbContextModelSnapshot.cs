@@ -324,6 +324,10 @@ namespace TrackLord.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -355,6 +359,10 @@ namespace TrackLord.Infrastructure.Migrations
                     b.Property<Guid>("StepId")
                         .HasColumnType("uuid")
                         .HasColumnName("step_id");
+
+                    b.Property<Guid?>("TargetStepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_step_id");
 
                     b.HasKey("Id");
 

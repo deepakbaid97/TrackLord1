@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using TrackLord.Application.Commands;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Exceptions;
@@ -216,7 +217,7 @@ public class RejectionTests
         var rejectHandler = new RejectItemsCommandHandler(lotRepo, stepRepo, movementRepo, rejectionRepo, _replayEngine);
 
         // Act: Reject 5 pieces at Washing due to stain defect
-        await rejectHandler.Handle(new RejectItemsCommand(lotId, washingStep.Id, 5m, "Stain defect during wash", DateTime.UtcNow, "QC_Inspector"), default);
+        await rejectHandler.Handle(new RejectItemsCommand(lotId, washingStep.Id, 5m, "Stain defect during wash", DateTime.UtcNow, CreatedBy: "QC_Inspector"), default);
 
         // Assert: Washing balance becomes 90 pcs (not 95!)
         var movements = await movementRepo.GetMovementsForLotAsync(lotId);
@@ -229,5 +230,61 @@ public class RejectionTests
         rejections.Should().HaveCount(1);
         rejections[0].QuantityRejected.Should().Be(5m);
         rejections[0].Reason.Should().Be("Stain defect during wash");
+    }
+
+    [Fact]
+    public async Task RejectItems_ShouldTransferItemsToTargetStep_KeepLotQuantityIntact_AndSupportReversal()
+    {
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var lotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var rejectionRepo = new RejectionRecordRepository(db);
+        var clientRepo = new ClientRepository(db);
+
+        var client = new Client(Guid.NewGuid(), "Acme Textiles", "+91 98765 00000", "Buyer");
+        await clientRepo.AddAsync(client);
+
+        var washingStep = new ManufacturingStep(Guid.NewGuid(), "WASH", "Washing", 1, Guid.NewGuid());
+        var finishingStep = new ManufacturingStep(Guid.NewGuid(), "FIN", "Finishing", 2, Guid.NewGuid());
+        await stepRepo.AddAsync(washingStep);
+        await stepRepo.AddAsync(finishingStep);
+
+        var createLot = new CreateProductionLotCommandHandler(lotRepo, stepRepo, movementRepo, _replayEngine);
+        var lotId = await createLot.Handle(new CreateProductionLotCommand("Lot-202", Guid.NewGuid(), 100m, UnitType.Pieces, washingStep.Id), default);
+
+        var moveLot = new MoveLotCommandHandler(lotRepo, stepRepo, movementRepo, clientRepo, _replayEngine);
+        await moveLot.Handle(new MoveLotCommand(lotId, washingStep.Id, finishingStep.Id, 100m, DateTime.UtcNow), default);
+
+        // Act 1: Reject 5 items at Finishing and transfer back to Washing with ClientId
+        var rejectHandler = new RejectItemsCommandHandler(lotRepo, stepRepo, movementRepo, rejectionRepo, clientRepo, _replayEngine);
+        await rejectHandler.Handle(new RejectItemsCommand(
+            lotId,
+            StepId: finishingStep.Id,
+            QuantityRejected: 5m,
+            Reason: "Stain found during finishing - return to washing",
+            RejectionDate: DateTime.UtcNow,
+            TargetStepId: washingStep.Id,
+            ClientId: client.Id,
+            CreatedBy: "QC_Inspector"), default);
+
+        // Assert 1: Total quantity remains 100, Finishing has 95, Washing has 5
+        var movements1 = await movementRepo.GetMovementsForLotAsync(lotId);
+        var snapshot1 = _replayEngine.ReplayLedger(lotId, movements1);
+        snapshot1.TotalActiveQuantity.Should().Be(100m);
+        snapshot1.StepBalances[finishingStep.Id].Should().Be(95m);
+        snapshot1.StepBalances[washingStep.Id].Should().Be(5m);
+
+        // Act 2: Reverse the rejection movement from ledger
+        var rejectionMovement = movements1.First(m => m.Type == MovementType.Rejection);
+        var reverseHandler = new ReverseMovementCommandHandler(movementRepo, _replayEngine);
+        await reverseHandler.Handle(new ReverseMovementCommand(rejectionMovement.Id, "Reversal test", "Supervisor"), default);
+
+        // Assert 2: Reversal restores 5 items back to Finishing, Washing balance becomes 0
+        var movements2 = await movementRepo.GetMovementsForLotAsync(lotId);
+        var snapshot2 = _replayEngine.ReplayLedger(lotId, movements2);
+        snapshot2.TotalActiveQuantity.Should().Be(100m);
+        snapshot2.StepBalances[finishingStep.Id].Should().Be(100m);
+        snapshot2.StepBalances.ContainsKey(washingStep.Id).Should().BeFalse();
     }
 }
