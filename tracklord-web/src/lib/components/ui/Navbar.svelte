@@ -3,6 +3,7 @@
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { href: '/lots', label: 'Lots', icon: 'reorder' },
     { href: '/inventory', label: 'Inventory', icon: 'inventory_2' },
     { href: '/clients', label: 'Clients', icon: 'groups' }
   ];
