@@ -34,6 +34,7 @@ public record MovementTimelineDto(
     string? ClientName,
     string? CreatedBy,
     string? Remarks,
+    string? ReferenceNumber,
     bool IsReversed);
 
 public record LotJourneyDto(
@@ -206,6 +207,7 @@ public class GetLotJourneyQueryHandler : IRequestHandler<GetLotJourneyQuery, Lot
                 m.ClientName,
                 m.CreatedBy,
                 m.Remarks,
+                m.ReferenceNumber,
                 m.IsReversed);
         }).ToList();
 

@@ -269,6 +269,7 @@
       qty: `${m.quantity} Pcs`,
       type: m.movementType,
       clientName: m.clientName || '-',
+      referenceNumber: m.referenceNumber || '-',
       user: m.createdBy || 'System',
       remarks: m.remarks || '-',
       isReversed: m.isReversed
@@ -758,6 +759,7 @@
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Movement Date</th>
               <th class="px-4 py-3">Type</th>
+              <th class="px-4 py-3">Ref No</th>
               <th class="px-4 py-3">Client Name</th>
               <th class="px-4 py-3">From Step</th>
               <th class="px-4 py-3">To Step</th>
@@ -770,7 +772,7 @@
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
             {#if movementsLedgerRows.length === 0}
               <tr>
-                <td colspan="8" class="px-4 py-8 text-center text-on-surface-variant">
+                <td colspan="10" class="px-4 py-8 text-center text-on-surface-variant">
                   No movements recorded for this production lot.
                 </td>
               </tr>
@@ -783,6 +785,7 @@
                       {m.type}
                     </span>
                   </td>
+                  <td class="px-4 py-3 whitespace-nowrap font-mono text-xs font-bold text-on-surface-variant">{m.referenceNumber}</td>
                   <td class="px-4 py-3 whitespace-nowrap font-bold text-primary">{m.clientName}</td>
                   <td class="px-4 py-3 whitespace-nowrap">{m.from}</td>
                   <td class="px-4 py-3 whitespace-nowrap">{m.to}</td>
