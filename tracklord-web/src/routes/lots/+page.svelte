@@ -233,7 +233,7 @@
 </header>
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20">
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   {#if errorMessage}
     <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
@@ -425,7 +425,11 @@
               </tr>
             {:else}
               {#each filteredLots as lot}
-                <tr class="hover:bg-surface-container-low/60 transition-colors">
+                <tr
+                  onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
+                  class="hover:bg-surface-container-low/60 transition-colors cursor-pointer group"
+                  title="View lot {lot.lotNumber} details"
+                >
                   <td class="px-4 py-3 whitespace-nowrap">
                     <div class="font-bold text-primary flex items-center gap-1.5">
                       <span class="material-symbols-outlined text-[16px]">tag</span>

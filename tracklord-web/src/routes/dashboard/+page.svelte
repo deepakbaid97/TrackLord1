@@ -99,7 +99,7 @@
 </header>
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20">
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   {#if errorMessage}
     <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">

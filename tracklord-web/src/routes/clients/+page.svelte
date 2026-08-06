@@ -151,7 +151,7 @@
 </header>
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20">
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   <!-- Notification Banners -->
   {#if errorMessage}

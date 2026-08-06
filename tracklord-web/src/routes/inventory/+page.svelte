@@ -123,7 +123,14 @@
     'PACK': 'inventory_2'
   };
 
+  import { page } from '$app/stores';
+
   onMount(async () => {
+    // Read URL query parameter to auto-select a lot
+    const urlParams = $page.url.searchParams;
+    const lotParam = urlParams.get('lot');
+    if (lotParam) selectedLotId = lotParam;
+
     await refreshAllData();
   });
 
@@ -525,7 +532,7 @@
 </header>
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-20">
+<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   <!-- Notification Banner -->
   {#if errorMessage}
