@@ -1,12 +1,19 @@
 <script>
   import { onMount } from 'svelte';
-  import { getDashboardOverview } from '$lib/api.js';
+  import { getDashboardOverview, getMaterialLots } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
 
   /** @type {any} */
   let overview = $state(null);
+
+  /** Material availability state */
+  let materialLoading = $state(true);
+  let materialError = $state('');
+  let totalMaterialAvailable = $state(0);
+  /** @type {any[]} */
+  let materialLots = $state([]);
 
   onMount(async () => {
     await refreshDashboard();
@@ -21,6 +28,23 @@
       errorMessage = err.message || 'Failed to load dashboard data';
     } finally {
       loading = false;
+    }
+
+    // Fetch material lots and compute total available quantity
+    materialLoading = true;
+    materialError = '';
+    try {
+      const fetchedLots = await getMaterialLots();
+      materialLots = fetchedLots;
+      // Sum remaining quantity across all material lots
+      totalMaterialAvailable = fetchedLots.reduce((sum, lot) => {
+        const qty = lot.remainingQuantity ?? lot.initialQuantity ?? 0;
+        return sum + Number(qty);
+      }, 0);
+    } catch (/** @type {any} */ err) {
+      materialError = err.message || 'Failed to load material data';
+    } finally {
+      materialLoading = false;
     }
   }
 
@@ -266,6 +290,80 @@
         {/if}
       </section>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET: Material Availability                              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+      <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+        <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined text-green-600 text-[22px]">inventory_2</span>
+          Material Availability
+        </h2>
+        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+          {materialLots.length} lots &middot; {totalMaterialAvailable.toLocaleString()} total
+        </span>
+      </div>
+
+      {#if materialLoading}
+        <div class="p-8 text-center text-on-surface-variant flex flex-col items-center gap-3">
+          <span class="material-symbols-outlined animate-spin text-[28px] text-green-600">sync</span>
+          <span class="text-sm">Loading material data...</span>
+        </div>
+      {:else if materialError}
+        <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+          {materialError}
+        </div>
+      {:else if materialLots.length > 0}
+        <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                <th class="px-4 py-3">Lot Number</th>
+                <th class="px-4 py-3">Material Name</th>
+                <th class="px-4 py-3 text-right">Initial Qty</th>
+                <th class="px-4 py-3 text-right">Remaining Qty</th>
+                <th class="px-4 py-3">Unit</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+              {#each materialLots as mat}
+                {@const remaining = mat.remainingQuantity ?? mat.initialQuantity ?? 0}
+                {@const initial = mat.initialQuantity ?? 0}
+                {@const usagePercent = initial > 0 ? (remaining / initial) * 100 : 0}
+                <tr class="hover:bg-surface-container-low/60 transition-colors">
+                  <td class="px-4 py-3">
+                    <span class="font-bold text-on-surface flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px] text-green-600">package_2</span>
+                      {mat.lotNumber}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-on-surface">{mat.materialName ?? '—'}</td>
+                  <td class="px-4 py-3 text-right font-mono text-on-surface-variant">{Number(initial).toLocaleString()}</td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <div class="w-16 bg-surface-variant/60 rounded-full h-1.5 hidden sm:block">
+                        <div
+                          class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                          style="width: {Math.min(usagePercent, 100)}%"
+                        ></div>
+                      </div>
+                      <span class="font-bold text-green-600 font-mono">{Number(remaining).toLocaleString()}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-on-surface-variant">{mat.unit}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+          <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">inventory_2</span>
+          No material lots found. Create a new material lot from the Inventory page.
+        </div>
+      {/if}
+    </section>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- WIDGET 4: Active Production Lots Table                     -->
