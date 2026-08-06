@@ -66,9 +66,10 @@
             // Ignore single lot journey failure
           }
 
+          /** @type {Array<any>} */
           let activeSteps = [];
           let totalWipQty = 0;
-          let lotClientsSet = new Set();
+          let activeLotClientsSet = new Set();
           /** @type {Array<string>} */
           let clientNamesList = [];
 
@@ -79,20 +80,24 @@
               totalWipQty = activeSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
             }
 
-            // Extract clients associated with movements
+            // Extract clients specifically associated with steps that currently hold active WIP quantity
+            const activeStepIds = new Set(activeSteps.map((/** @type {any} */ s) => s.stepId));
+
             if (journey.movementHistory) {
               journey.movementHistory.forEach((/** @type {any} */ m) => {
-                if (!m.isReversed && m.clientId) {
-                  lotClientsSet.add(m.clientId);
-                }
-                if (!m.isReversed && m.clientName) {
-                  clientNamesList.push(m.clientName);
+                if (!m.isReversed && m.toStepName && activeStepIds.size > 0) {
+                  // Find if this movement moved items into one of the currently active WIP steps
+                  const isMoveToActiveStep = activeSteps.some((/** @type {any} */ s) => s.stepName === m.toStepName);
+                  if (isMoveToActiveStep) {
+                    if (m.clientId) activeLotClientsSet.add(m.clientId);
+                    if (m.clientName) clientNamesList.push(m.clientName);
+                  }
                 }
               });
             }
           }
 
-          const clientIdsArray = Array.from(lotClientsSet);
+          const activeClientIdsArray = Array.from(activeLotClientsSet);
           const uniqueClientNames = Array.from(new Set(clientNamesList));
 
           return {
@@ -105,7 +110,7 @@
             createdDate: new Date(lot.createdAtUtc),
             activeSteps,
             totalWipQty: totalWipQty || lot.initialQuantity,
-            clientIds: clientIdsArray,
+            clientIds: activeClientIdsArray,
             clientNamesDisplay: uniqueClientNames.length > 0 ? uniqueClientNames.join(', ') : 'Direct Factory'
           };
         })
@@ -394,7 +399,6 @@
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Lot Number</th>
               <th class="px-4 py-3">Item / Name</th>
-              <th class="px-4 py-3">Client Name</th>
               <th class="px-4 py-3 text-right">Current Quantity</th>
               <th class="px-4 py-3">Active Steps & WIP</th>
               <th class="px-4 py-3">Created Date</th>
@@ -404,7 +408,7 @@
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
             {#if filteredLots.length === 0}
               <tr>
-                <td colspan="7" class="px-4 py-12 text-center text-on-surface-variant">
+                <td colspan="6" class="px-4 py-12 text-center text-on-surface-variant">
                   <span class="material-symbols-outlined text-[36px] text-on-surface-variant/40 mb-2 block">filter_alt_off</span>
                   No production lots match your filter criteria. Try adjusting the search query or filters above.
                 </td>
@@ -419,12 +423,6 @@
                     </div>
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
-                  <td class="px-4 py-3 whitespace-nowrap">
-                    <span class="flex items-center gap-1 font-bold text-primary/90 text-xs">
-                      <span class="material-symbols-outlined text-[14px]">badge</span>
-                      {lot.clientNamesDisplay}
-                    </span>
-                  </td>
                   <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
                     {lot.totalWipQty.toLocaleString()} Pcs
                   </td>
