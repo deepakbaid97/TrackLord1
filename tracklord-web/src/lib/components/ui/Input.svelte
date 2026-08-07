@@ -1,5 +1,5 @@
 <script>
-  /** @type {{ label?: string, type?: string, value?: any, placeholder?: string, error?: string, disabled?: boolean, icon?: string, id?: string, required?: boolean, oninput?: (e: Event) => void, onchange?: (e: Event) => void }} */
+  /** @type {{ label?: string, type?: string, value?: any, placeholder?: string, error?: string, disabled?: boolean, icon?: string, id?: string, required?: boolean, step?: string | number, oninput?: (e: Event) => void, onchange?: (e: Event) => void }} */
   let {
     label = '',
     type = 'text',
@@ -10,6 +10,7 @@
     icon = '',
     id = `input-${Math.random().toString(36).substring(2, 9)}`,
     required = false,
+    step,
     oninput,
     onchange
   } = $props();
@@ -34,6 +35,7 @@
       {placeholder}
       {disabled}
       {required}
+      {step}
       {oninput}
       {onchange}
       class="w-full bg-[#eff4ff] border border-[#c3c6d7] rounded-lg px-3 py-2.5 text-sm text-[#0b1c30] placeholder-[#737686] transition-all duration-200 outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-60 disabled:cursor-not-allowed {icon ? 'pl-10' : ''} {error ? 'border-[#ba1a1a] focus:ring-[#ba1a1a]/20' : ''}"

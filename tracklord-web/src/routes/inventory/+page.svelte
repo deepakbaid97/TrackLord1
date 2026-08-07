@@ -113,6 +113,16 @@
     createdBy: 'Inspector'
   });
 
+  let isConsumePiecesUnit = $derived.by(() => {
+    const selectedMatLot = materialLots.find(m => m.id === consumeMaterialForm.materialLotId);
+    return selectedMatLot && (selectedMatLot.unit === 'Pieces' || selectedMatLot.unit === 1 || selectedMatLot.unitType === 1);
+  });
+
+  let isEditConsumePiecesUnit = $derived.by(() => {
+    const targetMatLot = materialLots.find(m => m.lotNumber === editConsumptionForm.materialLotNumber);
+    return targetMatLot && (targetMatLot.unit === 'Pieces' || targetMatLot.unit === 1 || targetMatLot.unitType === 1);
+  });
+
   // Step Icon mapping helper
   /** @type {Record<string, string>} */
   const stepIconMap = {
@@ -960,8 +970,9 @@
     <Input
       label="Initial Quantity"
       type="number"
+      step={Number(createMaterialForm.unit) === 1 ? '1' : 'any'}
       bind:value={createMaterialForm.initialQuantity}
-      placeholder="e.g. 500"
+      placeholder={Number(createMaterialForm.unit) === 1 ? 'e.g. 500' : 'e.g. 500.5'}
       icon="numbers"
       required={true}
     />
@@ -969,6 +980,11 @@
     <Select
       label="Unit of Measurement"
       bind:value={createMaterialForm.unit}
+      onchange={() => {
+        if (Number(createMaterialForm.unit) === 1) {
+          createMaterialForm.initialQuantity = Math.round(Number(createMaterialForm.initialQuantity) || 0);
+        }
+      }}
       options={[
         { label: 'Meters', value: 2 },
         { label: 'Pieces', value: 1 },
@@ -1012,8 +1028,9 @@
     <Input
       label="Quantity Consumed"
       type="number"
+      step={isConsumePiecesUnit ? '1' : 'any'}
       bind:value={consumeMaterialForm.quantityConsumed}
-      placeholder="e.g. 25"
+      placeholder={isConsumePiecesUnit ? 'e.g. 25' : 'e.g. 25.5'}
       icon="numbers"
       required={true}
     />
@@ -1126,8 +1143,9 @@
     <Input
       label="Quantity Consumed"
       type="number"
+      step={isEditConsumePiecesUnit ? '1' : 'any'}
       bind:value={editConsumptionForm.quantityConsumed}
-      placeholder="e.g. 30"
+      placeholder={isEditConsumePiecesUnit ? 'e.g. 30' : 'e.g. 30.5'}
       icon="numbers"
       required={true}
     />
