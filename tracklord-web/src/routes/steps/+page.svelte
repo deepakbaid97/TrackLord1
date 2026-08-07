@@ -1,6 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { getManufacturingSteps, createManufacturingStep, updateManufacturingStep } from '$lib/api.js';
+  import {
+    getManufacturingSteps,
+    createManufacturingStep,
+    updateManufacturingStep,
+    getProductionLots,
+    getLotJourney
+  } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -37,7 +43,50 @@
     loading = true;
     errorMessage = '';
     try {
-      steps = await getManufacturingSteps();
+      const [stepsData, lotsData] = await Promise.all([
+        getManufacturingSteps(),
+        getProductionLots()
+      ]);
+
+      const stepsList = stepsData || [];
+      const lotsList = lotsData || [];
+
+      // Map to accumulate lots and quantities at each step
+      /** @type {Record<string, Array<{lotId: string, lotNumber: string, quantity: number}>>} */
+      const stepLotsMap = {};
+      stepsList.forEach(s => { stepLotsMap[s.id] = []; });
+
+      await Promise.all(
+        lotsList.map(async (lot) => {
+          try {
+            const journey = await getLotJourney(lot.id);
+            if (journey && journey.activeBalances) {
+              journey.activeBalances.forEach((/** @type {any} */ b) => {
+                if (b.quantity > 0) {
+                  if (!stepLotsMap[b.stepId]) stepLotsMap[b.stepId] = [];
+                  stepLotsMap[b.stepId].push({
+                    lotId: lot.id,
+                    lotNumber: lot.lotNumber,
+                    quantity: b.quantity
+                  });
+                }
+              });
+            }
+          } catch {
+            // Ignore single lot failure
+          }
+        })
+      );
+
+      steps = stepsList.map(s => {
+        const lotsAtThisStep = stepLotsMap[s.id] || [];
+        const totalQty = lotsAtThisStep.reduce((sum, l) => sum + l.quantity, 0);
+        return {
+          ...s,
+          lotsAtStep: lotsAtThisStep,
+          totalQuantity: totalQty
+        };
+      });
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to load manufacturing steps.';
     } finally {
@@ -218,15 +267,15 @@
       </div>
     </div>
 
-    <!-- Active Steps -->
+    <!-- Active Quantity across steps -->
     <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
       <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-        <span class="material-symbols-outlined text-[28px]">play_circle</span>
+        <span class="material-symbols-outlined text-[28px]">stacks</span>
       </div>
       <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Steps</div>
+        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Steps Qty</div>
         <div class="text-3xl font-bold text-on-surface leading-tight">
-          {steps.filter(s => s.isActive !== false).length}
+          {steps.filter(s => !s.isTerminating).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} Pcs
         </div>
       </div>
     </div>
@@ -252,10 +301,10 @@
       <div>
         <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
           <span class="material-symbols-outlined text-primary text-[22px]">view_timeline</span>
-          Manufacturing Sequence
+          Manufacturing Sequence & WIP
         </h2>
         <p class="text-xs text-on-surface-variant mt-0.5">
-          Steps define the workflow pipeline. Mark a step as <strong>Terminating</strong> if quantities at that step represent completed production.
+          Overview of manufacturing steps, lots present, and current quantities at each stage.
         </p>
       </div>
       <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant">
@@ -266,27 +315,32 @@
     {#if loading}
       <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
         <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-        <span>Loading manufacturing steps...</span>
+        <span>Loading manufacturing steps & lots...</span>
       </div>
     {:else if steps.length > 0}
       <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-              <th class="px-4 py-3 text-center w-16">Seq</th>
+              <th class="px-4 py-3 text-center w-14">Seq</th>
               <th class="px-4 py-3">Code</th>
               <th class="px-4 py-3">Step Name</th>
-              <th class="px-4 py-3 text-center">Status</th>
+              <th class="px-4 py-3 text-right">Total Qty</th>
+
               <th class="px-4 py-3 text-center">Terminating Step?</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
             {#each steps as step}
-              <tr class="hover:bg-surface-container-low/60 transition-colors">
+              <tr
+                onclick={() => window.location.href = `/lots?step=${step.id}`}
+                class="hover:bg-surface-container-low/60 transition-colors cursor-pointer group"
+                title="Click to view lots at '{step.name}' in Lots Directory"
+              >
                 <!-- Sequence Order Badge -->
                 <td class="px-4 py-3.5 text-center">
-                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs">
+                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs group-hover:scale-110 transition-transform">
                     {step.sequenceOrder}
                   </span>
                 </td>
@@ -294,32 +348,31 @@
                 <!-- Code -->
                 <td class="px-4 py-3.5">
                   <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[20px] text-primary/80">
+                    <span class="material-symbols-outlined text-[20px] text-primary/80 group-hover:text-primary transition-colors">
                       {stepIconMap[step.code] || 'work'}
                     </span>
-                    <span class="font-mono font-bold text-sm text-primary tracking-wide">
+                    <span class="font-mono font-bold text-sm text-primary tracking-wide group-hover:underline">
                       {step.code}
                     </span>
                   </div>
                 </td>
 
                 <!-- Name -->
-                <td class="px-4 py-3.5 font-bold text-on-surface">
+                <td class="px-4 py-3.5 font-bold text-on-surface group-hover:text-primary transition-colors">
                   {step.name}
                 </td>
 
-                <!-- Status Badge -->
-                <td class="px-4 py-3.5 text-center">
-                  {#if step.isActive !== false}
-                    <span class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                      Active
-                    </span>
-                  {:else}
-                    <span class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                      Inactive
-                    </span>
-                  {/if}
+                <!-- Total Quantity -->
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary font-bold text-base font-mono tracking-wide">
+                    {(step.totalQuantity || 0).toLocaleString()} Pcs
+                  </span>
+                  <div class="text-[11px] text-on-surface-variant font-mono mt-1">
+                    {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
+                  </div>
                 </td>
+
+
 
                 <!-- Terminating Indicator -->
                 <td class="px-4 py-3.5 text-center">
@@ -336,7 +389,7 @@
                 <!-- Actions -->
                 <td class="px-4 py-3.5 text-right">
                   <button
-                    onclick={() => openEditModal(step)}
+                    onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
                     class="px-3 py-1.5 rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-bold text-xs flex items-center gap-1 ml-auto transition-colors cursor-pointer"
                   >
                     <span class="material-symbols-outlined text-[16px]">edit</span>
