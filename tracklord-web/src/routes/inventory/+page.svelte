@@ -217,6 +217,32 @@
     }
   }
 
+  /** @param {string} stepId */
+  function updateMoveQuantityFromStep(stepId) {
+    moveForm.fromStepId = stepId;
+    const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === stepId);
+    moveForm.quantity = balanceObj && typeof balanceObj.quantity === 'number' ? balanceObj.quantity : 0;
+  }
+
+  function openMoveModal() {
+    // Find the first step that actually has an active WIP balance > 0
+    const activeStepWithBalance = activeWipBalances.find((/** @type {any} */ b) => b.quantity > 0);
+    if (activeStepWithBalance) {
+      moveForm.fromStepId = activeStepWithBalance.stepId;
+    } else if (manufacturingSteps.length > 0) {
+      moveForm.fromStepId = manufacturingSteps[0].id;
+    }
+
+    if (manufacturingSteps.length > 1) {
+      const fromIdx = manufacturingSteps.findIndex(s => s.id === moveForm.fromStepId);
+      const nextStep = manufacturingSteps[fromIdx + 1] || manufacturingSteps.find(s => s.id !== moveForm.fromStepId);
+      if (nextStep) moveForm.toStepId = nextStep.id;
+    }
+
+    updateMoveQuantityFromStep(moveForm.fromStepId);
+    isMoveModalOpen = true;
+  }
+
   /** @param {string} newLotId */
   async function handleLotChange(newLotId) {
     selectedLotId = newLotId;
@@ -590,7 +616,7 @@
       <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
         New Production Lot
       </Button>
-      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={() => isMoveModalOpen = true}>
+      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
         Move Quantity
       </Button>
       <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
@@ -610,15 +636,17 @@
     <div class="flex gap-2">
       <button
         onclick={() => activeTab = 'lots'}
-        class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'lots' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'lots' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        Lot Journey & WIP
+        <span class="material-symbols-outlined text-[18px]">reorder</span>
+        Lot Tracking & Journey
       </button>
       <button
-        onclick={() => activeTab = 'ledger'}
-        class="px-4 py-2 rounded-lg font-stat-label text-stat-label transition-colors {activeTab === 'ledger' ? 'bg-primary text-on-primary font-bold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        onclick={() => activeTab = 'materials'}
+        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'materials' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        Movements Ledger ({movementsLedgerRows.length})
+        <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+        Raw Materials Ledger
       </button>
     </div>
   </div>
@@ -629,6 +657,7 @@
       <span>Fetching live data from backend API...</span>
     </div>
   {:else if activeTab === 'lots'}
+    <!-- LOT TRACKING VIEW -->
     {#if currentLotJourney}
       <!-- Header Info -->
       <section class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
@@ -880,7 +909,12 @@
     <Select
       label="Source Step (From)"
       bind:value={moveForm.fromStepId}
-      options={manufacturingSteps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      onchange={(stepId) => updateMoveQuantityFromStep(stepId)}
+      options={manufacturingSteps.map(s => {
+        const bal = activeWipBalances.find((/** @type {any} */ b) => b.stepId === s.id);
+        const availableQty = bal ? bal.quantity : 0;
+        return { label: `${s.name} (${s.code}) - Avail: ${availableQty} Pcs`, value: s.id };
+      })}
       icon="logout"
       required={true}
     />
