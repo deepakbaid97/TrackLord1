@@ -12,6 +12,7 @@ public record LotLedgerSnapshot(
     Guid ProductionLotId,
     IReadOnlyDictionary<Guid, decimal> StepBalances,
     decimal TotalActiveQuantity,
+    decimal TotalTerminatedQuantity,
     DateTime CalculatedAsOfUtc,
     int TotalMovementsReplayed);
 
@@ -23,8 +24,10 @@ public interface ILedgerReplayEngine
     /// 2. CreatedAtUtc ASC
     /// 3. Id ASC
     /// Enforces non-negative balance invariant across all step locations at every point in history.
+    /// Steps whose IDs appear in terminatingStepIds will have their quantities counted as
+    /// TotalTerminatedQuantity instead of TotalActiveQuantity.
     /// </summary>
-    LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements);
+    LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null);
 }
 
 public interface IUnitConverterService

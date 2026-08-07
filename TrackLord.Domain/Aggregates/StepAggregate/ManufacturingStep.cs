@@ -10,11 +10,12 @@ public class ManufacturingStep : AggregateRoot<Guid>
     public string Name { get; private set; } = default!;
     public int SequenceOrder { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsTerminating { get; private set; }
     public Guid FactoryId { get; private set; }
 
     private ManufacturingStep() { } // EF Core
 
-    public ManufacturingStep(Guid id, string code, string name, int sequenceOrder, Guid factoryId)
+    public ManufacturingStep(Guid id, string code, string name, int sequenceOrder, Guid factoryId, bool isTerminating = false)
     {
         if (id == Guid.Empty) throw new DomainException("Step Id cannot be empty.");
         if (string.IsNullOrWhiteSpace(code)) throw new DomainException("Step code cannot be empty.");
@@ -27,15 +28,17 @@ public class ManufacturingStep : AggregateRoot<Guid>
         SequenceOrder = sequenceOrder;
         FactoryId = factoryId;
         IsActive = true;
+        IsTerminating = isTerminating;
     }
 
-    public void UpdateDetails(string name, int sequenceOrder)
+    public void UpdateDetails(string name, int sequenceOrder, bool isTerminating)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Step name cannot be empty.");
         if (sequenceOrder < 0) throw new DomainException("Sequence order must be non-negative.");
 
         Name = name.Trim();
         SequenceOrder = sequenceOrder;
+        IsTerminating = isTerminating;
     }
 
     public void Deactivate() => IsActive = false;

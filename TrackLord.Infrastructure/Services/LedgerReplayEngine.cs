@@ -10,7 +10,7 @@ namespace TrackLord.Infrastructure.Services;
 
 public class LedgerReplayEngine : ILedgerReplayEngine
 {
-    public LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements)
+    public LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null)
     {
         if (movements is null)
         {
@@ -75,12 +75,27 @@ public class LedgerReplayEngine : ILedgerReplayEngine
             .Where(kvp => kvp.Value > 0)
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-        var totalActive = activeBalances.Values.Sum();
+        // Split quantities into active vs terminated based on terminatingStepIds
+        decimal totalActive = 0m;
+        decimal totalTerminated = 0m;
+
+        foreach (var (stepId, qty) in activeBalances)
+        {
+            if (terminatingStepIds != null && terminatingStepIds.Contains(stepId))
+            {
+                totalTerminated += qty;
+            }
+            else
+            {
+                totalActive += qty;
+            }
+        }
 
         return new LotLedgerSnapshot(
             productionLotId,
             activeBalances,
             totalActive,
+            totalTerminated,
             DateTime.UtcNow,
             sortedMovements.Count);
     }

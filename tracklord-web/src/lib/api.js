@@ -23,6 +23,31 @@ export async function getManufacturingSteps() {
   return await handleResponse(response);
 }
 
+// 1b. Create Manufacturing Step
+/** @param {any} data */
+export async function createManufacturingStep(data) {
+  const response = await fetch(`${API_BASE_URL}/ManufacturingSteps`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 1c. Update Manufacturing Step
+/**
+ * @param {string} id
+ * @param {any} data
+ */
+export async function updateManufacturingStep(id, data) {
+  const response = await fetch(`${API_BASE_URL}/ManufacturingSteps/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
 // 2. Fetch all Production Lots
 export async function getProductionLots() {
   const response = await fetch(`${API_BASE_URL}/ProductionLots`);

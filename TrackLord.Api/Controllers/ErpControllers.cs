@@ -165,7 +165,35 @@ public class ManufacturingStepsController : ControllerBase
         var steps = await _mediator.Send(new GetAllManufacturingStepsQuery());
         return Ok(steps);
     }
+
+    /// <summary>
+    /// Creates a new manufacturing step.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateManufacturingStepCommand command)
+    {
+        var id = await _mediator.Send(command);
+        return Ok(new { id });
+    }
+
+    /// <summary>
+    /// Updates an existing manufacturing step.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateManufacturingStepRequest request)
+    {
+        var command = new UpdateManufacturingStepCommand(
+            id,
+            request.Name,
+            request.SequenceOrder,
+            request.IsTerminating,
+            request.IsActive);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
 }
+
+public record UpdateManufacturingStepRequest(string Name, int SequenceOrder, bool IsTerminating, bool IsActive);
 
 [ApiController]
 [Route("api/[controller]")]

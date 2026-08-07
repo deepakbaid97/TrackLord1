@@ -175,6 +175,12 @@ public class ManufacturingStepRepository : IManufacturingStepRepository
         await _dbContext.ManufacturingSteps.AddAsync(step, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateAsync(ManufacturingStep step, CancellationToken cancellationToken = default)
+    {
+        _dbContext.ManufacturingSteps.Update(step);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public class MaterialConsumptionRepository : IMaterialConsumptionRepository

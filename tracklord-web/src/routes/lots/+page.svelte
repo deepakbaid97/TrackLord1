@@ -87,7 +87,14 @@
             // Extract active step balances
             if (journey.activeBalances) {
               activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
-              totalWipQty = activeSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
+
+              // Exclude terminating step quantities from total active WIP calculation
+              const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
+                const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
+                return !stepObj?.isTerminating;
+              });
+
+              totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
             }
 
             // Extract clients specifically associated with steps that currently hold active WIP quantity
@@ -119,7 +126,7 @@
             createdAtUtc: lot.createdAtUtc,
             createdDate: new Date(lot.createdAtUtc),
             activeSteps,
-            totalWipQty: totalWipQty || lot.initialQuantity,
+            totalWipQty: journey ? totalWipQty : lot.initialQuantity,
             clientIds: activeClientIdsArray,
             clientNamesDisplay: uniqueClientNames.length > 0 ? uniqueClientNames.join(', ') : 'Direct Factory'
           };
@@ -443,9 +450,13 @@
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1.5 items-center">
                       {#each lot.activeSteps as step}
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-primary-container text-on-primary-container flex items-center gap-1">
+                        {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
                           <span class="material-symbols-outlined text-[12px]">{stepIconMap[step.stepCode] || 'work'}</span>
                           {step.stepName}: {step.quantity} Pcs
+                          {#if stepObj?.isTerminating}
+                            <span class="text-[9px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
+                          {/if}
                         </span>
                       {/each}
                       {#if lot.activeSteps.length === 0}

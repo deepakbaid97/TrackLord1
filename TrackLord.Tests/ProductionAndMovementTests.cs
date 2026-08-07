@@ -199,4 +199,37 @@ public class MovementTests
 
         await act.Should().ThrowAsync<DomainException>();
     }
+
+    [Fact]
+    public async Task ReplayLedger_WithTerminatingStep_ShouldSeparateActiveAndTerminatedQuantities()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var lotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+
+        var factoryId = Guid.NewGuid();
+        var cuttingStep = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, factoryId, isTerminating: false);
+        var packingStep = new ManufacturingStep(Guid.NewGuid(), "PACK", "Packing", 2, factoryId, isTerminating: true);
+        await stepRepo.AddAsync(cuttingStep);
+        await stepRepo.AddAsync(packingStep);
+
+        var createHandler = new CreateProductionLotCommandHandler(lotRepo, stepRepo, movementRepo, _replayEngine);
+        var lotId = await createHandler.Handle(new CreateProductionLotCommand("Lot-101", Guid.NewGuid(), 100m, UnitType.Pieces, cuttingStep.Id), default);
+
+        var moveHandler = new MoveLotCommandHandler(lotRepo, stepRepo, movementRepo, _replayEngine);
+        await moveHandler.Handle(new MoveLotCommand(lotId, cuttingStep.Id, packingStep.Id, 40m, DateTime.UtcNow), default);
+
+        // Act
+        var movements = await movementRepo.GetMovementsForLotAsync(lotId);
+        var terminatingStepIds = new System.Collections.Generic.HashSet<Guid> { packingStep.Id };
+        var snapshot = _replayEngine.ReplayLedger(lotId, movements, terminatingStepIds);
+
+        // Assert
+        snapshot.StepBalances[cuttingStep.Id].Should().Be(60m);
+        snapshot.StepBalances[packingStep.Id].Should().Be(40m);
+        snapshot.TotalActiveQuantity.Should().Be(60m);
+        snapshot.TotalTerminatedQuantity.Should().Be(40m);
+    }
 }

@@ -76,11 +76,11 @@ using (var scope = app.Services.CreateScope())
         if (!dbContext.ManufacturingSteps.Any())
         {
             var factoryId = Guid.NewGuid();
-            var stepCut = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, factoryId);
-            var stepStitch = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "STITCH", "Stitching", 2, factoryId);
-            var stepWash = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "WASH", "Washing", 3, factoryId);
-            var stepFin = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "FIN", "Finishing", 4, factoryId);
-            var stepPack = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "PACK", "Packing", 5, factoryId);
+            var stepCut = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, factoryId, false);
+            var stepStitch = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "STITCH", "Stitching", 2, factoryId, false);
+            var stepWash = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "WASH", "Washing", 3, factoryId, false);
+            var stepFin = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "FIN", "Finishing", 4, factoryId, false);
+            var stepPack = new TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep(Guid.NewGuid(), "PACK", "Packing", 5, factoryId, true);
 
             dbContext.ManufacturingSteps.AddRange(stepCut, stepStitch, stepWash, stepFin, stepPack);
             dbContext.SaveChanges();

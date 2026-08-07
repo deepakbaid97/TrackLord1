@@ -8,6 +8,7 @@ using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
+using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Entities;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Exceptions;
@@ -532,3 +533,72 @@ public class ReverseMovementCommandHandler : IRequestHandler<ReverseMovementComm
         return reversalId;
     }
 }
+
+// 8. Create Manufacturing Step Command
+public record CreateManufacturingStepCommand(
+    string Code,
+    string Name,
+    int SequenceOrder,
+    bool IsTerminating = false,
+    Guid? FactoryId = null) : IRequest<Guid>;
+
+public class CreateManufacturingStepCommandHandler : IRequestHandler<CreateManufacturingStepCommand, Guid>
+{
+    private readonly IManufacturingStepRepository _stepRepository;
+
+    public CreateManufacturingStepCommandHandler(IManufacturingStepRepository stepRepository)
+    {
+        _stepRepository = stepRepository;
+    }
+
+    public async Task<Guid> Handle(CreateManufacturingStepCommand request, CancellationToken cancellationToken)
+    {
+        var existingStep = await _stepRepository.GetByCodeAsync(request.Code, cancellationToken);
+        if (existingStep is not null)
+        {
+            throw new DomainException($"Manufacturing Step Code '{request.Code}' already exists.");
+        }
+
+        var stepId = Guid.NewGuid();
+        var factoryId = request.FactoryId ?? Guid.NewGuid();
+        var step = new ManufacturingStep(stepId, request.Code, request.Name, request.SequenceOrder, factoryId, request.IsTerminating);
+
+        await _stepRepository.AddAsync(step, cancellationToken);
+        return stepId;
+    }
+}
+
+// 9. Update Manufacturing Step Command
+public record UpdateManufacturingStepCommand(
+    Guid Id,
+    string Name,
+    int SequenceOrder,
+    bool IsTerminating,
+    bool IsActive) : IRequest<bool>;
+
+public class UpdateManufacturingStepCommandHandler : IRequestHandler<UpdateManufacturingStepCommand, bool>
+{
+    private readonly IManufacturingStepRepository _stepRepository;
+
+    public UpdateManufacturingStepCommandHandler(IManufacturingStepRepository stepRepository)
+    {
+        _stepRepository = stepRepository;
+    }
+
+    public async Task<bool> Handle(UpdateManufacturingStepCommand request, CancellationToken cancellationToken)
+    {
+        var step = await _stepRepository.GetByIdAsync(request.Id, cancellationToken);
+        if (step is null)
+        {
+            throw new DomainException($"Manufacturing Step ID '{request.Id}' not found.");
+        }
+
+        step.UpdateDetails(request.Name, request.SequenceOrder, request.IsTerminating);
+        if (request.IsActive) step.Activate();
+        else step.Deactivate();
+
+        await _stepRepository.UpdateAsync(step, cancellationToken);
+        return true;
+    }
+}
+

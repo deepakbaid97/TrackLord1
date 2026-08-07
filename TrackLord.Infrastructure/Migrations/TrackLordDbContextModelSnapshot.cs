@@ -300,6 +300,12 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsTerminating")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_terminating");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

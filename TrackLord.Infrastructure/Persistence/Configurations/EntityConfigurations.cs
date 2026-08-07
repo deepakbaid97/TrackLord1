@@ -124,6 +124,7 @@ public class ManufacturingStepConfiguration : IEntityTypeConfiguration<Manufactu
         builder.Property(s => s.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
         builder.Property(s => s.SequenceOrder).HasColumnName("sequence_order").IsRequired();
         builder.Property(s => s.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(s => s.IsTerminating).HasColumnName("is_terminating").IsRequired().HasDefaultValue(false);
         builder.Property(s => s.FactoryId).HasColumnName("factory_id").IsRequired();
 
         builder.HasIndex(s => s.Code).IsUnique();

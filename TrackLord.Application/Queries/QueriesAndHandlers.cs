@@ -20,6 +20,7 @@ public record WipStatusDto(
     string Status,
     decimal TotalInitialQuantity,
     decimal TotalCurrentWipQuantity,
+    decimal TotalTerminatedQuantity,
     IReadOnlyList<StepWipDto> CurrentStepBalances);
 
 public record MovementTimelineDto(
@@ -98,6 +99,7 @@ public record ManufacturingStepDto(
     string Code,
     string Name,
     int SequenceOrder,
+    bool IsTerminating,
     Guid FactoryId);
 
 public record MaterialLotDto(
@@ -141,8 +143,9 @@ public class GetCurrentWipQueryHandler : IRequestHandler<GetCurrentWipQuery, Wip
 
         var movements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
         var steps = (await _stepRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.Id);
+        var terminatingStepIds = steps.Values.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
 
-        var snapshot = _replayEngine.ReplayLedger(request.ProductionLotId, movements);
+        var snapshot = _replayEngine.ReplayLedger(request.ProductionLotId, movements, terminatingStepIds);
 
         var stepWips = snapshot.StepBalances.Select(sb =>
         {
@@ -156,6 +159,7 @@ public class GetCurrentWipQueryHandler : IRequestHandler<GetCurrentWipQuery, Wip
             lot.Status.ToString(),
             lot.InitialQuantity.Value,
             snapshot.TotalActiveQuantity,
+            snapshot.TotalTerminatedQuantity,
             stepWips);
     }
 }
@@ -189,6 +193,7 @@ public class GetLotJourneyQueryHandler : IRequestHandler<GetLotJourneyQuery, Lot
 
         var movements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
         var steps = (await _stepRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.Id);
+        var terminatingStepIds = steps.Values.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
 
         var timeline = movements.Select(m =>
         {
@@ -211,7 +216,7 @@ public class GetLotJourneyQueryHandler : IRequestHandler<GetLotJourneyQuery, Lot
                 m.IsReversed);
         }).ToList();
 
-        var snapshot = _replayEngine.ReplayLedger(request.ProductionLotId, movements);
+        var snapshot = _replayEngine.ReplayLedger(request.ProductionLotId, movements, terminatingStepIds);
         var activeWips = snapshot.StepBalances.Select(sb =>
         {
             steps.TryGetValue(sb.Key, out var step);
@@ -308,13 +313,16 @@ public class GetStepDashboardQueryHandler : IRequestHandler<GetStepDashboardQuer
         var step = await _stepRepository.GetByIdAsync(request.StepId, cancellationToken);
         if (step is null) throw new DomainException($"Step ID '{request.StepId}' not found.");
 
+        var allSteps = await _stepRepository.GetAllAsync(cancellationToken);
+        var terminatingStepIds = allSteps.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
+
         var lots = await _lotRepository.GetAllAsync(cancellationToken);
         var lotsAtStep = new List<StepDashboardLotDto>();
 
         foreach (var lot in lots)
         {
             var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
-            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements);
+            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
 
             if (snapshot.StepBalances.TryGetValue(request.StepId, out var qtyAtStep) && qtyAtStep > 0)
             {
@@ -360,6 +368,7 @@ public class GetFactoryDashboardQueryHandler : IRequestHandler<GetFactoryDashboa
     {
         var steps = await _stepRepository.GetAllAsync(cancellationToken);
         var factorySteps = steps.Where(s => s.FactoryId == request.FactoryId).ToList();
+        var terminatingStepIds = steps.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
 
         var lots = await _lotRepository.GetAllAsync(cancellationToken);
         var stepQuantities = factorySteps.ToDictionary(s => s.Id, s => 0m);
@@ -367,7 +376,7 @@ public class GetFactoryDashboardQueryHandler : IRequestHandler<GetFactoryDashboa
         foreach (var lot in lots)
         {
             var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
-            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements);
+            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
 
             foreach (var (stepId, qty) in snapshot.StepBalances)
             {
@@ -384,7 +393,10 @@ public class GetFactoryDashboardQueryHandler : IRequestHandler<GetFactoryDashboa
             s.Name,
             stepQuantities[s.Id])).ToList();
 
-        var totalFactoryWip = stepSummaries.Sum(s => s.TotalWipQuantity);
+        // Exclude terminating step quantities from total factory WIP
+        var totalFactoryWip = factorySteps
+            .Where(s => !s.IsTerminating)
+            .Sum(s => stepQuantities[s.Id]);
 
         return new FactoryDashboardDto(request.FactoryId, totalFactoryWip, stepSummaries);
     }
@@ -435,6 +447,7 @@ public class GetAllManufacturingStepsQueryHandler : IRequestHandler<GetAllManufa
             s.Code,
             s.Name,
             s.SequenceOrder,
+            s.IsTerminating,
             s.FactoryId
         )).OrderBy(s => s.SequenceOrder).ToList();
     }
@@ -473,7 +486,8 @@ public record DashboardStepSummaryDto(
     string StepCode,
     string StepName,
     decimal TotalWipQuantity,
-    int ActiveLotsCount);
+    int ActiveLotsCount,
+    bool IsTerminating);
 
 public record DashboardClientSummaryDto(
     Guid ClientId,
@@ -493,6 +507,7 @@ public record DashboardActiveLotDto(
 public record DashboardOverviewDto(
     int TotalActiveLots,
     decimal TotalActiveQuantity,
+    decimal TotalTerminatedQuantity,
     int TotalClients,
     int TotalMaterialLots,
     IReadOnlyList<DashboardStepSummaryDto> StepSummaries,
@@ -534,6 +549,7 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         var activeLots = allLots.Where(l => l.Status == LotStatus.Active).ToList();
         var steps = (await _stepRepository.GetAllAsync(cancellationToken)).OrderBy(s => s.SequenceOrder).ToList();
         var stepsDict = steps.ToDictionary(s => s.Id);
+        var terminatingStepIds = steps.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
         var clients = await _clientRepository.GetAllAsync(cancellationToken);
         var clientsDict = clients.ToDictionary(c => c.Id);
         var materialLots = await _materialLotRepository.GetAllAsync(cancellationToken);
@@ -542,6 +558,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         var stepWipTotals = steps.ToDictionary(s => s.Id, _ => 0m);
         var stepLotCounts = steps.ToDictionary(s => s.Id, _ => 0);
         var activeLotSummaries = new List<DashboardActiveLotDto>();
+        decimal totalTerminatedQty = 0m;
+        int nonTerminatedLotCount = 0;
 
         // 3. Per-client aggregation from movements
         // Key: ClientId, Value: (lotsSet, totalQty)
@@ -550,7 +568,7 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         foreach (var lot in activeLots)
         {
             var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
-            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements);
+            var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
 
             // Aggregate step WIP
             decimal lotWipTotal = 0m;
@@ -576,11 +594,21 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
                 }
             }
 
+            // Track terminated vs active quantities
+            totalTerminatedQty += snapshot.TotalTerminatedQuantity;
+
+            // A lot is considered "active" (non-terminated) if it has any non-terminated quantity
+            bool lotHasActiveQuantity = snapshot.TotalActiveQuantity > 0;
+            if (lotHasActiveQuantity)
+            {
+                nonTerminatedLotCount++;
+            }
+
             activeLotSummaries.Add(new DashboardActiveLotDto(
                 lot.Id,
                 lot.LotNumber.Value,
                 lot.InitialQuantity.Value,
-                lotWipTotal,
+                snapshot.TotalActiveQuantity,
                 primaryStepName,
                 lot.CreatedAtUtc));
 
@@ -603,7 +631,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
             s.Code,
             s.Name,
             stepWipTotals[s.Id],
-            stepLotCounts[s.Id]
+            stepLotCounts[s.Id],
+            s.IsTerminating
         )).ToList();
 
         // 5. Build client summaries
@@ -629,8 +658,9 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         var totalActiveQty = activeLotSummaries.Sum(l => l.CurrentWipQuantity);
 
         return new DashboardOverviewDto(
-            activeLots.Count,
+            nonTerminatedLotCount,
             totalActiveQty,
+            totalTerminatedQty,
             clients.Count,
             materialLots.Count,
             stepSummaries,

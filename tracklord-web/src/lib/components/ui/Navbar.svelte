@@ -3,9 +3,10 @@
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { href: '/lots', label: 'Lots', icon: 'reorder' },
     { href: '/inventory', label: 'Inventory', icon: 'inventory_2' },
-    { href: '/clients', label: 'Clients', icon: 'groups' }
+    { href: '/lots', label: 'Lots', icon: 'reorder' },
+    { href: '/clients', label: 'Clients', icon: 'groups' },
+    { href: '/steps', label: 'Steps', icon: 'alt_route' }
   ];
 
   let pathname = $derived($page.url.pathname);

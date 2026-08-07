@@ -123,7 +123,7 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- WIDGET 1: KPI Summary Cards                                -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <!-- Active Lots -->
       <a
         href="/lots"
@@ -148,28 +148,6 @@
           <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total WIP</div>
           <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveQuantity.toLocaleString()}</div>
           <div class="text-[11px] text-on-surface-variant font-mono">Pieces</div>
-        </div>
-      </div>
-
-      <!-- Total Clients -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-        <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-600 group-hover:bg-emerald-500/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">groups</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Clients</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalClients}</div>
-        </div>
-      </div>
-
-      <!-- Material Lots -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-        <div class="p-3 bg-amber-500/10 rounded-xl text-amber-600 group-hover:bg-amber-500/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">texture</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Material Lots</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalMaterialLots}</div>
         </div>
       </div>
     </section>
