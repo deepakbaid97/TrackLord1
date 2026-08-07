@@ -136,10 +136,15 @@
   import { page } from '$app/stores';
 
   onMount(async () => {
-    // Read URL query parameter to auto-select a lot
+    // Priority: 1. URL query parameter ('?lot=...'), 2. localStorage ('tracklord_last_lot_id')
     const urlParams = $page.url.searchParams;
     const lotParam = urlParams.get('lot');
-    if (lotParam) selectedLotId = lotParam;
+    if (lotParam) {
+      selectedLotId = lotParam;
+    } else {
+      const savedLotId = localStorage.getItem('tracklord_last_lot_id');
+      if (savedLotId) selectedLotId = savedLotId;
+    }
 
     await refreshAllData();
   });
@@ -170,6 +175,7 @@
         if (!selectedLotId || !productionLots.some((/** @type {any} */ l) => l.id === selectedLotId)) {
           selectedLotId = productionLots[0].id;
         }
+        localStorage.setItem('tracklord_last_lot_id', selectedLotId);
         await loadSelectedLotDetails(selectedLotId);
       } else {
         selectedLotId = '';
@@ -217,6 +223,15 @@
     }
   }
 
+  /** @param {string} newLotId */
+  async function handleLotChange(newLotId) {
+    selectedLotId = newLotId;
+    if (newLotId) {
+      localStorage.setItem('tracklord_last_lot_id', newLotId);
+    }
+    await loadSelectedLotDetails(newLotId);
+  }
+
   /** @param {string} stepId */
   function updateMoveQuantityFromStep(stepId) {
     moveForm.fromStepId = stepId;
@@ -243,11 +258,7 @@
     isMoveModalOpen = true;
   }
 
-  /** @param {string} newLotId */
-  async function handleLotChange(newLotId) {
-    selectedLotId = newLotId;
-    await loadSelectedLotDetails(newLotId);
-  }
+
 
   // Calculated properties from real API data
   let activeWipBalances = $derived.by(() => {
