@@ -74,12 +74,50 @@ public class ProductionTests
 
         await handler.Handle(command, default);
 
-        // Act
-        Func<Task> act = async () => await handler.Handle(command, default);
-
         // Assert
+        Func<Task> act = async () => await handler.Handle(command, default);
         await act.Should().ThrowAsync<DomainException>()
             .WithMessage("*already exists*");
+    }
+
+    [Fact]
+    public async Task ImportProductionLots_WithExistingLotNumber_ShouldAutoIncrementSuffixAndAssociateClient()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var lotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var clientRepo = new ClientRepository(db);
+
+        var importHandler = new ImportProductionLotsCommandHandler(lotRepo, stepRepo, movementRepo, clientRepo, _replayEngine);
+
+        // First import
+        var items1 = new System.Collections.Generic.List<ImportLotItemDto>
+        {
+            new ImportLotItemDto("Apex Textiles", 100m, "LOT-001")
+        };
+        var result1 = await importHandler.Handle(new ImportProductionLotsCommand(items1), default);
+        result1.ImportedLots[0].FinalLotNumber.Should().Be("LOT-001");
+
+        // Second import with duplicate lot number LOT-001
+        var items2 = new System.Collections.Generic.List<ImportLotItemDto>
+        {
+            new ImportLotItemDto("Apex Textiles", 250m, "LOT-001"),
+            new ImportLotItemDto("Apex Textiles", 300m, "LOT-001")
+        };
+        var result2 = await importHandler.Handle(new ImportProductionLotsCommand(items2), default);
+
+        // Assert auto-increment suffix
+        result2.ImportedLots[0].FinalLotNumber.Should().Be("LOT-001-1");
+        result2.ImportedLots[1].FinalLotNumber.Should().Be("LOT-001-2");
+
+        // Verify step 'IMPORT' was created and client associated
+        var importStep = await stepRepo.GetByCodeAsync("IMPORT");
+        importStep.Should().NotBeNull();
+
+        var clients = await clientRepo.GetAllAsync();
+        clients.Should().ContainSingle(c => c.Name == "Apex Textiles");
     }
 
     [Theory]

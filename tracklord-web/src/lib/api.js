@@ -92,6 +92,17 @@ export async function createProductionLot(data) {
   return await handleResponse(response);
 }
 
+// 7b. Import Production Lots
+/** @param {any} data */
+export async function importProductionLots(data) {
+  const response = await fetch(`${API_BASE_URL}/ProductionLots/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
 // 8. Move Lot Quantity Between Steps
 /** @param {any} data */
 export async function moveLot(data) {

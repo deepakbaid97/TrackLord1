@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
@@ -27,7 +28,9 @@ public record CreateProductionLotCommand(
     Guid InitialStepId,
     DateTime? CreationDate = null,
     string? CreatedBy = null,
-    string? Remarks = null) : IRequest<Guid>;
+    string? Remarks = null,
+    Guid? ClientId = null,
+    string? ClientName = null) : IRequest<Guid>;
 
 public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductionLotCommand, Guid>
 {
@@ -85,8 +88,10 @@ public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductio
             quantity: request.InitialQuantity,
             type: MovementType.InitialProduction,
             movementDate: creationDate,
+            clientId: request.ClientId,
+            clientName: request.ClientName,
             createdBy: request.CreatedBy,
-            remarks: "Initial production lot creation movement",
+            remarks: request.Remarks ?? "Initial production lot creation movement",
             referenceNumber: $"INIT-{request.LotNumber}");
 
         // Validate ledger replay
@@ -96,6 +101,177 @@ public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductio
         await _movementRepository.AddAsync(initialMovement, cancellationToken);
 
         return lotId;
+    }
+}
+
+// 1b. Import Production Lots Command DTOs & Handler
+public record ImportLotItemDto(
+    string? ClientName,
+    decimal Quantity,
+    string LotNumber);
+
+public record ImportProductionLotsCommand(
+    List<ImportLotItemDto> Items,
+    string? CreatedBy = null) : IRequest<ImportProductionLotsResultDto>;
+
+public record ImportProductionLotsResultDto(
+    int TotalImported,
+    List<ImportedLotSummaryDto> ImportedLots);
+
+public record ImportedLotSummaryDto(
+    Guid LotId,
+    string OriginalLotNumber,
+    string FinalLotNumber,
+    string ClientName,
+    decimal Quantity);
+
+public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProductionLotsCommand, ImportProductionLotsResultDto>
+{
+    private readonly IProductionLotRepository _lotRepository;
+    private readonly IManufacturingStepRepository _stepRepository;
+    private readonly IManufacturingMovementRepository _movementRepository;
+    private readonly IClientRepository _clientRepository;
+    private readonly ILedgerReplayEngine _replayEngine;
+
+    public ImportProductionLotsCommandHandler(
+        IProductionLotRepository lotRepository,
+        IManufacturingStepRepository stepRepository,
+        IManufacturingMovementRepository movementRepository,
+        IClientRepository clientRepository,
+        ILedgerReplayEngine replayEngine)
+    {
+        _lotRepository = lotRepository;
+        _stepRepository = stepRepository;
+        _movementRepository = movementRepository;
+        _clientRepository = clientRepository;
+        _replayEngine = replayEngine;
+    }
+
+    public async Task<ImportProductionLotsResultDto> Handle(ImportProductionLotsCommand request, CancellationToken cancellationToken)
+    {
+        if (request.Items == null || !request.Items.Any())
+        {
+            return new ImportProductionLotsResultDto(0, new List<ImportedLotSummaryDto>());
+        }
+
+        // 1. Find or create the 'IMPORT' manufacturing step
+        var importStep = await _stepRepository.GetByCodeAsync("IMPORT", cancellationToken);
+        if (importStep == null)
+        {
+            var allSteps = await _stepRepository.GetAllAsync(cancellationToken);
+            int nextSeq = allSteps.Count > 0 ? allSteps.Max(s => s.SequenceOrder) + 1 : 1;
+            var defaultFactoryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            importStep = new ManufacturingStep(
+                Guid.NewGuid(),
+                "IMPORT",
+                "Import",
+                nextSeq,
+                defaultFactoryId,
+                isTerminating: false);
+            await _stepRepository.AddAsync(importStep, cancellationToken);
+        }
+
+        // 2. Load existing clients into memory for case-insensitive lookup
+        var existingClients = await _clientRepository.GetAllAsync(cancellationToken);
+        var clientMap = existingClients.ToDictionary(
+            c => c.Name.Trim().ToLowerInvariant(),
+            c => c,
+            StringComparer.OrdinalIgnoreCase);
+
+        var batchUsedLotNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var importedSummaries = new List<ImportedLotSummaryDto>();
+        var defaultItemId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var now = DateTime.UtcNow;
+
+        foreach (var item in request.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.LotNumber) || item.Quantity <= 0)
+            {
+                continue; // Skip invalid entries
+            }
+
+            string rawClientName = string.IsNullOrWhiteSpace(item.ClientName) ? "General Client" : item.ClientName.Trim();
+            string clientKey = rawClientName.ToLowerInvariant();
+
+            Client client;
+            if (clientMap.TryGetValue(clientKey, out var foundClient))
+            {
+                client = foundClient;
+            }
+            else
+            {
+                client = new Client(Guid.NewGuid(), rawClientName, "", "Buyer");
+                await _clientRepository.AddAsync(client, cancellationToken);
+                clientMap[clientKey] = client;
+            }
+
+            // Resolve unique lot number (append -1, -2 if lot number already exists)
+            string rawLotNumber = item.LotNumber.Trim();
+            string finalLotNumber = await ResolveUniqueLotNumber(rawLotNumber, batchUsedLotNumbers, cancellationToken);
+
+            var lotId = Guid.NewGuid();
+            var lotNumberObj = ProductionLotNumber.Create(finalLotNumber);
+            var initialQtyObj = new Quantity(item.Quantity, UnitType.Pieces);
+
+            var lot = ProductionLot.Create(
+                lotId,
+                lotNumberObj,
+                defaultItemId,
+                initialQtyObj,
+                importStep.Id,
+                request.CreatedBy,
+                $"Imported production lot (Original: '{rawLotNumber}')");
+
+            var initialMovement = ManufacturingMovement.Create(
+                Guid.NewGuid(),
+                lotId,
+                fromStepId: null,
+                toStepId: importStep.Id,
+                quantity: item.Quantity,
+                type: MovementType.InitialProduction,
+                movementDate: now,
+                clientId: client.Id,
+                clientName: client.Name,
+                createdBy: request.CreatedBy,
+                remarks: "Initial imported lot creation movement",
+                referenceNumber: $"INIT-{finalLotNumber}");
+
+            _replayEngine.ReplayLedger(lotId, new[] { initialMovement });
+
+            await _lotRepository.AddAsync(lot, cancellationToken);
+            await _movementRepository.AddAsync(initialMovement, cancellationToken);
+
+            importedSummaries.Add(new ImportedLotSummaryDto(
+                lotId,
+                rawLotNumber,
+                finalLotNumber,
+                client.Name,
+                item.Quantity));
+        }
+
+        return new ImportProductionLotsResultDto(importedSummaries.Count, importedSummaries);
+    }
+
+    private async Task<string> ResolveUniqueLotNumber(string baseLotNumber, HashSet<string> batchUsedLotNumbers, CancellationToken cancellationToken)
+    {
+        string candidate = baseLotNumber;
+        if (!await _lotRepository.ExistsAsync(candidate, cancellationToken) && !batchUsedLotNumbers.Contains(candidate))
+        {
+            batchUsedLotNumbers.Add(candidate);
+            return candidate;
+        }
+
+        int suffix = 1;
+        while (true)
+        {
+            string testCandidate = $"{candidate}-{suffix}";
+            if (!await _lotRepository.ExistsAsync(testCandidate, cancellationToken) && !batchUsedLotNumbers.Contains(testCandidate))
+            {
+                batchUsedLotNumbers.Add(testCandidate);
+                return testCandidate;
+            }
+            suffix++;
+        }
     }
 }
 

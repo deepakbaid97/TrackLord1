@@ -39,6 +39,16 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
+    /// Imports multiple production lots from a parsed file structure.
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<IActionResult> Import([FromBody] ImportProductionLotsCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets current Work-In-Progress (WIP) balances per step for a production lot.
     /// </summary>
     [HttpGet("{id:guid}/wip")]
