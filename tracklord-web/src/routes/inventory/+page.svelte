@@ -561,23 +561,18 @@
 
   <!-- Action Bar & Lot Selector -->
   <section class="bg-surface-container-low p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
-      <label for="lot-select-dropdown" class="text-xs font-bold uppercase tracking-wider text-on-surface-variant font-mono">Select Lot:</label>
-      <select
-        id="lot-select-dropdown"
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto min-w-[280px]">
+      <Select
+        label="Select Lot:"
         value={selectedLotId}
-        onchange={(e) => handleLotChange(/** @type {HTMLSelectElement} */ (e.target).value)}
-        class="bg-surface border border-outline-variant rounded-lg px-4 py-2 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20 min-w-[220px] cursor-pointer"
-      >
-        {#each productionLots as lot}
-          <option value={lot.id}>
-            {lot.lotNumber} ({lot.initialQuantity} Pcs - {lot.status})
-          </option>
-        {/each}
-        {#if productionLots.length === 0}
-          <option value="">No lots available</option>
-        {/if}
-      </select>
+        onchange={(val) => handleLotChange(val)}
+        options={productionLots.map(lot => ({
+          label: `${lot.lotNumber} (${lot.initialQuantity} Pcs - ${lot.status})`,
+          value: lot.id
+        }))}
+        placeholder={productionLots.length === 0 ? "No lots available" : "Select a lot..."}
+        searchPlaceholder="Search lot number or status..."
+      />
     </div>
 
     <!-- Quick Action Buttons -->

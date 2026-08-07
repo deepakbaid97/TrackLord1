@@ -8,6 +8,7 @@
     importProductionLots
   } from '$lib/api.js';
   import * as XLSX from 'xlsx';
+  import Select from '$lib/components/ui/Select.svelte';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -454,34 +455,24 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
       <!-- 1. Step Filter -->
-      <div class="space-y-1">
-        <label for="filter-step" class="text-xs font-bold text-on-surface-variant uppercase font-mono">Manufacturing Step</label>
-        <select
-          id="filter-step"
-          bind:value={selectedStepId}
-          class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-        >
-          <option value="ALL">All Steps (Any active WIP)</option>
-          {#each steps as step}
-            <option value={step.id}>{step.name} ({step.code})</option>
-          {/each}
-        </select>
-      </div>
+      <Select
+        label="Manufacturing Step"
+        bind:value={selectedStepId}
+        options={[
+          { label: 'All Steps (Any active WIP)', value: 'ALL' },
+          ...steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))
+        ]}
+      />
 
       <!-- 2. Client Filter -->
-      <div class="space-y-1">
-        <label for="filter-client" class="text-xs font-bold text-on-surface-variant uppercase font-mono">Client / Customer</label>
-        <select
-          id="filter-client"
-          bind:value={selectedClientId}
-          class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-        >
-          <option value="ALL">All Clients</option>
-          {#each clients as client}
-            <option value={client.id}>{client.name} ({client.clientType})</option>
-          {/each}
-        </select>
-      </div>
+      <Select
+        label="Client / Customer"
+        bind:value={selectedClientId}
+        options={[
+          { label: 'All Clients', value: 'ALL' },
+          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+        ]}
+      />
 
       <!-- 3. Date Range Filter -->
       <div class="space-y-1">
