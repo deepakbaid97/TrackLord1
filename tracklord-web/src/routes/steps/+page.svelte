@@ -8,6 +8,10 @@
     getLotJourney
   } from '$lib/api.js';
 
+  import TopAppBar from '$lib/components/ui/TopAppBar.svelte';
+  import AlertBanner from '$lib/components/ui/AlertBanner.svelte';
+  import StatCard from '$lib/components/ui/StatCard.svelte';
+
   let loading = $state(true);
   let errorMessage = $state('');
   let successMessage = $state('');
@@ -51,7 +55,6 @@
       const stepsList = stepsData || [];
       const lotsList = lotsData || [];
 
-      // Map to accumulate lots and quantities at each step
       /** @type {Record<string, Array<{lotId: string, lotNumber: string, quantity: number}>>} */
       const stepLotsMap = {};
       stepsList.forEach(s => { stepLotsMap[s.id] = []; });
@@ -97,7 +100,6 @@
   function openCreateModal() {
     newCode = '';
     newName = '';
-    // Auto suggest next sequence number
     const maxSeq = steps.length > 0 ? Math.max(...steps.map(s => s.sequenceOrder || 0)) : 0;
     newSequenceOrder = maxSeq + 1;
     newIsTerminating = false;
@@ -116,6 +118,7 @@
     showEditModal = true;
   }
 
+  /** @param {SubmitEvent} e */
   async function handleCreateStep(e) {
     e.preventDefault();
     if (!newCode.trim()) {
@@ -146,6 +149,7 @@
     }
   }
 
+  /** @param {SubmitEvent} e */
   async function handleUpdateStep(e) {
     e.preventDefault();
     if (!editingStep) return;
@@ -181,7 +185,6 @@
     }, 4000);
   }
 
-  // Icon mapper for steps
   /** @type {Record<string, string>} */
   const stepIconMap = {
     'CUT': 'content_cut',
@@ -195,104 +198,47 @@
   };
 </script>
 
-<!-- Header -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">alt_route</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Manufacturing Steps</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => fetchSteps()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-    <button
-      onclick={openCreateModal}
-      class="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 shadow-sm flex items-center gap-1.5 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[18px]">add</span>
-      Add Step
-    </button>
-  </div>
-</header>
+<!-- TopAppBar -->
+<TopAppBar title="TRACKLORD ERP" subtitle="Manufacturing Steps" icon="alt_route">
+  <button
+    onclick={() => fetchSteps()}
+    class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[16px]">refresh</span>
+    Refresh
+  </button>
+  <button
+    onclick={openCreateModal}
+    class="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 shadow-sm flex items-center gap-1.5 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[18px]">add</span>
+    Add Step
+  </button>
+</TopAppBar>
 
 <!-- Main Content -->
 <main class="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 pt-20 pb-24">
 
-  <!-- Success Toast -->
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fade-in">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-600 hover:text-emerald-800">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Error Alert -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <!-- Banners -->
+  <AlertBanner type="success" message={successMessage} ondismiss={() => successMessage = ''} />
+  <AlertBanner type="error" message={errorMessage} ondismiss={() => errorMessage = ''} />
 
   <!-- Summary Cards -->
   <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <!-- Total Steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-primary/10 rounded-xl text-primary">
-        <span class="material-symbols-outlined text-[28px]">alt_route</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total Steps</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">{steps.length}</div>
-      </div>
-    </div>
-
-    <!-- Active Quantity across steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-        <span class="material-symbols-outlined text-[28px]">stacks</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Steps Qty</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">
-          {steps.filter(s => !s.isTerminating).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} Pcs
-        </div>
-      </div>
-    </div>
-
-    <!-- Terminating Steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-amber-500/10 rounded-xl text-amber-600">
-        <span class="material-symbols-outlined text-[28px]">flag_circle</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Terminating Steps</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">
-          {steps.filter(s => s.isTerminating).length}
-        </div>
-        <div class="text-[10px] text-on-surface-variant font-mono">Excluded from Active WIP</div>
-      </div>
-    </div>
+    <StatCard label="Total Steps" value={steps.length} icon="alt_route" variant="primary" />
+    <StatCard
+      label="Active Steps Qty"
+      value="{steps.filter(s => !s.isTerminating).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} Pcs"
+      icon="stacks"
+      variant="success"
+    />
+    <StatCard
+      label="Terminating Steps"
+      value={steps.filter(s => s.isTerminating).length}
+      icon="flag_circle"
+      variant="warning"
+      subvalue="Excluded from Active WIP"
+    />
   </section>
 
   <!-- Steps Table / Directory -->
@@ -326,7 +272,6 @@
               <th class="px-4 py-3">Code</th>
               <th class="px-4 py-3">Step Name</th>
               <th class="px-4 py-3 text-right">Total Qty</th>
-
               <th class="px-4 py-3 text-center">Terminating Step?</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -371,8 +316,6 @@
                     {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
                   </div>
                 </td>
-
-
 
                 <!-- Terminating Indicator -->
                 <td class="px-4 py-3.5 text-center">

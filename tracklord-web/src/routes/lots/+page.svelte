@@ -9,6 +9,11 @@
   } from '$lib/api.js';
   import * as XLSX from 'xlsx';
   import Select from '$lib/components/ui/Select.svelte';
+  import TopAppBar from '$lib/components/ui/TopAppBar.svelte';
+  import AlertBanner from '$lib/components/ui/AlertBanner.svelte';
+  import StatCard from '$lib/components/ui/StatCard.svelte';
+  import SearchBar from '$lib/components/ui/SearchBar.svelte';
+  import ExcelUploader from '$lib/components/ui/ExcelUploader.svelte';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -39,7 +44,6 @@
   let importErrorMessage = $state('');
   let importSuccessResult = $state(/** @type {any} */ (null));
 
-  // Step Icon mapping
   /** @type {Record<string, string>} */
   const stepIconMap = {
     'CUT': 'content_cut',
@@ -53,7 +57,6 @@
   import { page } from '$app/stores';
 
   onMount(async () => {
-    // Read URL query parameters for pre-selected step or client filters
     const urlParams = $page.url.searchParams;
     const stepParam = urlParams.get('step');
     const clientParam = urlParams.get('client');
@@ -68,7 +71,6 @@
     loading = true;
     errorMessage = '';
     try {
-      // 1. Fetch base steps & clients
       const [stepsData, clientsData, lotsData] = await Promise.all([
         getManufacturingSteps(),
         getClients(),
@@ -79,7 +81,6 @@
       clients = clientsData || [];
       rawLots = lotsData || [];
 
-      // 2. Fetch journeys for each lot to gather active steps, quantities, and client associations
       const enriched = await Promise.all(
         rawLots.map(async (lot) => {
           let journey = null;
@@ -97,11 +98,9 @@
           let clientNamesList = [];
 
           if (journey) {
-            // Extract active step balances
             if (journey.activeBalances) {
               activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
 
-              // Exclude terminating step quantities from total active WIP calculation
               const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
                 const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
                 return !stepObj?.isTerminating;
@@ -110,13 +109,11 @@
               totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
             }
 
-            // Extract clients specifically associated with steps that currently hold active WIP quantity
             const activeStepIds = new Set(activeSteps.map((/** @type {any} */ s) => s.stepId));
 
             if (journey.movementHistory) {
               journey.movementHistory.forEach((/** @type {any} */ m) => {
                 if (!m.isReversed && m.toStepName && activeStepIds.size > 0) {
-                  // Find if this movement moved items into one of the currently active WIP steps
                   const isMoveToActiveStep = activeSteps.some((/** @type {any} */ s) => s.stepName === m.toStepName);
                   if (isMoveToActiveStep) {
                     if (m.clientId) activeLotClientsSet.add(m.clientId);
@@ -133,7 +130,7 @@
           return {
             id: lot.id,
             lotNumber: lot.lotNumber,
-            itemName: 'Garment Item Lot', // Item default / display name
+            itemName: 'Garment Item Lot',
             initialQuantity: lot.initialQuantity,
             status: lot.status,
             createdAtUtc: lot.createdAtUtc,
@@ -154,10 +151,8 @@
     }
   }
 
-  // Filter Logic
   let filteredLots = $derived.by(() => {
     return enrichedLots.filter((lot) => {
-      // Search Query Filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const matchesNumber = lot.lotNumber.toLowerCase().includes(query);
@@ -166,13 +161,11 @@
         if (!matchesNumber && !matchesClient && !matchesItem) return false;
       }
 
-      // Step Filter
       if (selectedStepId !== 'ALL') {
         const hasStep = lot.activeSteps.some((/** @type {any} */ s) => s.stepId === selectedStepId);
         if (!hasStep) return false;
       }
 
-      // Client Filter
       if (selectedClientId !== 'ALL') {
         if (selectedClientId === 'NONE') {
           if (lot.clientIds.length > 0) return false;
@@ -181,7 +174,6 @@
         }
       }
 
-      // Date Range Filter
       if (selectedDateRange !== 'ALL') {
         const lotDate = new Date(lot.createdAtUtc);
         const now = new Date();
@@ -216,7 +208,6 @@
     });
   });
 
-  // Summary Metrics
   let totalWipSum = $derived(
     filteredLots.reduce((acc, l) => {
       if (selectedStepId !== 'ALL') {
@@ -244,6 +235,7 @@
     importSuccessResult = null;
   }
 
+  /** @param {any} event */
   async function handleFileSelect(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -268,7 +260,6 @@
         throw new Error('Selected file contains no data rows.');
       }
 
-      // Column Header Matching
       const sampleRow = jsonRows[0];
       const keys = Object.keys(sampleRow);
 
@@ -333,7 +324,6 @@
       const result = await importProductionLots(payload);
       importSuccessResult = result;
 
-      // Refresh lots list
       await refreshData();
     } catch (err) {
       importErrorMessage = err?.message || 'Import failed.';
@@ -344,93 +334,34 @@
 </script>
 
 <!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">reorder</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Production Lots Directory</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={openImportModal}
-      class="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[18px]">file_upload</span>
-      Import Lots
-    </button>
-    <button
-      onclick={() => refreshData()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
+<TopAppBar title="TRACKLORD ERP" subtitle="Production Lots Directory" icon="reorder">
+  <button
+    onclick={openImportModal}
+    class="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[18px]">file_upload</span>
+    Import Lots
+  </button>
+  <button
+    onclick={() => refreshData()}
+    class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[16px]">refresh</span>
+    Refresh
+  </button>
+</TopAppBar>
 
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <AlertBanner type="error" message={errorMessage} ondismiss={() => errorMessage = ''} />
 
   <!-- Header Info & KPI Summary -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-primary/10 rounded-lg text-primary">
-        <span class="material-symbols-outlined text-[24px]">inventory_2</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Lots</div>
-        <div class="text-2xl font-bold text-on-surface">{filteredLots.length}</div>
-      </div>
-    </div>
-
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
-        <span class="material-symbols-outlined text-[24px]">stacks</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total WIP Qty</div>
-        <div class="text-2xl font-bold text-on-surface">{totalWipSum.toLocaleString()} Pcs</div>
-      </div>
-    </div>
-
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
-        <span class="material-symbols-outlined text-[24px]">output</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Initial Created Qty</div>
-        <div class="text-2xl font-bold text-on-surface">{totalInitialSum.toLocaleString()} Pcs</div>
-      </div>
-    </div>
-
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
-        <span class="material-symbols-outlined text-[24px]">groups</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Clients Filtered</div>
-        <div class="text-2xl font-bold text-on-surface">
-          {new Set(filteredLots.flatMap(l => l.clientIds)).size}
-        </div>
-      </div>
-    </div>
+    <StatCard label="Total Lots" value={filteredLots.length} icon="inventory_2" variant="primary" />
+    <StatCard label="Total WIP Qty" value="{totalWipSum.toLocaleString()} Pcs" icon="stacks" variant="info" />
+    <StatCard label="Initial Created Qty" value="{totalInitialSum.toLocaleString()} Pcs" icon="output" variant="success" />
+    <StatCard label="Clients Filtered" value={new Set(filteredLots.flatMap(l => l.clientIds)).size} icon="groups" variant="warning" />
   </div>
 
   <!-- Filter Toolbar -->
@@ -441,15 +372,8 @@
         <span>Filter Production Lots</span>
       </div>
 
-      <!-- Search Input -->
-      <div class="relative flex-1 max-w-md">
-        <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
-        <input
-          type="text"
-          bind:value={searchQuery}
-          placeholder="Search by lot number, client, or item..."
-          class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
-        />
+      <div class="w-full md:w-auto min-w-[280px]">
+        <SearchBar bind:value={searchQuery} placeholder="Search by lot number, client, or item..." />
       </div>
     </div>
 
@@ -668,34 +592,11 @@
         {/if}
 
         <!-- File Upload Zone -->
-        <div class="border-2 border-dashed border-outline-variant hover:border-primary rounded-2xl p-6 text-center bg-surface-container-lowest transition-colors relative group">
-          <input
-            type="file"
-            accept=".xlsx, .xls, .csv"
-            onchange={handleFileSelect}
-            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-          <div class="flex flex-col items-center gap-2">
-            <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-              <span class="material-symbols-outlined text-[28px]">upload_file</span>
-            </div>
-            <div>
-              <span class="font-bold text-sm text-primary underline">Click to select file</span>
-              <span class="text-xs text-on-surface-variant"> or drag and drop</span>
-            </div>
-            <div class="flex gap-2 mt-1">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLSX</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLS</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.CSV</span>
-            </div>
-            {#if importFile}
-              <div class="mt-2 text-xs font-mono font-bold text-emerald-600 flex items-center gap-1">
-                <span class="material-symbols-outlined text-[16px]">description</span>
-                Selected: {importFile.name}
-              </div>
-            {/if}
-          </div>
-        </div>
+        <ExcelUploader
+          accept=".xlsx, .xls, .csv"
+          selectedFileName={importFile ? importFile.name : ''}
+          onfileselect={handleFileSelect}
+        />
 
         <!-- Format Rules Guide -->
         <div class="p-4 bg-surface-container-low rounded-xl text-xs space-y-2 border border-outline-variant/60">
@@ -797,7 +698,6 @@
           {/if}
         </button>
       </div>
-
     </div>
   </div>
 {/if}

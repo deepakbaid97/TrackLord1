@@ -1,11 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import Button from '$lib/components/ui/Button.svelte';
-  import Input from '$lib/components/ui/Input.svelte';
-  import Select from '$lib/components/ui/Select.svelte';
-  import Modal from '$lib/components/ui/Modal.svelte';
+  import TopAppBar from '$lib/components/ui/TopAppBar.svelte';
+  import AlertBanner from '$lib/components/ui/AlertBanner.svelte';
+  import StatCard from '$lib/components/ui/StatCard.svelte';
+  import SearchBar from '$lib/components/ui/SearchBar.svelte';
+  import ClientTypeBadge from '$lib/components/ui/ClientTypeBadge.svelte';
+  import RegisterClientModal from '$lib/components/domain/RegisterClientModal.svelte';
 
-  import { getClients, createClient, getProductionLots, getLotJourney } from '$lib/api.js';
+  import { getClients, getProductionLots, getLotJourney } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -14,13 +17,7 @@
 
   /** @type {Array<any>} */
   let clients = $state([]);
-
   let isCreateClientModalOpen = $state(false);
-  let createClientForm = $state({
-    name: '',
-    phoneNumber: '',
-    clientType: 'Buyer'
-  });
 
   onMount(async () => {
     await refreshClients();
@@ -38,15 +35,12 @@
       const baseClients = clientData || [];
       const lots = rawLots || [];
 
-      // Map client stats: active lots count and active WIP quantity
-      // Key: clientId, Value: { activeLotIds: Set, totalWip: number }
       /** @type {Map<string, { activeLotIds: Set<string>, totalWip: number }>} */
       const clientStats = new Map();
       baseClients.forEach((/** @type {any} */ c) => {
         clientStats.set(c.id, { activeLotIds: new Set(), totalWip: 0 });
       });
 
-      // Fetch journey for each lot to trace active WIP step balances and associated clients
       await Promise.all(
         lots.map(async (/** @type {any} */ lot) => {
           try {
@@ -61,13 +55,11 @@
 
             const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
 
-            // Trace movements into active WIP steps to calculate client active lots & WIP quantity
             journey.movementHistory.forEach((/** @type {any} */ m) => {
               if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
                 const stats = clientStats.get(m.clientId);
                 if (stats) {
                   stats.activeLotIds.add(lot.id);
-                  // Find step quantity
                   const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
                   if (stepObj) {
                     stats.totalWip += stepObj.quantity;
@@ -96,25 +88,10 @@
     }
   }
 
-  /** @param {SubmitEvent} e */
-  async function handleCreateClientSubmit(e) {
-    e.preventDefault();
-    errorMessage = '';
-    try {
-      const payload = {
-        name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim(),
-        clientType: createClientForm.clientType
-      };
-
-      await createClient(payload);
-      successMessage = `Client '${createClientForm.name}' created successfully!`;
-      isCreateClientModalOpen = false;
-      createClientForm = { name: '', phoneNumber: '', clientType: 'Buyer' };
-      await refreshClients();
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to create client';
-    }
+  /** @param {any} newClient */
+  function handleClientCreated(newClient) {
+    successMessage = `Client '${newClient.name}' created successfully!`;
+    refreshClients();
   }
 
   let filteredClients = $derived(
@@ -128,55 +105,22 @@
 </script>
 
 <!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">groups</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Client Directory</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => refreshClients()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
+<TopAppBar title="TRACKLORD ERP" subtitle="Client Directory" icon="groups">
+  <button
+    onclick={() => refreshClients()}
+    class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[16px]">refresh</span>
+    Refresh
+  </button>
+</TopAppBar>
 
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   <!-- Notification Banners -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-500">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-500 hover:text-emerald-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <AlertBanner type="error" message={errorMessage} ondismiss={() => errorMessage = ''} />
+  <AlertBanner type="success" message={successMessage} ondismiss={() => successMessage = ''} />
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
@@ -202,58 +146,15 @@
 
     <!-- Client Statistics Summary -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-primary/10 rounded-lg text-primary">
-          <span class="material-symbols-outlined text-[24px]">group</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Clients</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.length}</div>
-        </div>
-      </div>
-
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
-          <span class="material-symbols-outlined text-[24px]">shopping_bag</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Buyers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Buyer').length}</div>
-        </div>
-      </div>
-
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
-          <span class="material-symbols-outlined text-[24px]">storefront</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Wholesalers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Wholesaler').length}</div>
-        </div>
-      </div>
-
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
-          <span class="material-symbols-outlined text-[24px]">precision_manufacturing</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Job Workers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Job Worker').length}</div>
-        </div>
-      </div>
+      <StatCard label="Total Clients" value={clients.length} icon="group" variant="primary" />
+      <StatCard label="Buyers" value={clients.filter(c => c.clientType === 'Buyer').length} icon="shopping_bag" variant="info" />
+      <StatCard label="Wholesalers" value={clients.filter(c => c.clientType === 'Wholesaler').length} icon="storefront" variant="success" />
+      <StatCard label="Job Workers" value={clients.filter(c => c.clientType === 'Job Worker').length} icon="precision_manufacturing" variant="warning" />
     </div>
 
     <!-- Search Bar -->
     <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="relative flex-1">
-        <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
-        <input
-          type="text"
-          bind:value={clientSearchQuery}
-          placeholder="Search clients by name, phone, or type..."
-          class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
-        />
-      </div>
+      <SearchBar bind:value={clientSearchQuery} placeholder="Search clients by name, phone, or type..." />
     </div>
 
     <!-- Clients List Table -->
@@ -289,13 +190,7 @@
                   </span>
                 </td>
                 <td class="px-6 py-4">
-                  <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-                    {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
-                     client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                     client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
-                     'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'}">
-                    {client.clientType}
-                  </span>
+                  <ClientTypeBadge clientType={client.clientType} />
                 </td>
                 <td class="px-6 py-4 text-right font-mono font-bold text-on-surface">
                   {client.activeLotsCount}
@@ -333,48 +228,8 @@
 </main>
 
 <!-- Create Client Modal -->
-<Modal bind:isOpen={isCreateClientModalOpen} title="Register New Client">
-  <form onsubmit={handleCreateClientSubmit} class="space-y-4">
-    <Input
-      label="Client / Company Name"
-      bind:value={createClientForm.name}
-      placeholder="e.g. Apex Textiles Ltd."
-      icon="badge"
-      required={true}
-    />
-
-    <Input
-      label="Phone Number"
-      type="tel"
-      bind:value={createClientForm.phoneNumber}
-      placeholder="e.g. +91 98765 43210"
-      icon="call"
-      required={true}
-    />
-
-    <Select
-      label="Client Type"
-      bind:value={createClientForm.clientType}
-      options={[
-        { label: 'Buyer', value: 'Buyer' },
-        { label: 'Wholesaler', value: 'Wholesaler' },
-        { label: 'Job Worker', value: 'Job Worker' },
-        { label: 'Customer', value: 'Customer' },
-        { label: 'Retailer', value: 'Retailer' },
-        { label: 'Supplier', value: 'Supplier' },
-        { label: 'Self', value: 'Self'}
-      ]}
-      icon="category"
-      required={true}
-    />
-
-    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
-      <Button variant="outline" onclick={() => isCreateClientModalOpen = false}>
-        Cancel
-      </Button>
-      <Button variant="primary" type="submit" icon="save">
-        Save Client
-      </Button>
-    </div>
-  </form>
-</Modal>
+<RegisterClientModal
+  bind:isOpen={isCreateClientModalOpen}
+  onsuccess={handleClientCreated}
+  onerror={(err) => errorMessage = err}
+/>

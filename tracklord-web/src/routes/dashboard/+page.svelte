@@ -1,5 +1,11 @@
 <script>
   import { onMount } from 'svelte';
+  import TopAppBar from '$lib/components/ui/TopAppBar.svelte';
+  import AlertBanner from '$lib/components/ui/AlertBanner.svelte';
+  import StatCard from '$lib/components/ui/StatCard.svelte';
+  import ProgressBarRow from '$lib/components/ui/ProgressBarRow.svelte';
+  import ClientTypeBadge from '$lib/components/ui/ClientTypeBadge.svelte';
+
   import { getDashboardOverview, getMaterialLots } from '$lib/api.js';
 
   let loading = $state(true);
@@ -30,13 +36,11 @@
       loading = false;
     }
 
-    // Fetch material lots and compute total available quantity
     materialLoading = true;
     materialError = '';
     try {
       const fetchedLots = await getMaterialLots();
       materialLots = fetchedLots;
-      // Sum remaining quantity across all material lots
       totalMaterialAvailable = fetchedLots.reduce((sum, lot) => {
         const qty = lot.remainingQuantity ?? lot.initialQuantity ?? 0;
         return sum + Number(qty);
@@ -48,14 +52,12 @@
     }
   }
 
-  // Computed: max WIP across steps for bar scaling
   let maxStepWip = $derived(
     overview?.stepSummaries?.length > 0
       ? Math.max(...overview.stepSummaries.map((/** @type {any} */ s) => s.totalWipQuantity), 1)
       : 1
   );
 
-  // Step icon mapping
   /** @type {Record<string, string>} */
   const stepIconMap = {
     'CUT': 'content_cut',
@@ -76,42 +78,20 @@
 </script>
 
 <!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">dashboard</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Dashboard Overview</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => refreshDashboard()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
+<TopAppBar title="TRACKLORD ERP" subtitle="Dashboard Overview" icon="dashboard">
+  <button
+    onclick={() => refreshDashboard()}
+    class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[16px]">refresh</span>
+    Refresh
+  </button>
+</TopAppBar>
 
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <AlertBanner type="error" message={errorMessage} ondismiss={() => errorMessage = ''} />
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
@@ -120,44 +100,29 @@
     </div>
   {:else if overview}
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET 1: KPI Summary Cards                                -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET 1: KPI Summary Cards -->
     <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <!-- Active Lots -->
-      <a
+      <StatCard
+        label="Active Lots"
+        value={overview.totalActiveLots}
+        icon="inventory_2"
+        variant="primary"
         href="/lots"
-        class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50"
         title="View all lots in directory"
-      >
-        <div class="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">inventory_2</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider">Active Lots</div>
-          <div class="text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight">{overview.totalActiveLots}</div>
-        </div>
-      </a>
-
-      <!-- Total WIP Quantity -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-        <div class="p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">stacks</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total WIP</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveQuantity.toLocaleString()}</div>
-          <div class="text-[11px] text-on-surface-variant font-mono">Pieces</div>
-        </div>
-      </div>
+      />
+      <StatCard
+        label="Total WIP"
+        value={overview.totalActiveQuantity.toLocaleString()}
+        icon="stacks"
+        variant="info"
+        subvalue="Pieces"
+      />
     </section>
 
     <!-- Two Column Grid for Step WIP + Client Distribution -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!-- WIDGET 2: WIP by Manufacturing Step                       -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- WIDGET 2: WIP by Manufacturing Step -->
       <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
         <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
           <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -172,31 +137,17 @@
         {#if overview.stepSummaries && overview.stepSummaries.length > 0}
           <div class="space-y-4">
             {#each overview.stepSummaries as step}
-              {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
-              {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
-              <a
+              <ProgressBarRow
+                label={step.stepName}
+                value={step.totalWipQuantity}
+                total={maxStepWip}
+                unit="Pcs"
+                subtext="{step.stepCode} &middot; {step.activeLotsCount} lots"
+                colorClass={stepColorMap[step.stepCode] || 'bg-primary'}
+                icon={stepIconMap[step.stepCode] || 'work'}
                 href="/lots?step={step.stepId}"
-                class="group block p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                 title="View {step.stepName} lots in directory"
-              >
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
-                    <span class="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
-                    <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
-                    <span class="font-bold text-sm text-primary font-mono min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
-                  </div>
-                </div>
-                <div class="w-full bg-surface-variant/60 rounded-full h-3 overflow-hidden">
-                  <div
-                    class="{barColor} h-3 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
-                    style="width: {Math.max(barPercent, step.totalWipQuantity > 0 ? 2 : 0)}%"
-                  ></div>
-                </div>
-              </a>
+              />
             {/each}
           </div>
         {:else}
@@ -206,9 +157,7 @@
         {/if}
       </section>
 
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!-- WIDGET 3: Client Distribution                              -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- WIDGET 3: Client Distribution -->
       <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
         <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
           <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -245,13 +194,7 @@
                       </div>
                     </td>
                     <td class="py-3 pr-4">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
-                        {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800' :
-                         client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800' :
-                         client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800' :
-                         'bg-purple-100 text-purple-800'}">
-                        {client.clientType}
-                      </span>
+                      <ClientTypeBadge clientType={client.clientType} />
                     </td>
                     <td class="py-3 pr-4 text-right font-mono text-on-surface-variant">{client.totalLotsAssociated}</td>
                     <td class="py-3 text-right font-bold text-primary font-mono">{client.totalQuantityMoved.toLocaleString()} Pcs</td>
@@ -269,9 +212,7 @@
       </section>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET: Material Availability                              -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET: Material Availability -->
     <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
       <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
         <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -343,9 +284,7 @@
       {/if}
     </section>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET 4: Active Production Lots Table                     -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WIDGET 4: Active Production Lots Table -->
     <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
       <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
         <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">

@@ -5,6 +5,11 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
+  import TopAppBar from '$lib/components/ui/TopAppBar.svelte';
+  import AlertBanner from '$lib/components/ui/AlertBanner.svelte';
+  import Tabs from '$lib/components/ui/Tabs.svelte';
+  import ProgressBarRow from '$lib/components/ui/ProgressBarRow.svelte';
+  import RegisterClientModal from '$lib/components/domain/RegisterClientModal.svelte';
 
   import {
     getManufacturingSteps,
@@ -13,7 +18,6 @@
     getLotJourney,
     getMaterialTraceability,
     getClients,
-    createClient,
     createProductionLot,
     moveLot,
     createMaterialLot,
@@ -74,12 +78,6 @@
     referenceNumber: ''
   });
 
-  let createClientForm = $state({
-    name: '',
-    phoneNumber: '',
-    clientType: 'Buyer'
-  });
-
   let createMaterialForm = $state({
     lotNumber: '',
     materialName: '',
@@ -123,7 +121,6 @@
     return targetMatLot && (targetMatLot.unit === 'Pieces' || targetMatLot.unit === 1 || targetMatLot.unitType === 1);
   });
 
-  // Step Icon mapping helper
   /** @type {Record<string, string>} */
   const stepIconMap = {
     'CUT': 'content_cut',
@@ -136,7 +133,6 @@
   import { page } from '$app/stores';
 
   onMount(async () => {
-    // Priority: 1. URL query parameter ('?lot=...'), 2. localStorage ('tracklord_last_lot_id')
     const urlParams = $page.url.searchParams;
     const lotParam = urlParams.get('lot');
     if (lotParam) {
@@ -153,11 +149,9 @@
     loading = true;
     errorMessage = '';
     try {
-      // 1. Fetch Steps
       const steps = await getManufacturingSteps();
       manufacturingSteps = steps || [];
 
-      // Set default step ID for forms if available
       if (manufacturingSteps.length > 0) {
         if (!createLotForm.initialStepId) createLotForm.initialStepId = manufacturingSteps[0].id;
         if (!moveForm.fromStepId) moveForm.fromStepId = manufacturingSteps[0].id;
@@ -167,7 +161,6 @@
         if (!rejectForm.targetStepId) rejectForm.targetStepId = manufacturingSteps[0].id;
       }
 
-      // 2. Fetch Lots
       const lots = await getProductionLots();
       productionLots = lots || [];
 
@@ -183,14 +176,12 @@
         currentMaterialTraceability = null;
       }
 
-      // 3. Fetch Raw Material Lots
       const matLots = await getMaterialLots();
       materialLots = matLots || [];
       if (materialLots.length > 0 && !consumeMaterialForm.materialLotId) {
         consumeMaterialForm.materialLotId = materialLots[0].id;
       }
 
-      // 4. Fetch Clients
       const clientData = await getClients();
       clients = clientData || [];
       if (clients.length > 0) {
@@ -240,7 +231,6 @@
   }
 
   function openMoveModal() {
-    // Find the first step that actually has an active WIP balance > 0
     const activeStepWithBalance = activeWipBalances.find((/** @type {any} */ b) => b.quantity > 0);
     if (activeStepWithBalance) {
       moveForm.fromStepId = activeStepWithBalance.stepId;
@@ -258,9 +248,6 @@
     isMoveModalOpen = true;
   }
 
-
-
-  // Calculated properties from real API data
   let activeWipBalances = $derived.by(() => {
     if (!currentLotJourney || !currentLotJourney.activeBalances) return [];
     return currentLotJourney.activeBalances;
@@ -273,7 +260,6 @@
       activeWipBalances.forEach((/** @type {any} */ b) => stepBalancesMap.set(b.stepId, b.quantity));
     }
 
-    // Find the latest step that has quantity
     let activeStepIndex = -1;
     manufacturingSteps.forEach((s, idx) => {
       if (stepBalancesMap.has(s.id) && stepBalancesMap.get(s.id) > 0) {
@@ -295,7 +281,6 @@
         subtitle = 'Completed';
       }
 
-      // Find latest non-reversed movement associated with this step to extract Client Name
       let stepClientName = '';
       if (currentLotJourney && currentLotJourney.movementHistory) {
         const stepMovements = currentLotJourney.movementHistory.filter((/** @type {any} */ m) => m.toStepName === step.name && !m.isReversed);
@@ -332,7 +317,6 @@
     }));
   });
 
-  // Form Handlers
   /** @param {SubmitEvent} e */
   async function handleCreateLotSubmit(e) {
     e.preventDefault();
@@ -394,31 +378,13 @@
     }
   }
 
-  /** @param {SubmitEvent} e */
-  async function handleCreateClientSubmit(e) {
-    e.preventDefault();
-    errorMessage = '';
-    try {
-      const payload = {
-        name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim(),
-        clientType: createClientForm.clientType
-      };
-
-      const res = await createClient(payload);
-      successMessage = `Client '${createClientForm.name}' created successfully!`;
-      isCreateClientModalOpen = false;
-      
-      const newClientId = res.id;
-      createClientForm = { name: '', phoneNumber: '', clientType: 'Buyer' };
-      
-      const clientData = await getClients();
-      clients = clientData || [];
-      if (newClientId) {
-        moveForm.clientId = newClientId;
-      }
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to create client';
+  /** @param {any} newClient */
+  async function handleClientCreated(newClient) {
+    successMessage = `Client '${newClient.name}' created successfully!`;
+    const clientData = await getClients();
+    clients = clientData || [];
+    if (newClient && newClient.id) {
+      moveForm.clientId = newClient.id;
     }
   }
 
@@ -556,55 +522,22 @@
 </script>
 
 <!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Production Lot Inventory</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => refreshAllData()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh Data
-    </button>
-  </div>
-</header>
+<TopAppBar title="TRACKLORD ERP" subtitle="Production Lot Inventory" icon="factory">
+  <button
+    onclick={() => refreshAllData()}
+    class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+  >
+    <span class="material-symbols-outlined text-[16px]">refresh</span>
+    Refresh Data
+  </button>
+</TopAppBar>
 
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
   <!-- Notification Banner -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-500">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-500 hover:text-emerald-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <AlertBanner type="error" message={errorMessage} ondismiss={() => errorMessage = ''} />
+  <AlertBanner type="success" message={successMessage} ondismiss={() => successMessage = ''} />
 
   <!-- Action Bar & Lot Selector -->
   <section class="bg-surface-container-low p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -643,24 +576,14 @@
   </section>
 
   <!-- View Mode Tabs -->
-  <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-    <div class="flex gap-2">
-      <button
-        onclick={() => activeTab = 'lots'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'lots' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
-      >
-        <span class="material-symbols-outlined text-[18px]">reorder</span>
-        Lot Tracking & Journey
-      </button>
-      <button
-        onclick={() => activeTab = 'materials'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'materials' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
-      >
-        <span class="material-symbols-outlined text-[18px]">inventory_2</span>
-        Raw Materials Ledger
-      </button>
-    </div>
-  </div>
+  <Tabs
+    tabs={[
+      { id: 'lots', label: 'Lot Tracking & Journey', icon: 'reorder' },
+      { id: 'materials', label: 'Raw Materials Ledger', icon: 'inventory_2' }
+    ]}
+    activeTab={activeTab}
+    ontabchange={(tabId) => activeTab = tabId}
+  />
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
@@ -713,18 +636,12 @@
                 {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
                 {@const qty = balanceObj ? balanceObj.quantity : 0}
                 {@const totalActive = activeWipBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0)}
-                <div>
-                  <div class="flex justify-between font-stat-label text-stat-label mb-1">
-                    <span class="font-bold text-on-surface">{step.name} ({step.code})</span>
-                    <span class="font-mono text-primary">{qty} Pcs</span>
-                  </div>
-                  <div class="w-full bg-surface-variant rounded-full h-2.5">
-                    <div
-                      class="bg-primary h-2.5 rounded-full transition-all duration-500"
-                      style="width: {totalActive > 0 ? (qty / totalActive) * 100 : 0}%"
-                    ></div>
-                  </div>
-                </div>
+                <ProgressBarRow
+                  label="{step.name} ({step.code})"
+                  value={qty}
+                  total={totalActive}
+                  unit="Pcs"
+                />
               {/each}
             </div>
           </section>
@@ -792,8 +709,8 @@
         No lot selected or no production lots found. Click "New Production Lot" above to create one.
       </div>
     {/if}
-  {:else if activeTab === 'ledger'}
-    <!-- Ledger Table -->
+  {:else if activeTab === 'materials'}
+    <!-- Raw Materials Ledger Table -->
     <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
       <div class="flex justify-between items-center border-b border-outline-variant pb-2">
         <h2 class="font-headline-md text-headline-md">Inventory Movement Ledger</h2>
@@ -1213,49 +1130,9 @@
   </form>
 </Modal>
 
-<!-- Modal 7: Add New Client (inline for movements) -->
-<Modal bind:isOpen={isCreateClientModalOpen} title="Register New Client">
-  <form onsubmit={handleCreateClientSubmit} class="space-y-4">
-    <Input
-      label="Client / Company Name"
-      bind:value={createClientForm.name}
-      placeholder="e.g. Apex Textiles Ltd."
-      icon="badge"
-      required={true}
-    />
-
-    <Input
-      label="Phone Number"
-      type="tel"
-      bind:value={createClientForm.phoneNumber}
-      placeholder="e.g. +91 98765 43210"
-      icon="call"
-      required={true}
-    />
-
-    <Select
-      label="Client Type"
-      bind:value={createClientForm.clientType}
-      options={[
-        { label: 'Buyer', value: 'Buyer' },
-        { label: 'Wholesaler', value: 'Wholesaler' },
-        { label: 'Job Worker', value: 'Job Worker' },
-        { label: 'Customer', value: 'Customer' },
-        { label: 'Retailer', value: 'Retailer' },
-        { label: 'Supplier', value: 'Supplier' },
-        { label: 'Self', value: 'Self'}
-      ]}
-      icon="category"
-      required={true}
-    />
-
-    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
-      <Button variant="outline" onclick={() => isCreateClientModalOpen = false}>
-        Cancel
-      </Button>
-      <Button variant="primary" type="submit" icon="save">
-        Save Client
-      </Button>
-    </div>
-  </form>
-</Modal>
+<!-- Modal 7: Register Client -->
+<RegisterClientModal
+  bind:isOpen={isCreateClientModalOpen}
+  onsuccess={handleClientCreated}
+  onerror={(err) => errorMessage = err}
+/>
