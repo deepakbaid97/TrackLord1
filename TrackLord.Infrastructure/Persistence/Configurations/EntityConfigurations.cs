@@ -6,11 +6,29 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Infrastructure.Persistence.Configurations;
+
+public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+{
+    public void Configure(EntityTypeBuilder<Tenant> builder)
+    {
+        builder.ToTable("tenants");
+
+        builder.HasKey(t => t.Id);
+
+        builder.Property(t => t.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+        builder.Property(t => t.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+        builder.Property(t => t.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(t => t.IsActive).HasColumnName("is_active").IsRequired();
+
+        builder.HasIndex(t => t.Code).IsUnique();
+    }
+}
 
 public class ProductionLotConfiguration : IEntityTypeConfiguration<ProductionLot>
 {
@@ -20,13 +38,15 @@ public class ProductionLotConfiguration : IEntityTypeConfiguration<ProductionLot
 
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.TenantId).HasColumnName("tenant_id").IsRequired();
+
         builder.Property(p => p.LotNumber)
             .HasConversion(p => p.Value, v => new ProductionLotNumber(v))
             .HasColumnName("lot_number")
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.HasIndex(p => p.LotNumber).IsUnique();
+        builder.HasIndex(p => new { p.TenantId, p.LotNumber }).IsUnique();
 
         builder.Property(p => p.ItemId).HasColumnName("item_id").IsRequired();
         builder.Property(p => p.InitialStepId).HasColumnName("initial_step_id").IsRequired();
@@ -51,13 +71,15 @@ public class MaterialLotConfiguration : IEntityTypeConfiguration<MaterialLot>
 
         builder.HasKey(m => m.Id);
 
+        builder.Property(m => m.TenantId).HasColumnName("tenant_id").IsRequired();
+
         builder.Property(m => m.LotNumber)
             .HasConversion(m => m.Value, v => new MaterialLotNumber(v))
             .HasColumnName("lot_number")
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.HasIndex(m => m.LotNumber).IsUnique();
+        builder.HasIndex(m => new { m.TenantId, m.LotNumber }).IsUnique();
 
         builder.Property(m => m.MaterialItemId).HasColumnName("material_item_id").IsRequired();
         builder.Property(m => m.MaterialName).HasColumnName("material_name").HasMaxLength(200);
@@ -85,6 +107,7 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
 
         builder.HasKey(m => m.Id);
 
+        builder.Property(m => m.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(m => m.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
         builder.Property(m => m.FromStepId).HasColumnName("from_step_id");
         builder.Property(m => m.ToStepId).HasColumnName("to_step_id").IsRequired();
@@ -108,7 +131,7 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
             .OnDelete(DeleteBehavior.SetNull);
 
         // Crucial index for Ledger Replay Engine deterministic sorting
-        builder.HasIndex(m => new { m.ProductionLotId, m.MovementDate, m.CreatedAtUtc, m.Id })
+        builder.HasIndex(m => new { m.TenantId, m.ProductionLotId, m.MovementDate, m.CreatedAtUtc, m.Id })
             .HasDatabaseName("ix_movements_lot_replay_order");
     }
 }
@@ -121,6 +144,7 @@ public class ManufacturingStepConfiguration : IEntityTypeConfiguration<Manufactu
 
         builder.HasKey(s => s.Id);
 
+        builder.Property(s => s.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(s => s.Code).HasColumnName("code").HasMaxLength(20).IsRequired();
         builder.Property(s => s.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
         builder.Property(s => s.SequenceOrder).HasColumnName("sequence_order").IsRequired();
@@ -128,7 +152,7 @@ public class ManufacturingStepConfiguration : IEntityTypeConfiguration<Manufactu
         builder.Property(s => s.IsTerminating).HasColumnName("is_terminating").IsRequired().HasDefaultValue(false);
         builder.Property(s => s.FactoryId).HasColumnName("factory_id").IsRequired();
 
-        builder.HasIndex(s => s.Code).IsUnique();
+        builder.HasIndex(s => new { s.TenantId, s.Code }).IsUnique();
     }
 }
 
@@ -140,6 +164,7 @@ public class MaterialConsumptionConfiguration : IEntityTypeConfiguration<Materia
 
         builder.HasKey(c => c.Id);
 
+        builder.Property(c => c.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(c => c.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
         builder.Property(c => c.MaterialLotId).HasColumnName("material_lot_id").IsRequired();
         builder.Property(c => c.StepId).HasColumnName("step_id").IsRequired();
@@ -163,6 +188,7 @@ public class RejectionRecordConfiguration : IEntityTypeConfiguration<RejectionRe
 
         builder.HasKey(r => r.Id);
 
+        builder.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(r => r.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
         builder.Property(r => r.StepId).HasColumnName("step_id").IsRequired();
         builder.Property(r => r.TargetStepId).HasColumnName("target_step_id");
@@ -185,13 +211,14 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         builder.HasKey(c => c.Id);
 
+        builder.Property(c => c.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(c => c.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
         builder.Property(c => c.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();
         builder.Property(c => c.ClientType).HasColumnName("client_type").HasMaxLength(50).IsRequired();
         builder.Property(c => c.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(c => c.IsActive).HasColumnName("is_active").IsRequired();
 
-        builder.HasIndex(c => c.Name);
+        builder.HasIndex(c => new { c.TenantId, c.Name });
     }
 }
 
@@ -203,6 +230,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasKey(u => u.Id);
 
+        builder.Property(u => u.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(u => u.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();
         builder.Property(u => u.Name).HasColumnName("name").HasMaxLength(150);
         builder.Property(u => u.Role).HasColumnName("role").HasMaxLength(50).IsRequired().HasDefaultValue("Operator");
@@ -211,8 +239,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastLoginAtUtc).HasColumnName("last_login_at_utc");
         builder.Property(u => u.IsActive).HasColumnName("is_active").IsRequired();
 
-        builder.HasIndex(u => u.PhoneNumber).IsUnique();
+        builder.HasIndex(u => new { u.TenantId, u.PhoneNumber }).IsUnique();
         builder.HasIndex(u => u.FirebaseUid);
     }
 }
+
 

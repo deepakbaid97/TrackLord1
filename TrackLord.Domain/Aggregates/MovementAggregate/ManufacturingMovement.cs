@@ -1,4 +1,5 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Events;
@@ -6,8 +7,9 @@ using TrackLord.Domain.Exceptions;
 
 namespace TrackLord.Domain.Aggregates.MovementAggregate;
 
-public class ManufacturingMovement : AggregateRoot<Guid>
+public class ManufacturingMovement : AggregateRoot<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public Guid ProductionLotId { get; private set; }
     public Guid? FromStepId { get; private set; } // Null for initial production creation movement
     public Guid ToStepId { get; private set; }
@@ -39,7 +41,8 @@ public class ManufacturingMovement : AggregateRoot<Guid>
         string? clientName = null,
         string? createdBy = null,
         string? remarks = null,
-        string? referenceNumber = null)
+        string? referenceNumber = null,
+        Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("Movement Id cannot be empty.");
         if (productionLotId == Guid.Empty) throw new DomainException("ProductionLotId cannot be empty.");
@@ -54,6 +57,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>
         var movement = new ManufacturingMovement
         {
             Id = id,
+            TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId,
             ProductionLotId = productionLotId,
             FromStepId = fromStepId,
             ToStepId = toStepId,
@@ -132,6 +136,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>
         var reversal = new ManufacturingMovement
         {
             Id = reversalMovementId,
+            TenantId = TenantId,
             ProductionLotId = ProductionLotId,
             FromStepId = ToStepId,
             ToStepId = FromStepId ?? ToStepId,

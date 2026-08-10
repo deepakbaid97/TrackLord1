@@ -1,4 +1,5 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Events;
@@ -7,8 +8,9 @@ using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Domain.Aggregates.ProductionLotAggregate;
 
-public class ProductionLot : AggregateRoot<Guid>
+public class ProductionLot : AggregateRoot<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public ProductionLotNumber LotNumber { get; private set; } = default!;
     public Guid ItemId { get; private set; }
     public Quantity InitialQuantity { get; private set; } = default!;
@@ -27,7 +29,8 @@ public class ProductionLot : AggregateRoot<Guid>
         Quantity initialQuantity,
         Guid initialStepId,
         string? createdBy = null,
-        string? remarks = null)
+        string? remarks = null,
+        Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("ProductionLot Id cannot be empty.");
         if (lotNumber is null) throw new DomainException("ProductionLotNumber cannot be null.");
@@ -41,6 +44,7 @@ public class ProductionLot : AggregateRoot<Guid>
         var lot = new ProductionLot
         {
             Id = id,
+            TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId,
             LotNumber = lotNumber,
             ItemId = itemId,
             InitialQuantity = initialQuantity,

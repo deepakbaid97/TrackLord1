@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             await _userRepository.UpdateAsync(user);
         }
 
-        var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber);
+        var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber, user.TenantId);
 
         return Ok(new
         {
@@ -74,6 +74,7 @@ public class AuthController : ControllerBase
             user = new
             {
                 id = user.Id,
+                tenantId = user.TenantId,
                 phoneNumber = user.PhoneNumber,
                 name = user.Name,
                 role = user.Role,
@@ -107,6 +108,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             id = user?.Id.ToString() ?? userIdStr,
+            tenantId = user?.TenantId,
             phoneNumber = user?.PhoneNumber ?? phoneNumber ?? "Unknown",
             name = user?.Name,
             role = user?.Role ?? "Operator",
@@ -125,6 +127,7 @@ public class AuthController : ControllerBase
         return Ok(users.Select(u => new
         {
             u.Id,
+            u.TenantId,
             u.PhoneNumber,
             u.Name,
             u.Role,

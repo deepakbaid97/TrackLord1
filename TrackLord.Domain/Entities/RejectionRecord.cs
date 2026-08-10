@@ -1,12 +1,14 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Events;
 using TrackLord.Domain.Exceptions;
 
 namespace TrackLord.Domain.Entities;
 
-public class RejectionRecord : BaseEntity<Guid>
+public class RejectionRecord : BaseEntity<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public Guid ProductionLotId { get; private set; }
     public Guid StepId { get; private set; }
     public Guid? TargetStepId { get; private set; }
@@ -24,9 +26,10 @@ public class RejectionRecord : BaseEntity<Guid>
         decimal quantityRejected,
         string reason,
         DateTime rejectionDate,
-        string? createdBy = null)
+        string? createdBy = null,
+        Guid? tenantId = null)
     {
-        return Create(id, productionLotId, stepId, stepId, quantityRejected, reason, rejectionDate, null, createdBy);
+        return Create(id, productionLotId, stepId, stepId, quantityRejected, reason, rejectionDate, null, createdBy, tenantId);
     }
 
     public static RejectionRecord Create(
@@ -38,7 +41,8 @@ public class RejectionRecord : BaseEntity<Guid>
         string reason,
         DateTime rejectionDate,
         Guid? clientId = null,
-        string? createdBy = null)
+        string? createdBy = null,
+        Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("Rejection Id cannot be empty.");
         if (productionLotId == Guid.Empty) throw new DomainException("ProductionLotId cannot be empty.");
@@ -55,6 +59,7 @@ public class RejectionRecord : BaseEntity<Guid>
         return new RejectionRecord
         {
             Id = id,
+            TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId,
             ProductionLotId = productionLotId,
             StepId = stepId,
             TargetStepId = targetStepId,

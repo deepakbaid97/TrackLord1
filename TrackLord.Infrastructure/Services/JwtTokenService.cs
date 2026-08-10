@@ -5,14 +5,15 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 
 namespace TrackLord.Infrastructure.Services;
 
-public record AuthTokenResult(string Token, DateTime ExpiresAt, string UserId, string PhoneNumber);
+public record AuthTokenResult(string Token, DateTime ExpiresAt, string UserId, string PhoneNumber, Guid TenantId);
 
 public interface IJwtTokenService
 {
-    AuthTokenResult GenerateToken(string userId, string phoneNumber);
+    AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null);
 }
 
 public class JwtTokenService : IJwtTokenService
@@ -24,8 +25,9 @@ public class JwtTokenService : IJwtTokenService
         _configuration = configuration;
     }
 
-    public AuthTokenResult GenerateToken(string userId, string phoneNumber)
+    public AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null)
     {
+        var activeTenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId;
         var secretKey = _configuration["JwtSettings:SecretKey"] ?? "TrackLordSuperSecretAuthenticationKey2026!#ForJwtTokens";
         var issuer = _configuration["JwtSettings:Issuer"] ?? "TrackLordApi";
         var audience = _configuration["JwtSettings:Audience"] ?? "TrackLordWeb";
@@ -42,7 +44,8 @@ public class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new("phone_number", phoneNumber),
             new(ClaimTypes.MobilePhone, phoneNumber),
-            new(ClaimTypes.NameIdentifier, userId)
+            new(ClaimTypes.NameIdentifier, userId),
+            new("tenant_id", activeTenantId.ToString())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -58,6 +61,6 @@ public class JwtTokenService : IJwtTokenService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
 
-        return new AuthTokenResult(tokenString, expiresAt, userId, phoneNumber);
+        return new AuthTokenResult(tokenString, expiresAt, userId, phoneNumber, activeTenantId);
     }
 }

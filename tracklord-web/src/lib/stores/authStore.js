@@ -45,7 +45,7 @@ function createAuthStore() {
 
         if (res.ok) {
           const data = await res.json();
-          const user = { userId: data.userId, phoneNumber: data.phoneNumber };
+          const user = { userId: data.id, tenantId: data.tenantId, phoneNumber: data.phoneNumber };
           localStorage.setItem(USER_KEY, JSON.stringify(user));
           update(s => ({
             ...s,
@@ -132,6 +132,12 @@ function createAuthStore() {
     getToken() {
       const state = get(store);
       return state.token || (typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null);
+    },
+
+    /** Gets current user's tenantId */
+    getTenantId() {
+      const state = get(store);
+      return state.user?.tenantId || null;
     },
 
     openModal() {

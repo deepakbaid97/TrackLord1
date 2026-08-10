@@ -1,4 +1,5 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Events;
@@ -6,8 +7,9 @@ using TrackLord.Domain.Exceptions;
 
 namespace TrackLord.Domain.Aggregates.ConsumptionAggregate;
 
-public class MaterialConsumption : AggregateRoot<Guid>
+public class MaterialConsumption : AggregateRoot<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public Guid ProductionLotId { get; private set; }
     public Guid MaterialLotId { get; private set; }
     public Guid StepId { get; private set; }
@@ -29,7 +31,8 @@ public class MaterialConsumption : AggregateRoot<Guid>
         UnitType unit,
         DateTime consumptionDate,
         string? createdBy = null,
-        string? remarks = null)
+        string? remarks = null,
+        Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("Consumption Id cannot be empty.");
         if (productionLotId == Guid.Empty) throw new DomainException("ProductionLotId cannot be empty.");
@@ -44,6 +47,7 @@ public class MaterialConsumption : AggregateRoot<Guid>
         var consumption = new MaterialConsumption
         {
             Id = id,
+            TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId,
             ProductionLotId = productionLotId,
             MaterialLotId = materialLotId,
             StepId = stepId,

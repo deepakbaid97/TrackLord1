@@ -8,6 +8,7 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 
@@ -82,4 +83,14 @@ public interface IUserRepository
     Task AddAsync(User user, CancellationToken cancellationToken = default);
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
 }
+
+public interface ITenantRepository
+{
+    Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Tenant?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Tenant>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken = default);
+}
+
 

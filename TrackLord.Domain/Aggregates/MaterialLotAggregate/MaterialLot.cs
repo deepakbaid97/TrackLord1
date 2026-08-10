@@ -1,4 +1,5 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Events;
@@ -7,8 +8,9 @@ using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Domain.Aggregates.MaterialLotAggregate;
 
-public class MaterialLot : AggregateRoot<Guid>
+public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public MaterialLotNumber LotNumber { get; private set; } = default!;
     public Guid MaterialItemId { get; private set; }
     public string? MaterialName { get; private set; }
@@ -23,7 +25,8 @@ public class MaterialLot : AggregateRoot<Guid>
         MaterialLotNumber lotNumber,
         Guid materialItemId,
         Quantity initialQuantity,
-        string? materialName = null)
+        string? materialName = null,
+        Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("MaterialLot Id cannot be empty.");
         if (lotNumber is null) throw new DomainException("MaterialLotNumber cannot be null.");
@@ -36,6 +39,7 @@ public class MaterialLot : AggregateRoot<Guid>
         var lot = new MaterialLot
         {
             Id = id,
+            TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId,
             LotNumber = lotNumber,
             MaterialItemId = materialItemId,
             MaterialName = materialName,

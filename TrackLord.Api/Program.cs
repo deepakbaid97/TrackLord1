@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TrackLord.Application.Commands;
+using TrackLord.Domain.Common;
 using TrackLord.Domain.Repositories;
 using TrackLord.Domain.Services;
 using TrackLord.Infrastructure.Persistence;
@@ -100,6 +101,9 @@ if (System.IO.File.Exists(serviceAccountPath))
     }
 }
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IFirebaseTokenVerifier, FirebaseTokenVerifier>();
 
@@ -125,6 +129,7 @@ builder.Services.AddDbContext<TrackLordDbContext>(options =>
 builder.Services.AddSingleton<ILedgerReplayEngine, LedgerReplayEngine>();
 builder.Services.AddSingleton<IUnitConverterService, UnitConverterService>();
 
+builder.Services.AddScoped<ITenantRepository, TenantRepository>();
 builder.Services.AddScoped<IProductionLotRepository, ProductionLotRepository>();
 builder.Services.AddScoped<IMaterialLotRepository, MaterialLotRepository>();
 builder.Services.AddScoped<IManufacturingMovementRepository, ManufacturingMovementRepository>();
@@ -158,6 +163,16 @@ using (var scope = app.Services.CreateScope())
     try
     {
         dbContext.Database.Migrate();
+
+        if (!dbContext.Tenants.Any())
+        {
+            var defaultTenant = new TrackLord.Domain.Aggregates.TenantAggregate.Tenant(
+                TrackLord.Domain.Aggregates.TenantAggregate.Tenant.DefaultTenantId,
+                "Default Tenant",
+                "DEFAULT");
+            dbContext.Tenants.Add(defaultTenant);
+            dbContext.SaveChanges();
+        }
 
         if (!dbContext.ManufacturingSteps.Any())
         {

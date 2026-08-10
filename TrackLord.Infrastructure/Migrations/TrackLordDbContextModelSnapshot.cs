@@ -54,9 +54,13 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("phone_number");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
+                    b.HasIndex("TenantId", "Name");
 
                     b.ToTable("clients", (string)null);
                 });
@@ -102,6 +106,10 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("step_id");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<int>("Unit")
                         .HasColumnType("integer")
                         .HasColumnName("unit");
@@ -140,9 +148,13 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("material_name");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("LotNumber")
+                    b.HasIndex("TenantId", "LotNumber")
                         .IsUnique();
 
                     b.ToTable("material_lots", (string)null);
@@ -212,6 +224,10 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reversal_reason");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("ToStepId")
                         .HasColumnType("uuid")
                         .HasColumnName("to_step_id");
@@ -228,7 +244,7 @@ namespace TrackLord.Infrastructure.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.HasIndex("ProductionLotId", "MovementDate", "CreatedAtUtc", "Id")
+                    b.HasIndex("TenantId", "ProductionLotId", "MovementDate", "CreatedAtUtc", "Id")
                         .HasDatabaseName("ix_movements_lot_replay_order");
 
                     b.ToTable("manufacturing_movements", (string)null);
@@ -272,9 +288,13 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("LotNumber")
+                    b.HasIndex("TenantId", "LotNumber")
                         .IsUnique();
 
                     b.ToTable("production_lots", (string)null);
@@ -316,12 +336,50 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sequence_order");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("manufacturing_steps", (string)null);
+                });
+
+            modelBuilder.Entity("TrackLord.Domain.Aggregates.TenantAggregate.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("manufacturing_steps", (string)null);
+                    b.ToTable("tenants", (string)null);
                 });
 
             modelBuilder.Entity("TrackLord.Domain.Aggregates.UserAggregate.User", b =>
@@ -366,11 +424,15 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasDefaultValue("Operator")
                         .HasColumnName("role");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FirebaseUid");
 
-                    b.HasIndex("PhoneNumber")
+                    b.HasIndex("TenantId", "PhoneNumber")
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
@@ -421,6 +483,10 @@ namespace TrackLord.Infrastructure.Migrations
                     b.Property<Guid?>("TargetStepId")
                         .HasColumnType("uuid")
                         .HasColumnName("target_step_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
 

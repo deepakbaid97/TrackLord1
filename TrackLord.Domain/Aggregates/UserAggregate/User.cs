@@ -1,11 +1,13 @@
 using System;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Exceptions;
 
 namespace TrackLord.Domain.Aggregates.UserAggregate;
 
-public class User : AggregateRoot<Guid>
+public class User : AggregateRoot<Guid>, ITenantScopedEntity
 {
+    public Guid TenantId { get; private set; } = Tenant.DefaultTenantId;
     public string PhoneNumber { get; private set; } = default!;
     public string? Name { get; private set; }
     public string Role { get; private set; } = "Operator";
@@ -16,12 +18,13 @@ public class User : AggregateRoot<Guid>
 
     private User() { } // EF Core constructor
 
-    public User(Guid id, string phoneNumber, string? name = null, string role = "Operator", string? firebaseUid = null, DateTime? createdAtUtc = null)
+    public User(Guid id, string phoneNumber, string? name = null, string role = "Operator", string? firebaseUid = null, DateTime? createdAtUtc = null, Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("User Id cannot be empty.");
         if (string.IsNullOrWhiteSpace(phoneNumber)) throw new DomainException("User phone number is required.");
 
         Id = id;
+        TenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId;
         PhoneNumber = phoneNumber.Trim();
         Name = name?.Trim();
         Role = string.IsNullOrWhiteSpace(role) ? "Operator" : role.Trim();
