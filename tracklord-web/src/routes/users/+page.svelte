@@ -1,11 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import Button from '$lib/components/ui/Button.svelte';
-  import { getUsers } from '$lib/api.js';
+  import { getUsers, createUser, updateUser } from '$lib/api.js';
   import { authStore } from '$lib/stores/authStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
+  let successMessage = $state('');
   let searchQuery = $state('');
   let roleFilter = $state('All');
 
@@ -14,6 +14,24 @@
 
   let currentUser = $derived($authStore.user);
   let isAuthenticated = $derived($authStore.isAuthenticated);
+  let isAdmin = $derived(currentUser?.role === 'Admin');
+
+  // Add User Modal State
+  let showAddModal = $state(false);
+  let addFormName = $state('');
+  let addFormPhone = $state('');
+  let addFormRole = $state('Operator');
+  let addIsSubmitting = $state(false);
+  let addModalError = $state('');
+
+  // Edit User Modal State
+  let showEditModal = $state(false);
+  /** @type {any} */
+  let editingUser = $state(null);
+  let editFormName = $state('');
+  let editFormRole = $state('Operator');
+  let editIsSubmitting = $state(false);
+  let editModalError = $state('');
 
   onMount(async () => {
     await refreshUsers();
@@ -36,8 +54,91 @@
     authStore.logout();
   }
 
+  function openAddModal() {
+    addFormName = '';
+    addFormPhone = '';
+    addFormRole = 'Operator';
+    addModalError = '';
+    showAddModal = true;
+  }
+
+  function closeAddModal() {
+    showAddModal = false;
+  }
+
+  async function handleAddUserSubmit(e) {
+    if (e) e.preventDefault();
+    const cleanPhone = addFormPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      addModalError = 'Please enter a valid 10-digit mobile number.';
+      return;
+    }
+
+    addIsSubmitting = true;
+    addModalError = '';
+    try {
+      const fullPhone = `+91${cleanPhone.slice(-10)}`;
+      await createUser({
+        phoneNumber: fullPhone,
+        name: addFormName.trim() || null,
+        role: addFormRole
+      });
+      successMessage = `Successfully added new team member ${fullPhone}`;
+      closeAddModal();
+      await refreshUsers();
+      setTimeout(() => successMessage = '', 4000);
+    } catch (/** @type {any} */ err) {
+      addModalError = err.message || 'Failed to add user.';
+    } finally {
+      addIsSubmitting = false;
+    }
+  }
+
+  /** @param {any} user */
+  function openEditModal(user) {
+    editingUser = user;
+    editFormName = user.name || '';
+    editFormRole = user.role || 'Operator';
+    editModalError = '';
+    showEditModal = true;
+  }
+
+  function closeEditModal() {
+    showEditModal = false;
+    editingUser = null;
+  }
+
+  async function handleEditUserSubmit(e) {
+    if (e) e.preventDefault();
+    if (!editingUser) return;
+
+    editIsSubmitting = true;
+    editModalError = '';
+    try {
+      await updateUser(editingUser.id, {
+        name: editFormName.trim() || null,
+        role: editFormRole
+      });
+      successMessage = `Updated profile for ${editingUser.phoneNumber}`;
+      closeEditModal();
+      await refreshUsers();
+      setTimeout(() => successMessage = '', 4000);
+    } catch (/** @type {any} */ err) {
+      editModalError = err.message || 'Failed to update user profile.';
+    } finally {
+      editIsSubmitting = false;
+    }
+  }
+
+  let isManager = $derived(currentUser?.role === 'Admin' || currentUser?.role === 'Supervisor');
+
   let filteredUsers = $derived(
     users.filter(u => {
+      // Non-admin / non-supervisor can only see their own profile
+      if (!isManager && currentUser && currentUser.phoneNumber !== u.phoneNumber) {
+        return false;
+      }
+
       const matchesSearch = !searchQuery ||
         (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (u.phoneNumber && u.phoneNumber.includes(searchQuery)) ||
@@ -63,7 +164,7 @@
   }
 </script>
 
-<!-- Header -->
+<!-- Top Header Navigation -->
 <header class="fixed top-0 w-full z-40 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
   <div class="flex items-center gap-3">
     <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
@@ -76,6 +177,17 @@
   </div>
 
   <div class="flex items-center gap-2 sm:gap-3">
+    {#if isAdmin}
+      <button
+        onclick={openAddModal}
+        class="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-primary/20 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+      >
+        <span class="material-symbols-outlined text-[18px]">person_add</span>
+        <span class="hidden sm:inline">Add Team Member</span>
+        <span class="sm:hidden">Add</span>
+      </button>
+    {/if}
+
     <button
       onclick={() => refreshUsers()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
@@ -99,6 +211,19 @@
 <!-- Main Container -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
+  <!-- Success Notification -->
+  {#if successMessage}
+    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fadeIn">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+        <span class="font-medium">{successMessage}</span>
+      </div>
+      <button onclick={() => successMessage = ''} class="text-emerald-600 hover:text-emerald-800">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+  {/if}
+
   <!-- Error Banner -->
   {#if errorMessage}
     <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
@@ -115,40 +240,45 @@
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
       <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-      <span>Loading registered users...</span>
+      <span>Loading tenant directory...</span>
     </div>
   {:else}
-    <!-- Top Hero Card & Current Session Banner -->
+    <!-- Top Hero Card & Action Banner -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
       <div>
         <h2 class="font-headline-md text-headline-md text-primary font-bold flex items-center gap-2">
           <span class="material-symbols-outlined text-[28px]">group_add</span>
-          User Directory & Phone Auth Accounts
+          User Directory & Tenant Access Controls
         </h2>
         <p class="text-sm text-on-surface-variant mt-1">
-          Registered user accounts verified via Firebase Phone OTP authentication and JWT tokens.
+          Manage team members, roles, and verified phone accounts for your organization.
         </p>
       </div>
 
-      {#if isAuthenticated && currentUser}
-        <!-- Active Session Card with Logout -->
-        <div class="flex items-center gap-3 p-3 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 w-full sm:w-auto">
-          <div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            <span class="material-symbols-outlined text-[20px]">person</span>
-          </div>
-          <div class="flex-1 min-w-[120px]">
-            <div class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Logged In Session</div>
-            <div class="text-xs font-bold text-slate-900 dark:text-white font-['JetBrains_Mono']">{currentUser.phoneNumber}</div>
-          </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        {#if isAdmin}
           <button
-            onclick={handleLogout}
-            class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+            onclick={openAddModal}
+            class="px-4 py-2.5 bg-primary hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 w-full sm:w-auto"
           >
-            <span class="material-symbols-outlined text-[16px]">logout</span>
-            <span>Sign Out</span>
+            <span class="material-symbols-outlined text-base">person_add</span>
+            <span>+ Add New User</span>
           </button>
-        </div>
-      {/if}
+        {/if}
+
+        {#if isAuthenticated && currentUser}
+          <!-- Active Session Card -->
+          <div class="flex items-center gap-3 p-2.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-sm shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">person</span>
+            </div>
+            <div class="hidden md:block">
+              <div class="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Logged In Session</div>
+              <div class="text-xs font-bold text-slate-900 dark:text-white font-['JetBrains_Mono']">{currentUser.phoneNumber}</div>
+            </div>
+          </div>
+        {/if}
+      </div>
     </div>
 
     <!-- User KPI Stats Cards -->
@@ -202,7 +332,7 @@
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Search by phone number, name, or role..."
+          placeholder="Search by name, phone number, or role..."
           class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
@@ -222,34 +352,35 @@
       </div>
     </div>
 
-    <!-- User Table -->
+    <!-- User Directory Table -->
     <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
       <div class="w-full overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-              <th class="px-6 py-3">User / Identity</th>
+              <th class="px-6 py-3">Full Name / User Identity</th>
               <th class="px-6 py-3">Phone Number</th>
               <th class="px-6 py-3">Role</th>
               <th class="px-6 py-3">Status</th>
-              <th class="px-6 py-3">Firebase UID</th>
               <th class="px-6 py-3">Registered Date</th>
               <th class="px-6 py-3">Last Login</th>
+              <th class="px-6 py-3 text-right">Action</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant">
             {#each filteredUsers as user}
               {@const isMe = currentUser && currentUser.phoneNumber === user.phoneNumber}
+              {@const canEdit = isMe || isAdmin}
               <tr class="hover:bg-surface-container-low/70 transition-colors">
-                <!-- User Name / Badge -->
+                <!-- User Name / Avatar -->
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                    <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
                       {user.name ? user.name.charAt(0).toUpperCase() : user.phoneNumber ? user.phoneNumber.slice(-2) : 'U'}
                     </div>
                     <div>
                       <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>{user.name || 'Phone Verified User'}</span>
+                        <span>{user.name || 'Unnamed Team Member'}</span>
                         {#if isMe}
                           <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-primary text-white shadow-sm">You</span>
                         {/if}
@@ -292,11 +423,6 @@
                   {/if}
                 </td>
 
-                <!-- Firebase UID -->
-                <td class="px-6 py-4 text-xs font-mono text-on-surface-variant truncate max-w-[150px]">
-                  {user.firebaseUid || 'N/A'}
-                </td>
-
                 <!-- Registered Date -->
                 <td class="px-6 py-4 text-xs text-on-surface-variant font-mono">
                   {formatDate(user.createdAtUtc)}
@@ -305,6 +431,21 @@
                 <!-- Last Login -->
                 <td class="px-6 py-4 text-xs font-mono font-semibold text-primary">
                   {formatDate(user.lastLoginAtUtc)}
+                </td>
+
+                <!-- Edit Action -->
+                <td class="px-6 py-4 text-right">
+                  {#if canEdit}
+                    <button
+                      onclick={() => openEditModal(user)}
+                      class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1 ml-auto cursor-pointer transition-all active:scale-95"
+                    >
+                      <span class="material-symbols-outlined text-[16px] text-primary">edit</span>
+                      <span>Edit</span>
+                    </button>
+                  {:else}
+                    <span class="text-xs text-slate-400 font-mono">-</span>
+                  {/if}
                 </td>
               </tr>
             {/each}
@@ -322,3 +463,199 @@
     </div>
   {/if}
 </main>
+
+<!-- ADD USER MODAL (ADMIN ONLY) -->
+{#if showAddModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md transition-all animate-fadeIn">
+    <div class="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8">
+      
+      <!-- Top Icon & Header -->
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold shadow-sm">
+          <span class="material-symbols-outlined text-[28px]">person_add</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Add New Team Member</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Register a new user in your tenant organization</p>
+        </div>
+      </div>
+
+      <!-- Error Alert -->
+      {#if addModalError}
+        <div class="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs flex items-center gap-2">
+          <span class="material-symbols-outlined text-base shrink-0">error</span>
+          <span>{addModalError}</span>
+        </div>
+      {/if}
+
+      <!-- Add User Form -->
+      <form onsubmit={handleAddUserSubmit} class="space-y-4">
+        <!-- Full Name -->
+        <div>
+          <label for="add-user-name" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 font-['JetBrains_Mono']">
+            Full Name
+          </label>
+          <input
+            id="add-user-name"
+            type="text"
+            bind:value={addFormName}
+            placeholder="e.g. Rajesh Kumar"
+            class="w-full h-11 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <!-- Phone Number -->
+        <div>
+          <label for="add-user-phone" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 font-['JetBrains_Mono']">
+            Mobile Number *
+          </label>
+          <div class="flex items-center gap-2">
+            <div class="h-11 px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 select-none shrink-0 font-['JetBrains_Mono']">
+              <span>🇮🇳</span>
+              <span>+91</span>
+            </div>
+            <input
+              id="add-user-phone"
+              type="tel"
+              bind:value={addFormPhone}
+              placeholder="98765 43210"
+              maxlength="10"
+              required
+              class="flex-1 h-11 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary font-['JetBrains_Mono'] tracking-wide"
+            />
+          </div>
+        </div>
+
+        <!-- Role Selector -->
+        <div>
+          <label for="add-user-role" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 font-['JetBrains_Mono']">
+            Assigned Role *
+          </label>
+          <select
+            id="add-user-role"
+            bind:value={addFormRole}
+            class="w-full h-11 px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="Operator">Operator (Floor Operations)</option>
+            <option value="Supervisor">Supervisor (Line Manager)</option>
+            <option value="Admin">Admin (Full Control)</option>
+          </select>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onclick={closeAddModal}
+            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={addIsSubmitting || !addFormPhone}
+            class="px-5 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            {#if addIsSubmitting}
+              <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span>Adding User...</span>
+            {:else}
+              <span class="material-symbols-outlined text-base">check</span>
+              <span>Save & Add User</span>
+            {/if}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
+<!-- EDIT USER MODAL -->
+{#if showEditModal && editingUser}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md transition-all animate-fadeIn">
+    <div class="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8">
+      
+      <!-- Top Icon & Header -->
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold shadow-sm">
+          <span class="material-symbols-outlined text-[28px]">edit_square</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Edit User Profile</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{editingUser.phoneNumber}</p>
+        </div>
+      </div>
+
+      <!-- Error Alert -->
+      {#if editModalError}
+        <div class="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs flex items-center gap-2">
+          <span class="material-symbols-outlined text-base shrink-0">error</span>
+          <span>{editModalError}</span>
+        </div>
+      {/if}
+
+      <!-- Edit Form -->
+      <form onsubmit={handleEditUserSubmit} class="space-y-4">
+        <!-- Full Name -->
+        <div>
+          <label for="edit-user-name" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 font-['JetBrains_Mono']">
+            Full Name
+          </label>
+          <input
+            id="edit-user-name"
+            type="text"
+            bind:value={editFormName}
+            placeholder="Enter full name"
+            class="w-full h-11 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <!-- Role (Editable if Admin, Read-only if User self-editing) -->
+        <div>
+          <label for="edit-user-role" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 font-['JetBrains_Mono']">
+            Role
+          </label>
+          {#if isAdmin}
+            <select
+              id="edit-user-role"
+              bind:value={editFormRole}
+              class="w-full h-11 px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="Operator">Operator</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Admin">Admin</option>
+            </select>
+          {:else}
+            <div class="h-11 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center font-mono">
+              {editingUser.role} (Role changes require Admin privileges)
+            </div>
+          {/if}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onclick={closeEditModal}
+            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={editIsSubmitting}
+            class="px-5 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            {#if editIsSubmitting}
+              <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span>Updating Profile...</span>
+            {:else}
+              <span class="material-symbols-outlined text-base">save</span>
+              <span>Save Changes</span>
+            {/if}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}

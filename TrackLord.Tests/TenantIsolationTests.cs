@@ -120,4 +120,42 @@ public class TenantIsolationTests
             stepsB[0].Code.Should().Be("SEW");
         }
     }
+
+    [Fact]
+    public async Task CreateProductionLot_WithoutExplicitTenantId_ShouldBeAssignedActiveTenantIdOnSave()
+    {
+        var activeTenantId = Guid.NewGuid();
+        var dbName = Guid.NewGuid().ToString();
+
+        var options = new DbContextOptionsBuilder<TrackLordDbContext>()
+            .UseInMemoryDatabase(databaseName: dbName)
+            .Options;
+
+        var context = new MockTenantContext(activeTenantId);
+
+        using (var db = new TrackLordDbContext(options, context))
+        {
+            var step = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid(), false);
+            db.ManufacturingSteps.Add(step);
+
+            // Lot created without explicit tenantId (defaults to Tenant.DefaultTenantId)
+            var lot = ProductionLot.Create(Guid.NewGuid(), ProductionLotNumber.Create("LOT-TEST-999"), Guid.NewGuid(), new Quantity(50, UnitType.Pieces), step.Id);
+            db.ProductionLots.Add(lot);
+
+            await db.SaveChangesAsync();
+
+            // Verify that PopulateTenantIds assigned activeTenantId to both step and lot
+            step.TenantId.Should().Be(activeTenantId);
+            lot.TenantId.Should().Be(activeTenantId);
+        }
+
+        using (var queryDb = new TrackLordDbContext(options, context))
+        {
+            var lotRepo = new ProductionLotRepository(queryDb);
+            var lot = await lotRepo.GetByLotNumberAsync("LOT-TEST-999");
+
+            lot.Should().NotBeNull();
+            lot!.TenantId.Should().Be(activeTenantId);
+        }
+    }
 }

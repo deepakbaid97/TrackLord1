@@ -84,7 +84,7 @@ public class TrackLordDbContext : DbContext
             if (entry.State == EntityState.Added)
             {
                 var currentTenantIdProp = entry.Property(x => x.TenantId);
-                if (currentTenantIdProp.CurrentValue == System.Guid.Empty)
+                if (currentTenantIdProp.CurrentValue == System.Guid.Empty || currentTenantIdProp.CurrentValue == Tenant.DefaultTenantId)
                 {
                     currentTenantIdProp.CurrentValue = activeTenantId;
                 }

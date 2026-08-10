@@ -236,3 +236,29 @@ export async function getUsers() {
   return await handleResponse(response);
 }
 
+// 18. Create New User (Admin)
+/** @param {any} data */
+export async function createUser(data) {
+  const response = await authFetch(`${API_BASE_URL}/Auth/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 19. Update User Profile (Name / Role)
+/**
+ * @param {string} userId
+ * @param {any} data
+ */
+export async function updateUser(userId, data) {
+  const response = await authFetch(`${API_BASE_URL}/Auth/users/${userId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+

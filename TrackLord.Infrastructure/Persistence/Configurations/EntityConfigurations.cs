@@ -20,6 +20,7 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.ToTable("tenants");
 
         builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).HasColumnName("id");
 
         builder.Property(t => t.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
         builder.Property(t => t.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
@@ -37,6 +38,7 @@ public class ProductionLotConfiguration : IEntityTypeConfiguration<ProductionLot
         builder.ToTable("production_lots");
 
         builder.HasKey(p => p.Id);
+        builder.Property(p => p.Id).HasColumnName("id");
 
         builder.Property(p => p.TenantId).HasColumnName("tenant_id").IsRequired();
 
@@ -70,6 +72,7 @@ public class MaterialLotConfiguration : IEntityTypeConfiguration<MaterialLot>
         builder.ToTable("material_lots");
 
         builder.HasKey(m => m.Id);
+        builder.Property(m => m.Id).HasColumnName("id");
 
         builder.Property(m => m.TenantId).HasColumnName("tenant_id").IsRequired();
 
@@ -106,6 +109,7 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
         builder.ToTable("manufacturing_movements");
 
         builder.HasKey(m => m.Id);
+        builder.Property(m => m.Id).HasColumnName("id");
 
         builder.Property(m => m.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(m => m.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
@@ -143,6 +147,7 @@ public class ManufacturingStepConfiguration : IEntityTypeConfiguration<Manufactu
         builder.ToTable("manufacturing_steps");
 
         builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).HasColumnName("id");
 
         builder.Property(s => s.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(s => s.Code).HasColumnName("code").HasMaxLength(20).IsRequired();
@@ -163,6 +168,7 @@ public class MaterialConsumptionConfiguration : IEntityTypeConfiguration<Materia
         builder.ToTable("material_consumptions");
 
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).HasColumnName("id");
 
         builder.Property(c => c.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(c => c.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
@@ -187,6 +193,7 @@ public class RejectionRecordConfiguration : IEntityTypeConfiguration<RejectionRe
         builder.ToTable("rejection_records");
 
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).HasColumnName("id");
 
         builder.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(r => r.ProductionLotId).HasColumnName("production_lot_id").IsRequired();
@@ -210,6 +217,7 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.ToTable("clients");
 
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).HasColumnName("id");
 
         builder.Property(c => c.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(c => c.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
@@ -229,6 +237,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ToTable("users");
 
         builder.HasKey(u => u.Id);
+        builder.Property(u => u.Id).HasColumnName("id");
 
         builder.Property(u => u.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(u => u.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();

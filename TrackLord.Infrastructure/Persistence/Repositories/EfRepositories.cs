@@ -302,19 +302,19 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        return await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
     public async Task<User?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default)
     {
         var targetPhone = phoneNumber.Trim();
-        return await _dbContext.Users.FirstOrDefaultAsync(u => u.PhoneNumber == targetPhone, cancellationToken);
+        return await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.PhoneNumber == targetPhone, cancellationToken);
     }
 
     public async Task<User?> GetByFirebaseUidAsync(string firebaseUid, CancellationToken cancellationToken = default)
     {
         var targetUid = firebaseUid.Trim();
-        return await _dbContext.Users.FirstOrDefaultAsync(u => u.FirebaseUid == targetUid, cancellationToken);
+        return await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.FirebaseUid == targetUid, cancellationToken);
     }
 
     public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
