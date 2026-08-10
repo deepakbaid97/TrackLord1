@@ -14,7 +14,7 @@
 
   let currentUser = $derived($authStore.user);
   let isAuthenticated = $derived($authStore.isAuthenticated);
-  let isAdmin = $derived(currentUser?.role === 'Admin');
+  let isAdmin = $derived(currentUser?.role?.toLowerCase() === 'admin');
 
   // Add User Modal State
   let showAddModal = $state(false);
@@ -130,7 +130,7 @@
     }
   }
 
-  let isManager = $derived(currentUser?.role === 'Admin' || currentUser?.role === 'Supervisor');
+  let isManager = $derived(currentUser?.role?.toLowerCase() === 'admin' || currentUser?.role?.toLowerCase() === 'supervisor');
 
   let filteredUsers = $derived(
     users.filter(u => {

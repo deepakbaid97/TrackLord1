@@ -45,7 +45,14 @@ function createAuthStore() {
 
         if (res.ok) {
           const data = await res.json();
-          const user = { userId: data.id, tenantId: data.tenantId, phoneNumber: data.phoneNumber };
+          const user = {
+            id: data.id,
+            userId: data.id,
+            tenantId: data.tenantId,
+            phoneNumber: data.phoneNumber,
+            name: data.name,
+            role: data.role
+          };
           localStorage.setItem(USER_KEY, JSON.stringify(user));
           update(s => ({
             ...s,
