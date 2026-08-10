@@ -177,17 +177,6 @@
   </div>
 
   <div class="flex items-center gap-2 sm:gap-3">
-    {#if isAdmin}
-      <button
-        onclick={openAddModal}
-        class="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-primary/20 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-      >
-        <span class="material-symbols-outlined text-[18px]">person_add</span>
-        <span class="hidden sm:inline">Add Team Member</span>
-        <span class="sm:hidden">Add</span>
-      </button>
-    {/if}
-
     <button
       onclick={() => refreshUsers()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
