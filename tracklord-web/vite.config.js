@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	server: {
+		// Firebase Phone Auth + reCAPTCHA Enterprise reject "localhost" for real numbers.
+		// Use http://127.0.0.1:5173 and add 127.0.0.1 to Firebase Authorized Domains.
+		host: '127.0.0.1',
 		proxy: {
 			'/api': 'http://localhost:5217'
 		}

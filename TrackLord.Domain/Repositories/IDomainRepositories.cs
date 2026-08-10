@@ -8,6 +8,7 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 
 namespace TrackLord.Domain.Repositories;
@@ -70,5 +71,15 @@ public interface IClientRepository
     Task<IReadOnlyList<Client>> GetAllAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Client client, CancellationToken cancellationToken = default);
     Task UpdateAsync(Client client, CancellationToken cancellationToken = default);
+}
+
+public interface IUserRepository
+{
+    Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<User?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default);
+    Task<User?> GetByFirebaseUidAsync(string firebaseUid, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(User user, CancellationToken cancellationToken = default);
+    Task UpdateAsync(User user, CancellationToken cancellationToken = default);
 }
 

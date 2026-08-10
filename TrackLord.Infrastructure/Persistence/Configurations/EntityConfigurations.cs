@@ -6,6 +6,7 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 using TrackLord.Domain.ValueObjects;
 
@@ -191,6 +192,27 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(c => c.IsActive).HasColumnName("is_active").IsRequired();
 
         builder.HasIndex(c => c.Name);
+    }
+}
+
+public class UserConfiguration : IEntityTypeConfiguration<User>
+{
+    public void Configure(EntityTypeBuilder<User> builder)
+    {
+        builder.ToTable("users");
+
+        builder.HasKey(u => u.Id);
+
+        builder.Property(u => u.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();
+        builder.Property(u => u.Name).HasColumnName("name").HasMaxLength(150);
+        builder.Property(u => u.Role).HasColumnName("role").HasMaxLength(50).IsRequired().HasDefaultValue("Operator");
+        builder.Property(u => u.FirebaseUid).HasColumnName("firebase_uid").HasMaxLength(128);
+        builder.Property(u => u.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(u => u.LastLoginAtUtc).HasColumnName("last_login_at_utc");
+        builder.Property(u => u.IsActive).HasColumnName("is_active").IsRequired();
+
+        builder.HasIndex(u => u.PhoneNumber).IsUnique();
+        builder.HasIndex(u => u.FirebaseUid);
     }
 }
 

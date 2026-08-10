@@ -5,6 +5,7 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 
 namespace TrackLord.Infrastructure.Persistence;
@@ -22,6 +23,7 @@ public class TrackLordDbContext : DbContext
     public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
     public DbSet<RejectionRecord> RejectionRecords => Set<RejectionRecord>();
     public DbSet<Client> Clients => Set<Client>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

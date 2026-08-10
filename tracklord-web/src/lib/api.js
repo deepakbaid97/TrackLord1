@@ -1,4 +1,30 @@
+import { authStore } from './stores/authStore.js';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE || '/api';
+
+/**
+ * Custom fetch wrapper that automatically injects Authorization Bearer token header
+ * and handles 401 Unauthorized responses.
+ * @param {string} url 
+ * @param {RequestInit} [options] 
+ */
+async function authFetch(url, options = {}) {
+  const token = authStore.getToken();
+  const headers = new Headers(options.headers || {});
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    authStore.logout();
+    authStore.openModal();
+  }
+
+  return response;
+}
 
 /** @param {Response} response */
 async function handleResponse(response) {
@@ -19,14 +45,14 @@ async function handleResponse(response) {
 
 // 1. Fetch Manufacturing Steps
 export async function getManufacturingSteps() {
-  const response = await fetch(`${API_BASE_URL}/ManufacturingSteps`);
+  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps`);
   return await handleResponse(response);
 }
 
 // 1b. Create Manufacturing Step
 /** @param {any} data */
 export async function createManufacturingStep(data) {
-  const response = await fetch(`${API_BASE_URL}/ManufacturingSteps`, {
+  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -40,7 +66,7 @@ export async function createManufacturingStep(data) {
  * @param {any} data
  */
 export async function updateManufacturingStep(id, data) {
-  const response = await fetch(`${API_BASE_URL}/ManufacturingSteps/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -50,41 +76,41 @@ export async function updateManufacturingStep(id, data) {
 
 // 2. Fetch all Production Lots
 export async function getProductionLots() {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots`);
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots`);
   return await handleResponse(response);
 }
 
 // 3. Fetch all Raw Material Lots
 export async function getMaterialLots() {
-  const response = await fetch(`${API_BASE_URL}/MaterialConsumptions/lots`);
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots`);
   return await handleResponse(response);
 }
 
 // 4. Fetch Lot WIP summary
 /** @param {string} lotId */
 export async function getLotWip(lotId) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots/${lotId}/wip`);
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}/wip`);
   return await handleResponse(response);
 }
 
 // 5. Fetch Lot Journey & Movements History
 /** @param {string} lotId */
 export async function getLotJourney(lotId) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots/${lotId}/journey`);
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}/journey`);
   return await handleResponse(response);
 }
 
 // 6. Fetch Material Traceability for Lot
 /** @param {string} lotId */
 export async function getMaterialTraceability(lotId) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots/${lotId}/material-traceability`);
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}/material-traceability`);
   return await handleResponse(response);
 }
 
 // 7. Create New Production Lot
 /** @param {any} data */
 export async function createProductionLot(data) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots`, {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -95,7 +121,7 @@ export async function createProductionLot(data) {
 // 7b. Import Production Lots
 /** @param {any} data */
 export async function importProductionLots(data) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots/import`, {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -106,7 +132,7 @@ export async function importProductionLots(data) {
 // 8. Move Lot Quantity Between Steps
 /** @param {any} data */
 export async function moveLot(data) {
-  const response = await fetch(`${API_BASE_URL}/Movements`, {
+  const response = await authFetch(`${API_BASE_URL}/Movements`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -117,7 +143,7 @@ export async function moveLot(data) {
 // 9. Create New Raw Material Lot
 /** @param {any} data */
 export async function createMaterialLot(data) {
-  const response = await fetch(`${API_BASE_URL}/MaterialConsumptions/lots`, {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -128,7 +154,7 @@ export async function createMaterialLot(data) {
 // 10. Consume Raw Material for Production Lot
 /** @param {any} data */
 export async function consumeMaterial(data) {
-  const response = await fetch(`${API_BASE_URL}/MaterialConsumptions/consume`, {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/consume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -142,7 +168,7 @@ export async function consumeMaterial(data) {
  * @param {any} data
  */
 export async function rejectItems(lotId, data) {
-  const response = await fetch(`${API_BASE_URL}/ProductionLots/${lotId}/reject`, {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}/reject`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -156,7 +182,7 @@ export async function rejectItems(lotId, data) {
  * @param {any} data
  */
 export async function reverseMovement(movementId, data) {
-  const response = await fetch(`${API_BASE_URL}/Movements/${movementId}/reverse`, {
+  const response = await authFetch(`${API_BASE_URL}/Movements/${movementId}/reverse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -173,7 +199,7 @@ export async function editMaterialConsumption(consumptionId, data) {
   if (!consumptionId || consumptionId === 'undefined') {
     throw new Error('Material Consumption ID is missing or invalid.');
   }
-  const response = await fetch(`${API_BASE_URL}/MaterialConsumptions/consume/${consumptionId}`, {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/consume/${consumptionId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -183,14 +209,14 @@ export async function editMaterialConsumption(consumptionId, data) {
 
 // 14. Fetch All Clients
 export async function getClients() {
-  const response = await fetch(`${API_BASE_URL}/Clients`);
+  const response = await authFetch(`${API_BASE_URL}/Clients`);
   return await handleResponse(response);
 }
 
 // 15. Create New Client
 /** @param {any} data */
 export async function createClient(data) {
-  const response = await fetch(`${API_BASE_URL}/Clients`, {
+  const response = await authFetch(`${API_BASE_URL}/Clients`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -200,7 +226,13 @@ export async function createClient(data) {
 
 // 16. Fetch Dashboard Overview
 export async function getDashboardOverview() {
-  const response = await fetch(`${API_BASE_URL}/Dashboards/overview`);
+  const response = await authFetch(`${API_BASE_URL}/Dashboards/overview`);
+  return await handleResponse(response);
+}
+
+// 17. Fetch All Registered Users
+export async function getUsers() {
+  const response = await authFetch(`${API_BASE_URL}/Auth/users`);
   return await handleResponse(response);
 }
 

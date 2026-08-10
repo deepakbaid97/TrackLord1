@@ -90,3 +90,17 @@ CREATE INDEX IF NOT EXISTS ix_material_consumptions_mat_lot
 
 CREATE INDEX IF NOT EXISTS ix_rejection_records_prod_lot 
     ON rejection_records (production_lot_id);
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY,
+    phone_number VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(150),
+    role VARCHAR(50) NOT NULL DEFAULT 'Operator',
+    firebase_uid VARCHAR(128),
+    created_at_utc TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_login_at_utc TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS ix_users_phone_number ON users (phone_number);
+CREATE INDEX IF NOT EXISTS ix_users_firebase_uid ON users (firebase_uid);

@@ -10,6 +10,7 @@ using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
+using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 using TrackLord.Domain.Repositories;
 using TrackLord.Domain.ValueObjects;
@@ -289,4 +290,53 @@ public class ClientRepository : IClientRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
+
+public class UserRepository : IUserRepository
+{
+    private readonly TrackLordDbContext _dbContext;
+
+    public UserRepository(TrackLordDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+    }
+
+    public async Task<User?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        var targetPhone = phoneNumber.Trim();
+        return await _dbContext.Users.FirstOrDefaultAsync(u => u.PhoneNumber == targetPhone, cancellationToken);
+    }
+
+    public async Task<User?> GetByFirebaseUidAsync(string firebaseUid, CancellationToken cancellationToken = default)
+    {
+        var targetUid = firebaseUid.Trim();
+        return await _dbContext.Users.FirstOrDefaultAsync(u => u.FirebaseUid == targetUid, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(u => u.IsActive)
+            .OrderBy(u => u.PhoneNumber)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(User user, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Users.AddAsync(user, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Users.Update(user);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
 

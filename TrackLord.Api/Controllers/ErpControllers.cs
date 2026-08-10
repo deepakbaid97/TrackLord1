@@ -1,12 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TrackLord.Application.Commands;
 using TrackLord.Application.Queries;
 
 namespace TrackLord.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ProductionLotsController : ControllerBase
@@ -108,6 +110,7 @@ public record RejectItemsRequest(
     Guid? ClientId,
     string? CreatedBy);
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MovementsController : ControllerBase
@@ -155,6 +158,7 @@ public class MovementsController : ControllerBase
 public record EditMovementRequest(Guid? FromStepId, Guid ToStepId, decimal NewQuantity, DateTime NewMovementDate, string? Remarks, string? ReferenceNumber);
 public record ReverseMovementRequest(string Reason, string? User);
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ManufacturingStepsController : ControllerBase
@@ -205,6 +209,7 @@ public class ManufacturingStepsController : ControllerBase
 
 public record UpdateManufacturingStepRequest(string Name, int SequenceOrder, bool IsTerminating, bool IsActive);
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MaterialConsumptionsController : ControllerBase
@@ -261,6 +266,7 @@ public class MaterialConsumptionsController : ControllerBase
 
 public record EditMaterialConsumptionRequest(decimal QuantityConsumed, string? Remarks);
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class DashboardsController : ControllerBase

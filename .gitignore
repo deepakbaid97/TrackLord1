@@ -362,3 +362,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Firebase Service Account Credentials
+tracklord-service.json
+*.service-account.json
+/TrackLord.Api/appsettings.Development.json
