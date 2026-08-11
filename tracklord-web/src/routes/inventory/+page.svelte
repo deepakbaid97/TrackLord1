@@ -115,6 +115,17 @@
     createdBy: 'Inspector'
   });
 
+  let isReverseModalOpen = $state(false);
+  let reverseForm = $state({
+    movementId: '',
+    fromStep: '',
+    toStep: '',
+    quantity: '',
+    referenceNumber: '',
+    reason: 'Typo correction / Accidental movement',
+    user: 'Supervisor'
+  });
+
   let isConsumePiecesUnit = $derived.by(() => {
     const selectedMatLot = materialLots.find(m => m.id === consumeMaterialForm.materialLotId);
     return selectedMatLot && (selectedMatLot.unit === 'Pieces' || selectedMatLot.unit === 1 || selectedMatLot.unitType === 1);
@@ -542,19 +553,33 @@
     }
   }
 
-  /** @param {string} movementId */
-  async function handleReverseMovement(movementId) {
-    if (!confirm('Are you sure you want to reverse this movement transaction?')) return;
+  /** @param {any} m */
+  function openReverseModal(m) {
+    reverseForm.movementId = m.id;
+    reverseForm.fromStep = m.from || 'Source Step';
+    reverseForm.toStep = m.to || 'Destination Step';
+    reverseForm.quantity = m.qty || '';
+    reverseForm.referenceNumber = m.referenceNumber || '-';
+    reverseForm.reason = 'Typo correction / Accidental movement';
+    reverseForm.user = 'Supervisor';
+    isReverseModalOpen = true;
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleReverseSubmit(e) {
+    e.preventDefault();
+    if (!reverseForm.movementId) return;
     errorMessage = '';
     try {
-      await reverseMovement(movementId, {
-        reason: 'Reversal initiated from audit ledger UI',
-        user: 'Supervisor'
+      await reverseMovement(reverseForm.movementId, {
+        reason: reverseForm.reason.trim() || 'Reversal initiated from audit ledger UI',
+        user: reverseForm.user.trim() || 'Supervisor'
       });
       successMessage = 'Movement transaction reversed successfully!';
+      isReverseModalOpen = false;
       await loadSelectedLotDetails(selectedLotId);
     } catch (/** @type {any} */ err) {
-      errorMessage = err.message;
+      errorMessage = err.message || 'Failed to reverse movement transaction.';
     }
   }
 
@@ -687,11 +712,11 @@
         Lot Tracking & Journey
       </button>
       <button
-        onclick={() => activeTab = 'materials'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'materials' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        onclick={() => activeTab = 'ledger'}
+        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'ledger' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        <span class="material-symbols-outlined text-[18px]">inventory_2</span>
-        Raw Materials Ledger
+        <span class="material-symbols-outlined text-[18px]">history</span>
+        Movements Ledger ({movementsLedgerRows.length})
       </button>
     </div>
   </div>
@@ -845,7 +870,7 @@
               </div>
             {/if}
           </section>
-        </div>
+          </div>
       </div>
     {:else}
       <div class="p-12 text-center text-on-surface-variant bg-surface rounded-xl border border-outline-variant">
@@ -902,7 +927,7 @@
                   <td class="px-4 py-3 text-right whitespace-nowrap">
                     {#if !m.isReversed && m.type !== 'InitialProduction'}
                       <button
-                        onclick={() => handleReverseMovement(m.id)}
+                        onclick={() => openReverseModal(m)}
                         class="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300 rounded font-semibold transition-colors cursor-pointer"
                       >
                         Reverse
@@ -1325,6 +1350,42 @@
       </Button>
       <Button variant="primary" type="submit" icon="save">
         Save Client
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 8: Reverse Movement Transaction -->
+<Modal bind:isOpen={isReverseModalOpen} title="Reverse Movement Transaction">
+  <form onsubmit={handleReverseSubmit} class="space-y-4">
+    <div class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs space-y-1">
+      <div class="font-bold text-red-700 dark:text-red-300">Transaction to Reverse:</div>
+      <div><span class="text-on-surface-variant font-medium">Ref No:</span> <strong class="text-on-surface">{reverseForm.referenceNumber}</strong></div>
+      <div><span class="text-on-surface-variant font-medium">Transfer:</span> <strong class="text-primary">{reverseForm.fromStep} &rarr; {reverseForm.toStep} ({reverseForm.quantity})</strong></div>
+    </div>
+
+    <Input
+      label="Reason for Reversal"
+      bind:value={reverseForm.reason}
+      placeholder="e.g. Typo correction / Accidental movement"
+      icon="report_problem"
+      required={true}
+    />
+
+    <Input
+      label="Authorized By"
+      bind:value={reverseForm.user}
+      placeholder="e.g. Supervisor"
+      icon="person"
+      required={true}
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isReverseModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="undo">
+        Confirm Reversal
       </Button>
     </div>
   </form>
