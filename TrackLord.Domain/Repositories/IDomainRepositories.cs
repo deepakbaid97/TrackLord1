@@ -21,6 +21,7 @@ public interface IProductionLotRepository
     Task<bool> ExistsAsync(string lotNumber, CancellationToken cancellationToken = default);
     Task AddAsync(ProductionLot lot, CancellationToken cancellationToken = default);
     Task UpdateAsync(ProductionLot lot, CancellationToken cancellationToken = default);
+    Task DeleteAsync(ProductionLot lot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductionLot>> GetAllAsync(CancellationToken cancellationToken = default);
 }
 
@@ -40,6 +41,7 @@ public interface IManufacturingMovementRepository
     Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotAsync(Guid productionLotId, CancellationToken cancellationToken = default);
     Task AddAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
     Task UpdateAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
+    Task DeleteRangeAsync(IEnumerable<ManufacturingMovement> movements, CancellationToken cancellationToken = default);
 }
 
 public interface IManufacturingStepRepository
@@ -56,6 +58,7 @@ public interface IMaterialConsumptionRepository
     Task<MaterialConsumption?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task AddAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default);
     Task UpdateAsync(MaterialConsumption consumption, CancellationToken cancellationToken = default);
+    Task DeleteRangeAsync(IEnumerable<MaterialConsumption> consumptions, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialConsumption>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialConsumption>> GetByMaterialLotIdAsync(Guid materialLotId, CancellationToken cancellationToken = default);
 }
@@ -63,6 +66,7 @@ public interface IMaterialConsumptionRepository
 public interface IRejectionRecordRepository
 {
     Task AddAsync(RejectionRecord rejection, CancellationToken cancellationToken = default);
+    Task DeleteRangeAsync(IEnumerable<RejectionRecord> rejections, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RejectionRecord>> GetByProductionLotIdAsync(Guid productionLotId, CancellationToken cancellationToken = default);
 }
 

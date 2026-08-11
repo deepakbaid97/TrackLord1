@@ -239,6 +239,61 @@ public class MaterialConsumptionTests
     }
 
     [Fact]
+    public async Task DeleteProductionLot_ShouldRestoreMaterialBalances_AndDeleteMovementsAndLot()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var prodLotRepo = new ProductionLotRepository(db);
+        var matLotRepo = new MaterialLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var consumptionRepo = new MaterialConsumptionRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var rejectionRepo = new RejectionRecordRepository(db);
+        var replayEngine = new LedgerReplayEngine();
+
+        var cuttingStep = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(cuttingStep);
+
+        // Raw Material 100 meters
+        var createMatHandler = new CreateMaterialLotCommandHandler(matLotRepo);
+        var greyClothLotId = await createMatHandler.Handle(new CreateMaterialLotCommand("Grey-Delete-001", Guid.NewGuid(), 100m, UnitType.Meters, "Denim Cloth", 150m), default);
+
+        // Production Lot
+        var createProdHandler = new CreateProductionLotCommandHandler(prodLotRepo, stepRepo, movementRepo, replayEngine);
+        var prodLotId = await createProdHandler.Handle(new CreateProductionLotCommand("Lot-Delete-101", Guid.NewGuid(), 50m, UnitType.Pieces, cuttingStep.Id), default);
+
+        // Consume 35m
+        var consumeHandler = new ConsumeMaterialCommandHandler(prodLotRepo, matLotRepo, stepRepo, consumptionRepo);
+        await consumeHandler.Handle(new ConsumeMaterialCommand(prodLotId, greyClothLotId, cuttingStep.Id, 35m, UnitType.Meters, DateTime.UtcNow), default);
+
+        // Verify balance is 65m
+        var matBefore = await matLotRepo.GetByIdAsync(greyClothLotId);
+        matBefore!.CurrentQuantity.Value.Should().Be(65m);
+
+        // Act: Delete Production Lot
+        var deleteHandler = new DeleteProductionLotCommandHandler(prodLotRepo, matLotRepo, consumptionRepo, movementRepo, rejectionRepo);
+        var deleteResult = await deleteHandler.Handle(new DeleteProductionLotCommand(prodLotId), default);
+
+        // Assert
+        deleteResult.Should().BeTrue();
+
+        // 1. Raw Material quantity restored to 100m
+        var matAfter = await matLotRepo.GetByIdAsync(greyClothLotId);
+        matAfter!.CurrentQuantity.Value.Should().Be(100m);
+
+        // 2. Production Lot deleted
+        var deletedLot = await prodLotRepo.GetByIdAsync(prodLotId);
+        deletedLot.Should().BeNull();
+
+        // 3. Movements & Consumptions deleted
+        var movements = await movementRepo.GetMovementsForLotAsync(prodLotId);
+        movements.Should().BeEmpty();
+
+        var consumptions = await consumptionRepo.GetByProductionLotIdAsync(prodLotId);
+        consumptions.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ConsumeMaterial_BeyondAvailableBalance_ShouldThrowDomainException()
     {
         // Arrange

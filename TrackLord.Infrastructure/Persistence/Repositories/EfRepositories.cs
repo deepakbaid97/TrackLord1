@@ -55,6 +55,20 @@ public class ProductionLotRepository : IProductionLotRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteAsync(ProductionLot lot, CancellationToken cancellationToken = default)
+    {
+        var tracked = _dbContext.ProductionLots.Local.FirstOrDefault(x => x.Id == lot.Id);
+        if (tracked is not null)
+        {
+            _dbContext.ProductionLots.Remove(tracked);
+        }
+        else
+        {
+            _dbContext.ProductionLots.Remove(lot);
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ProductionLot>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.ProductionLots.AsNoTracking().ToListAsync(cancellationToken);
@@ -139,6 +153,23 @@ public class ManufacturingMovementRepository : IManufacturingMovementRepository
     public async Task UpdateAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default)
     {
         _dbContext.ManufacturingMovements.Update(movement);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteRangeAsync(IEnumerable<ManufacturingMovement> movements, CancellationToken cancellationToken = default)
+    {
+        foreach (var m in movements)
+        {
+            var tracked = _dbContext.ManufacturingMovements.Local.FirstOrDefault(x => x.Id == m.Id);
+            if (tracked is not null)
+            {
+                _dbContext.ManufacturingMovements.Remove(tracked);
+            }
+            else
+            {
+                _dbContext.ManufacturingMovements.Remove(m);
+            }
+        }
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
@@ -228,6 +259,23 @@ public class MaterialConsumptionRepository : IMaterialConsumptionRepository
         _dbContext.MaterialConsumptions.Update(consumption);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task DeleteRangeAsync(IEnumerable<MaterialConsumption> consumptions, CancellationToken cancellationToken = default)
+    {
+        foreach (var c in consumptions)
+        {
+            var tracked = _dbContext.MaterialConsumptions.Local.FirstOrDefault(x => x.Id == c.Id);
+            if (tracked is not null)
+            {
+                _dbContext.MaterialConsumptions.Remove(tracked);
+            }
+            else
+            {
+                _dbContext.MaterialConsumptions.Remove(c);
+            }
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public class RejectionRecordRepository : IRejectionRecordRepository
@@ -251,6 +299,23 @@ public class RejectionRecordRepository : IRejectionRecordRepository
     public async Task AddAsync(RejectionRecord rejection, CancellationToken cancellationToken = default)
     {
         await _dbContext.RejectionRecords.AddAsync(rejection, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteRangeAsync(IEnumerable<RejectionRecord> rejections, CancellationToken cancellationToken = default)
+    {
+        foreach (var r in rejections)
+        {
+            var tracked = _dbContext.RejectionRecords.Local.FirstOrDefault(x => x.Id == r.Id);
+            if (tracked is not null)
+            {
+                _dbContext.RejectionRecords.Remove(tracked);
+            }
+            else
+            {
+                _dbContext.RejectionRecords.Remove(r);
+            }
+        }
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

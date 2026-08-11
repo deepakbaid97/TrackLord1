@@ -114,6 +114,15 @@ export async function getMaterialTraceability(lotId) {
   return await handleResponse(response);
 }
 
+// 6b. Delete Production Lot (reverses material consumption and deletes movements)
+/** @param {string} lotId */
+export async function deleteProductionLot(lotId) {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}`, {
+    method: 'DELETE'
+  });
+  return await handleResponse(response);
+}
+
 // 7. Create New Production Lot
 /** @param {any} data */
 export async function createProductionLot(data) {

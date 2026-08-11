@@ -20,7 +20,8 @@
     consumeMaterial,
     editMaterialConsumption,
     rejectItems,
-    reverseMovement
+    reverseMovement,
+    deleteProductionLot
   } from '$lib/api.js';
 
   // App State
@@ -556,6 +557,27 @@
       errorMessage = err.message;
     }
   }
+
+  async function handleDeleteLot() {
+    if (!selectedLotId || !currentLotJourney) return;
+    const lotNumber = currentLotJourney.lotNumber;
+    const confirmMessage = `Are you sure you want to delete Production Lot '${lotNumber}'?\n\nWARNING:\n• All raw material consumptions will be reversed and stock quantities restored.\n• All manufacturing movements & audit records for this lot will be permanently deleted.\n• The production lot entity will be removed.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    errorMessage = '';
+    try {
+      await deleteProductionLot(selectedLotId);
+      successMessage = `Production Lot '${lotNumber}' deleted successfully and raw material stock restored!`;
+      selectedLotId = '';
+      currentLotJourney = null;
+      currentMaterialTraceability = null;
+      localStorage.removeItem('tracklord_last_lot_id');
+      await refreshAllData();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to delete production lot.';
+    }
+  }
 </script>
 
 <!-- TopAppBar -->
@@ -642,6 +664,15 @@
       <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
         Report Rejection
       </Button>
+      {#if selectedLotId}
+        <button
+          onclick={handleDeleteLot}
+          class="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-stat-label text-xs hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-1 cursor-pointer transition-colors"
+        >
+          <span class="material-symbols-outlined text-[16px]">delete</span>
+          Delete Lot
+        </button>
+      {/if}
     </div>
   </section>
 
@@ -681,6 +712,14 @@
             <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
               {currentLotJourney.status}
             </span>
+            <button
+              onclick={handleDeleteLot}
+              title="Delete Production Lot"
+              class="px-2.5 py-1 text-xs bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-[15px]">delete</span>
+              Delete Lot
+            </button>
           </div>
           <p class="text-sm text-on-surface-variant mt-1">
             Lot ID: <span class="font-mono text-xs">{currentLotJourney.lotId}</span>

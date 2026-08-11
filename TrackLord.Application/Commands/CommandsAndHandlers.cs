@@ -780,3 +780,75 @@ public class UpdateManufacturingStepCommandHandler : IRequestHandler<UpdateManuf
     }
 }
 
+// 12. Delete Production Lot Command
+public record DeleteProductionLotCommand(Guid ProductionLotId) : IRequest<bool>;
+
+public class DeleteProductionLotCommandHandler : IRequestHandler<DeleteProductionLotCommand, bool>
+{
+    private readonly IProductionLotRepository _productionLotRepository;
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+    private readonly IManufacturingMovementRepository _movementRepository;
+    private readonly IRejectionRecordRepository _rejectionRecordRepository;
+
+    public DeleteProductionLotCommandHandler(
+        IProductionLotRepository productionLotRepository,
+        IMaterialLotRepository materialLotRepository,
+        IMaterialConsumptionRepository consumptionRepository,
+        IManufacturingMovementRepository movementRepository,
+        IRejectionRecordRepository rejectionRecordRepository)
+    {
+        _productionLotRepository = productionLotRepository;
+        _materialLotRepository = materialLotRepository;
+        _consumptionRepository = consumptionRepository;
+        _movementRepository = movementRepository;
+        _rejectionRecordRepository = rejectionRecordRepository;
+    }
+
+    public async Task<bool> Handle(DeleteProductionLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _productionLotRepository.GetByIdAsync(request.ProductionLotId, cancellationToken);
+        if (lot is null)
+        {
+            throw new DomainException($"Production Lot ID '{request.ProductionLotId}' not found.");
+        }
+
+        // 1. Reverse raw material consumptions & restore material lot balances
+        var consumptions = await _consumptionRepository.GetByProductionLotIdAsync(request.ProductionLotId, cancellationToken);
+        foreach (var c in consumptions)
+        {
+            var matLot = await _materialLotRepository.GetByIdAsync(c.MaterialLotId, cancellationToken);
+            if (matLot is not null)
+            {
+                matLot.Restore(c.QuantityConsumed);
+                await _materialLotRepository.UpdateAsync(matLot, cancellationToken);
+            }
+        }
+
+        // Delete all material consumptions for this lot
+        if (consumptions.Count > 0)
+        {
+            await _consumptionRepository.DeleteRangeAsync(consumptions, cancellationToken);
+        }
+
+        // 2. Delete all manufacturing movements related to this lot
+        var movements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
+        if (movements.Count > 0)
+        {
+            await _movementRepository.DeleteRangeAsync(movements, cancellationToken);
+        }
+
+        // 3. Delete all rejection records related to this lot
+        var rejections = await _rejectionRecordRepository.GetByProductionLotIdAsync(request.ProductionLotId, cancellationToken);
+        if (rejections.Count > 0)
+        {
+            await _rejectionRecordRepository.DeleteRangeAsync(rejections, cancellationToken);
+        }
+
+        // 4. Delete the production lot itself
+        await _productionLotRepository.DeleteAsync(lot, cancellationToken);
+
+        return true;
+    }
+}
+

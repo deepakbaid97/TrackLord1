@@ -81,6 +81,16 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
+    /// Deletes a production lot, reverses its material consumptions, and removes all related movements and records.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _mediator.Send(new DeleteProductionLotCommand(id));
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
     /// Rejects a quantity of items from a step due to damage/wastage and returns them to target step.
     /// </summary>
     [HttpPost("{id:guid}/reject")]
