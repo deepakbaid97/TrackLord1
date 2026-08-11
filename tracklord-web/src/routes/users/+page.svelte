@@ -256,14 +256,23 @@
         {/if}
 
         {#if isAuthenticated && currentUser}
-          <!-- Active Session Card -->
-          <div class="flex items-center gap-3 p-2.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
-            <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              <span class="material-symbols-outlined text-[18px]">person</span>
+          <!-- Active Session & Tenant Info Card -->
+          <div class="flex items-center gap-3 p-3 bg-surface-container-low dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shadow-sm">
+              <span class="material-symbols-outlined text-[22px]">account_circle</span>
             </div>
-            <div class="hidden md:block">
-              <div class="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Logged In Session</div>
-              <div class="text-xs font-bold text-slate-900 dark:text-white font-['JetBrains_Mono']">{currentUser.phoneNumber}</div>
+            <div class="text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-on-surface text-sm">{currentUser.name || 'Unnamed User'}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-primary/15 text-primary">
+                  {currentUser.role || 'Operator'}
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-on-surface-variant text-[11px] font-mono mt-0.5">
+                <span>📱 {currentUser.phoneNumber}</span>
+                <span class="text-outline">|</span>
+                <span class="text-tertiary font-semibold">🏢 {currentUser.tenantName || 'Default Tenant'} ({currentUser.tenantCode || 'DEFAULT'})</span>
+              </div>
             </div>
           </div>
         {/if}

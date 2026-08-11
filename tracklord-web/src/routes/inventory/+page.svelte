@@ -603,7 +603,18 @@
       errorMessage = err.message || 'Failed to delete production lot.';
     }
   }
+  let isMoreActionsOpen = $state(false);
+
+  /** @param {MouseEvent} e */
+  function handleDocumentClick(e) {
+    const target = /** @type {HTMLElement} */ (e.target);
+    if (isMoreActionsOpen && target && !target.closest('#more-actions-container')) {
+      isMoreActionsOpen = false;
+    }
+  }
 </script>
+
+<svelte:window onclick={handleDocumentClick} />
 
 <!-- TopAppBar -->
 <header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
@@ -673,31 +684,107 @@
     </div>
 
     <!-- Quick Action Buttons -->
-    <div class="flex flex-wrap gap-2 w-full md:w-auto">
-      <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
-        New Production Lot
-      </Button>
-      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
-        Move Quantity
-      </Button>
-      <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
-        Register Material
-      </Button>
-      <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
-        Log Consumption
-      </Button>
-      <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
-        Report Rejection
-      </Button>
-      {#if selectedLotId}
-        <button
-          onclick={handleDeleteLot}
-          class="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-stat-label text-xs hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-1 cursor-pointer transition-colors"
-        >
-          <span class="material-symbols-outlined text-[16px]">delete</span>
-          Delete Lot
-        </button>
-      {/if}
+    <div class="w-full md:w-auto">
+      <!-- Desktop View (hidden on mobile, visible on md and up) -->
+      <div class="hidden md:flex flex-wrap gap-2">
+        <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
+          New Production Lot
+        </Button>
+        <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
+          Move Quantity
+        </Button>
+        <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
+          Register Material
+        </Button>
+        <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
+          Log Consumption
+        </Button>
+        <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
+          Report Rejection
+        </Button>
+        {#if selectedLotId}
+          <button
+            onclick={handleDeleteLot}
+            class="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-stat-label text-xs hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <span class="material-symbols-outlined text-[16px]">delete</span>
+            Delete Lot
+          </button>
+        {/if}
+      </div>
+
+      <!-- Mobile View (visible on mobile, hidden on md and up) -->
+      <div class="flex md:hidden items-center gap-2 w-full">
+        <div class="flex-1">
+          <Button variant="primary" icon="add" class="w-full justify-center" onclick={() => isCreateLotModalOpen = true}>
+            New Lot
+          </Button>
+        </div>
+
+        <div id="more-actions-container" class="relative">
+          <Button
+            variant="outline"
+            icon="more_vert"
+            onclick={() => isMoreActionsOpen = !isMoreActionsOpen}
+          >
+            More Actions
+            <span class="material-symbols-outlined text-[16px] transition-transform duration-200 {isMoreActionsOpen ? 'rotate-180' : ''}">expand_more</span>
+          </Button>
+
+          {#if isMoreActionsOpen}
+            <div class="absolute right-0 top-full mt-2 w-56 bg-surface dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-xl z-50 py-1 divide-y divide-outline-variant/40 animate-in fade-in zoom-in-95 duration-100">
+              <div class="py-1">
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; openMoveModal(); }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-primary">move_item</span>
+                  Move Quantity
+                </button>
+
+                <button
+                  onclick={() => { isMoreActionsOpen = false; isCreateMaterialModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-tertiary">inventory</span>
+                  Register Material
+                </button>
+
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; isConsumeMaterialModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-emerald-600">local_mall</span>
+                  Log Consumption
+                </button>
+
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; isRejectModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-amber-600">report_problem</span>
+                  Report Rejection
+                </button>
+              </div>
+
+              {#if selectedLotId}
+                <div class="py-1">
+                  <button
+                    onclick={() => { isMoreActionsOpen = false; handleDeleteLot(); }}
+                    class="w-full px-4 py-2.5 text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    Delete Lot
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </div>
     </div>
   </section>
 
