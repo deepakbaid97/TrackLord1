@@ -108,7 +108,9 @@ public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductio
 public record ImportLotItemDto(
     string? ClientName,
     decimal Quantity,
-    string LotNumber);
+    string LotNumber,
+    Guid? StepId = null,
+    string? StepName = null);
 
 public record ImportProductionLotsCommand(
     List<ImportLotItemDto> Items,
@@ -154,7 +156,7 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
             return new ImportProductionLotsResultDto(0, new List<ImportedLotSummaryDto>());
         }
 
-        // 1. Find or create the 'IMPORT' manufacturing step
+        // 1. Find or create the 'IMPORT' manufacturing step (as default fallback)
         var importStep = await _stepRepository.GetByCodeAsync("IMPORT", cancellationToken);
         if (importStep == null)
         {
@@ -169,6 +171,16 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 defaultFactoryId,
                 isTerminating: false);
             await _stepRepository.AddAsync(importStep, cancellationToken);
+        }
+
+        // Load all manufacturing steps for resolution
+        var existingSteps = await _stepRepository.GetAllAsync(cancellationToken);
+        var stepById = existingSteps.ToDictionary(s => s.Id);
+        var stepByNameOrCode = new Dictionary<string, ManufacturingStep>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in existingSteps)
+        {
+            stepByNameOrCode[s.Code.Trim()] = s;
+            stepByNameOrCode[s.Name.Trim()] = s;
         }
 
         // 2. Load existing clients into memory for case-insensitive lookup
@@ -205,6 +217,42 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 clientMap[clientKey] = client;
             }
 
+            // Resolve target step for this item
+            ManufacturingStep targetStep = importStep;
+            if (item.StepId.HasValue && stepById.TryGetValue(item.StepId.Value, out var stepFoundById))
+            {
+                targetStep = stepFoundById;
+            }
+            else if (!string.IsNullOrWhiteSpace(item.StepName))
+            {
+                string cleanStepName = item.StepName.Trim();
+                if (stepByNameOrCode.TryGetValue(cleanStepName, out var stepFoundByName))
+                {
+                    targetStep = stepFoundByName;
+                }
+                else
+                {
+                    // Dynamically create the new manufacturing step
+                    var currentSteps = await _stepRepository.GetAllAsync(cancellationToken);
+                    int nextSeq = currentSteps.Count > 0 ? currentSteps.Max(s => s.SequenceOrder) + 1 : 1;
+                    var defaultFactoryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+                    string code = cleanStepName.ToUpperInvariant().Replace(" ", "_");
+                    if (code.Length > 20) code = code.Substring(0, 20);
+
+                    targetStep = new ManufacturingStep(
+                        Guid.NewGuid(),
+                        code,
+                        cleanStepName,
+                        nextSeq,
+                        defaultFactoryId,
+                        isTerminating: false);
+                    await _stepRepository.AddAsync(targetStep, cancellationToken);
+                    stepById[targetStep.Id] = targetStep;
+                    stepByNameOrCode[targetStep.Code] = targetStep;
+                    stepByNameOrCode[targetStep.Name] = targetStep;
+                }
+            }
+
             // Resolve unique lot number (append -1, -2 if lot number already exists)
             string rawLotNumber = item.LotNumber.Trim();
             string finalLotNumber = await ResolveUniqueLotNumber(rawLotNumber, batchUsedLotNumbers, cancellationToken);
@@ -218,7 +266,7 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 lotNumberObj,
                 defaultItemId,
                 initialQtyObj,
-                importStep.Id,
+                targetStep.Id,
                 request.CreatedBy,
                 $"Imported production lot (Original: '{rawLotNumber}')");
 
@@ -226,14 +274,14 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 Guid.NewGuid(),
                 lotId,
                 fromStepId: null,
-                toStepId: importStep.Id,
+                toStepId: targetStep.Id,
                 quantity: item.Quantity,
                 type: MovementType.InitialProduction,
                 movementDate: now,
                 clientId: client.Id,
                 clientName: client.Name,
                 createdBy: request.CreatedBy,
-                remarks: "Initial imported lot creation movement",
+                remarks: $"Initial imported lot creation movement to step '{targetStep.Name}'",
                 referenceNumber: $"INIT-{finalLotNumber}");
 
             _replayEngine.ReplayLedger(lotId, new[] { initialMovement });

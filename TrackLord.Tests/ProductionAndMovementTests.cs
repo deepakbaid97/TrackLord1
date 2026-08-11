@@ -120,6 +120,46 @@ public class ProductionTests
         clients.Should().ContainSingle(c => c.Name == "Apex Textiles");
     }
 
+    [Fact]
+    public async Task ImportProductionLots_WithSpecifiedStep_ShouldAssignCorrectStep()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var lotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var clientRepo = new ClientRepository(db);
+
+        // Pre-create a step "Cutting"
+        var cuttingStep = new ManufacturingStep(Guid.NewGuid(), "CUTTING", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(cuttingStep);
+
+        var importHandler = new ImportProductionLotsCommandHandler(lotRepo, stepRepo, movementRepo, clientRepo, _replayEngine);
+
+        var items = new System.Collections.Generic.List<ImportLotItemDto>
+        {
+            new ImportLotItemDto("Apex Textiles", 100m, "LOT-101", StepId: cuttingStep.Id),
+            new ImportLotItemDto("Apex Textiles", 200m, "LOT-102", StepName: "Stitching")
+        };
+
+        // Act
+        var result = await importHandler.Handle(new ImportProductionLotsCommand(items), default);
+
+        // Assert
+        result.TotalImported.Should().Be(2);
+
+        var lot1 = await lotRepo.GetByIdAsync(result.ImportedLots[0].LotId);
+        lot1.Should().NotBeNull();
+        lot1!.InitialStepId.Should().Be(cuttingStep.Id);
+
+        var lot2 = await lotRepo.GetByIdAsync(result.ImportedLots[1].LotId);
+        lot2.Should().NotBeNull();
+        var stitchingStep = await stepRepo.GetByCodeAsync("STITCHING");
+        stitchingStep.Should().NotBeNull();
+        lot2!.InitialStepId.Should().Be(stitchingStep!.Id);
+    }
+
+
     [Theory]
     [InlineData(0)]
     [InlineData(-10)]
