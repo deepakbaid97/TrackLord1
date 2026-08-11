@@ -702,15 +702,6 @@
         <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
           Report Rejection
         </Button>
-        {#if selectedLotId}
-          <button
-            onclick={handleDeleteLot}
-            class="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-stat-label text-xs hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <span class="material-symbols-outlined text-[16px]">delete</span>
-            Delete Lot
-          </button>
-        {/if}
       </div>
 
       <!-- Mobile View (visible on mobile, hidden on md and up) -->
