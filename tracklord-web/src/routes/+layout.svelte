@@ -21,7 +21,7 @@
 <Header title="TRACKLORD ERP" />
 
 <!-- Main Content Area -->
-<main class="pt-16 pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+<main class="pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
   {@render children()}
 </main>
 
