@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using TrackLord.Application.Commands;
+using TrackLord.Application.Queries;
 using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Enums;
@@ -159,6 +160,82 @@ public class MaterialConsumptionTests
         // Assert Traceability
         var consumptions = await consumptionRepo.GetByProductionLotIdAsync(prodLotId);
         consumptions.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ConsumeMaterial_WithUnitRate_ShouldCalculateTotalPriceAndTotalMaterialCost()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var prodLotRepo = new ProductionLotRepository(db);
+        var matLotRepo = new MaterialLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var consumptionRepo = new MaterialConsumptionRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var replayEngine = new LedgerReplayEngine();
+
+        var cuttingStep = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(cuttingStep);
+
+        // Create Raw Material Lot with Rate ₹150/meter
+        var createMatHandler = new CreateMaterialLotCommandHandler(matLotRepo);
+        var greyClothLotId = await createMatHandler.Handle(new CreateMaterialLotCommand("Grey-Rates-001", Guid.NewGuid(), 100m, UnitType.Meters, "Denim Grey Cloth", 150m), default);
+
+        var createProdHandler = new CreateProductionLotCommandHandler(prodLotRepo, stepRepo, movementRepo, replayEngine);
+        var prodLotId = await createProdHandler.Handle(new CreateProductionLotCommand("Lot-Rates-101", Guid.NewGuid(), 50m, UnitType.Pieces, cuttingStep.Id), default);
+
+        var consumeHandler = new ConsumeMaterialCommandHandler(prodLotRepo, matLotRepo, stepRepo, consumptionRepo);
+
+        // Act: Consume 25m Grey Cloth @ ₹150/meter
+        await consumeHandler.Handle(new ConsumeMaterialCommand(prodLotId, greyClothLotId, cuttingStep.Id, 25m, UnitType.Meters, DateTime.UtcNow), default);
+
+        // Assert Query Result
+        var traceQueryHandler = new GetMaterialTraceabilityQueryHandler(prodLotRepo, consumptionRepo, matLotRepo, stepRepo);
+        var traceability = await traceQueryHandler.Handle(new GetMaterialTraceabilityQuery(prodLotId), default);
+
+        traceability.Consumptions.Should().HaveCount(1);
+        traceability.Consumptions[0].UnitRate.Should().Be(150m);
+        traceability.Consumptions[0].TotalPrice.Should().Be(3750m); // 25 * 150 = 3750
+        traceability.TotalMaterialCost.Should().Be(3750m);
+    }
+
+    [Fact]
+    public async Task GetMaterialLotHistoryQueryHandler_ShouldReturnCompleteConsumptionHistory()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var prodLotRepo = new ProductionLotRepository(db);
+        var matLotRepo = new MaterialLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var consumptionRepo = new MaterialConsumptionRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+        var replayEngine = new LedgerReplayEngine();
+
+        var cuttingStep = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(cuttingStep);
+
+        var createMatHandler = new CreateMaterialLotCommandHandler(matLotRepo);
+        var greyClothLotId = await createMatHandler.Handle(new CreateMaterialLotCommand("Grey-History-001", Guid.NewGuid(), 200m, UnitType.Meters, "Denim Cloth", 120m), default);
+
+        var createProdHandler = new CreateProductionLotCommandHandler(prodLotRepo, stepRepo, movementRepo, replayEngine);
+        var prodLot1Id = await createProdHandler.Handle(new CreateProductionLotCommand("Lot-Hist-1", Guid.NewGuid(), 50m, UnitType.Pieces, cuttingStep.Id), default);
+        var prodLot2Id = await createProdHandler.Handle(new CreateProductionLotCommand("Lot-Hist-2", Guid.NewGuid(), 50m, UnitType.Pieces, cuttingStep.Id), default);
+
+        var consumeHandler = new ConsumeMaterialCommandHandler(prodLotRepo, matLotRepo, stepRepo, consumptionRepo);
+        await consumeHandler.Handle(new ConsumeMaterialCommand(prodLot1Id, greyClothLotId, cuttingStep.Id, 40m, UnitType.Meters, DateTime.UtcNow.AddMinutes(-10)), default);
+        await consumeHandler.Handle(new ConsumeMaterialCommand(prodLot2Id, greyClothLotId, cuttingStep.Id, 60m, UnitType.Meters, DateTime.UtcNow), default);
+
+        // Act
+        var historyHandler = new GetMaterialLotHistoryQueryHandler(matLotRepo, consumptionRepo, prodLotRepo, stepRepo);
+        var history = await historyHandler.Handle(new GetMaterialLotHistoryQuery(greyClothLotId), default);
+
+        // Assert
+        history.Lot.LotNumber.Should().Be("Grey-History-001");
+        history.Lot.RemainingQuantity.Should().Be(100m); // 200 - 100 = 100
+        history.TotalQuantityConsumed.Should().Be(100m);
+        history.TotalConsumptionCost.Should().Be(12000m); // 100 * 120 = 12000
+        history.TotalConsumptionCount.Should().Be(2);
+        history.Consumptions.Should().HaveCount(2);
     }
 
     [Fact]

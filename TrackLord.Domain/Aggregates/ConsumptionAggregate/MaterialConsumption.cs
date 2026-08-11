@@ -15,6 +15,8 @@ public class MaterialConsumption : AggregateRoot<Guid>, ITenantScopedEntity
     public Guid StepId { get; private set; }
     public decimal QuantityConsumed { get; private set; }
     public UnitType Unit { get; private set; }
+    public decimal UnitRate { get; private set; }
+    public decimal TotalPrice => QuantityConsumed * UnitRate;
     public DateTime ConsumptionDate { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public string? CreatedBy { get; private set; }
@@ -32,6 +34,7 @@ public class MaterialConsumption : AggregateRoot<Guid>, ITenantScopedEntity
         DateTime consumptionDate,
         string? createdBy = null,
         string? remarks = null,
+        decimal unitRate = 0m,
         Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("Consumption Id cannot be empty.");
@@ -41,6 +44,10 @@ public class MaterialConsumption : AggregateRoot<Guid>, ITenantScopedEntity
         if (quantityConsumed <= 0)
         {
             throw new DomainException($"Consumed quantity must be greater than zero. Provided: {quantityConsumed}");
+        }
+        if (unitRate < 0)
+        {
+            throw new DomainException("Material consumption unit rate cannot be negative.");
         }
 
         var utcNow = DateTime.UtcNow;
@@ -53,6 +60,7 @@ public class MaterialConsumption : AggregateRoot<Guid>, ITenantScopedEntity
             StepId = stepId,
             QuantityConsumed = quantityConsumed,
             Unit = unit,
+            UnitRate = unitRate,
             ConsumptionDate = consumptionDate,
             CreatedAtUtc = utcNow,
             CreatedBy = createdBy,

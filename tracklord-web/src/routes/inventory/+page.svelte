@@ -84,7 +84,8 @@
     lotNumber: '',
     materialName: '',
     initialQuantity: 500,
-    unit: 2 // Meters
+    unit: 2, // Meters
+    unitRate: 0
   });
 
   let consumeMaterialForm = $state({
@@ -432,7 +433,8 @@
         materialItemId: '00000000-0000-0000-0000-000000000002',
         materialName: createMaterialForm.materialName.trim(),
         initialQuantity: Number(createMaterialForm.initialQuantity),
-        unit: Number(createMaterialForm.unit)
+        unit: Number(createMaterialForm.unit),
+        unitRate: Number(createMaterialForm.unitRate) || 0
       };
 
       await createMaterialLot(payload);
@@ -440,6 +442,7 @@
       isCreateMaterialModalOpen = false;
       createMaterialForm.lotNumber = '';
       createMaterialForm.materialName = '';
+      createMaterialForm.unitRate = 0;
 
       const matLots = await getMaterialLots();
       materialLots = matLots || [];
@@ -731,8 +734,17 @@
 
           <!-- Raw Material Traceability -->
           <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-            <div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-4">
-              <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant pb-2 mb-4 gap-2">
+              <div class="flex items-center gap-3">
+                <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+                {#if currentMaterialTraceability}
+                  {@const totalCost = currentMaterialTraceability.totalMaterialCost ?? (currentMaterialTraceability.consumptions ? currentMaterialTraceability.consumptions.reduce((/** @type {number} */ a, /** @type {any} */ c) => a + (c.totalPrice ?? (c.quantityConsumed * (c.unitRate || 0))), 0) : 0)}
+                  <span class="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center gap-1 font-mono">
+                    <span class="material-symbols-outlined text-[15px]">payments</span>
+                    Total Price: ₹{Number(totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                {/if}
+              </div>
               <button
                 onclick={() => isConsumeMaterialModalOpen = true}
                 class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
@@ -765,6 +777,15 @@
                       </button>
                     </div>
                     <div class="text-2xl font-bold text-primary">{mat.quantityConsumed} {mat.unit}</div>
+                    
+                    {#if mat.unitRate !== undefined && mat.unitRate !== null}
+                      {@const itemTotal = mat.totalPrice ?? (mat.quantityConsumed * mat.unitRate)}
+                      <div class="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-300 mt-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 rounded border border-emerald-200/50 dark:border-emerald-800/50">
+                        <span>@ ₹{Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{mat.unit}</span>
+                        <span class="font-bold text-emerald-800 dark:text-emerald-200">Total: ₹{Number(itemTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    {/if}
+
                     <div class="text-xs text-on-surface-variant mt-2 font-mono flex justify-between items-end">
                       <div>
                         Step: {mat.stepName}<br/>
@@ -1040,6 +1061,16 @@
       required={true}
     />
 
+    <Input
+      label="Rate per Unit (₹)"
+      type="number"
+      step="any"
+      bind:value={createMaterialForm.unitRate}
+      placeholder="e.g. 150.00"
+      icon="payments"
+      required={false}
+    />
+
     <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
       <Button variant="outline" onclick={() => isCreateMaterialModalOpen = false}>
         Cancel
@@ -1057,7 +1088,7 @@
     <Select
       label="Select Raw Material Lot"
       bind:value={consumeMaterialForm.materialLotId}
-      options={materialLots.map(m => ({ label: `${m.lotNumber}${m.materialName ? ' (' + m.materialName + ')' : ''} - Avail: ${m.remainingQuantity} ${m.unit}`, value: m.id }))}
+      options={materialLots.map(m => ({ label: `${m.lotNumber}${m.materialName ? ' (' + m.materialName + ')' : ''} - Avail: ${m.remainingQuantity} ${m.unit}${m.unitRate ? ' @ ₹' + m.unitRate + '/' + m.unit : ''}`, value: m.id }))}
       icon="texture"
       required={true}
     />

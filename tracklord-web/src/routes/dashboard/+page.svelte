@@ -302,6 +302,7 @@
                 <th class="px-4 py-3 text-right">Initial Qty</th>
                 <th class="px-4 py-3 text-right">Remaining Qty</th>
                 <th class="px-4 py-3">Unit</th>
+                <th class="px-4 py-3 text-right">Rate / Unit</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-outline-variant/50 text-on-surface">
@@ -330,6 +331,9 @@
                     </div>
                   </td>
                   <td class="px-4 py-3 font-mono text-on-surface-variant">{mat.unit}</td>
+                  <td class="px-4 py-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                    {mat.unitRate ? `₹${Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                  </td>
                 </tr>
               {/each}
             </tbody>

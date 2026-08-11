@@ -9,9 +9,9 @@ DECLARE
     -- -------------------------------------------------------------------------
     -- EDIT CONFIGURATION PARAMETERS HERE
     -- -------------------------------------------------------------------------
-    v_tenant_name    VARCHAR(150) := 'Apex Apparels Ltd';   -- Name of the Organization / Company
-    v_tenant_code    VARCHAR(50)  := 'APEX';                -- Unique Tenant Code / Short Identifier
-    v_admin_name     VARCHAR(150) := 'Apex Administrator';  -- Primary Admin User Name
+    v_tenant_name    VARCHAR(150) := 'Aliya Wash';   -- Name of the Organization / Company
+    v_tenant_code    VARCHAR(50)  := 'ALIYA';                -- Unique Tenant Code / Short Identifier
+    v_admin_name     VARCHAR(150) := 'Jitendra Bothra';  -- Primary Admin User Name
     v_admin_phone    VARCHAR(50)  := '+919876543210';       -- Primary Admin Mobile Number with Country Code
     v_admin_role     VARCHAR(50)  := 'Admin';               -- Primary User Role ('Admin', 'Manager', 'Operator')
     -- -------------------------------------------------------------------------

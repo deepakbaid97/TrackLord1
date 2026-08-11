@@ -5,6 +5,7 @@
     { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { href: '/inventory', label: 'Inventory', icon: 'inventory_2' },
     { href: '/lots', label: 'Lots', icon: 'reorder' },
+    { href: '/materials', label: 'Materials', icon: 'texture' },
     { href: '/clients', label: 'Clients', icon: 'groups' },
     { href: '/users', label: 'Users', icon: 'manage_accounts' },
     { href: '/steps', label: 'Steps', icon: 'alt_route' }

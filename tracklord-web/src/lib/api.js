@@ -86,6 +86,13 @@ export async function getMaterialLots() {
   return await handleResponse(response);
 }
 
+// 3b. Fetch Consumption History for a specific Raw Material Lot
+/** @param {string} materialLotId */
+export async function getMaterialLotHistory(materialLotId) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${materialLotId}/history`);
+  return await handleResponse(response);
+}
+
 // 4. Fetch Lot WIP summary
 /** @param {string} lotId */
 export async function getLotWip(lotId) {

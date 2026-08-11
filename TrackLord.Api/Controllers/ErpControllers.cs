@@ -232,6 +232,16 @@ public class MaterialConsumptionsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets detailed consumption history for a specific raw material lot.
+    /// </summary>
+    [HttpGet("lots/{id:guid}/history")]
+    public async Task<IActionResult> GetMaterialLotHistory(Guid id)
+    {
+        var history = await _mediator.Send(new GetMaterialLotHistoryQuery(id));
+        return Ok(history);
+    }
+
+    /// <summary>
     /// Creates a raw material lot.
     /// </summary>
     [HttpPost("lots")]
