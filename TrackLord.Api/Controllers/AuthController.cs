@@ -18,17 +18,20 @@ public class AuthController : ControllerBase
     private readonly IFirebaseTokenVerifier _firebaseTokenVerifier;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IUserRepository _userRepository;
+    private readonly ITenantRepository _tenantRepository;
     private readonly ITenantContext _tenantContext;
 
     public AuthController(
         IFirebaseTokenVerifier firebaseTokenVerifier,
         IJwtTokenService jwtTokenService,
         IUserRepository userRepository,
+        ITenantRepository tenantRepository,
         ITenantContext tenantContext)
     {
         _firebaseTokenVerifier = firebaseTokenVerifier;
         _jwtTokenService = jwtTokenService;
         _userRepository = userRepository;
+        _tenantRepository = tenantRepository;
         _tenantContext = tenantContext;
     }
 
@@ -70,6 +73,7 @@ public class AuthController : ControllerBase
         }
 
         var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber, user.TenantId);
+        var tenant = await _tenantRepository.GetByIdAsync(user.TenantId);
 
         return Ok(new
         {
@@ -79,6 +83,8 @@ public class AuthController : ControllerBase
             {
                 id = user.Id,
                 tenantId = user.TenantId,
+                tenantName = tenant?.Name ?? "Default Tenant",
+                tenantCode = tenant?.Code ?? "DEFAULT",
                 phoneNumber = user.PhoneNumber,
                 name = user.Name,
                 role = user.Role,
@@ -109,10 +115,15 @@ public class AuthController : ControllerBase
             user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
         }
 
+        var targetTenantId = user?.TenantId ?? _tenantContext.TenantId;
+        var tenant = await _tenantRepository.GetByIdAsync(targetTenantId);
+
         return Ok(new
         {
             id = user?.Id.ToString() ?? userIdStr,
-            tenantId = user?.TenantId,
+            tenantId = targetTenantId,
+            tenantName = tenant?.Name ?? "Default Tenant",
+            tenantCode = tenant?.Code ?? "DEFAULT",
             phoneNumber = user?.PhoneNumber ?? phoneNumber ?? "Unknown",
             name = user?.Name,
             role = user?.Role ?? "Operator",

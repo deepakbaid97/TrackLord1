@@ -55,13 +55,38 @@ public record MaterialConsumptionTraceDto(
     string StepName,
     decimal QuantityConsumed,
     string Unit,
+    decimal UnitRate,
+    decimal TotalPrice,
     DateTime ConsumptionDate,
     string? Remarks);
 
 public record MaterialTraceabilityDto(
     Guid ProductionLotId,
     string ProductionLotNumber,
+    decimal TotalMaterialCost,
     IReadOnlyList<MaterialConsumptionTraceDto> Consumptions);
+
+public record MaterialConsumptionHistoryItemDto(
+    Guid Id,
+    Guid ProductionLotId,
+    string ProductionLotNumber,
+    Guid StepId,
+    string StepName,
+    decimal QuantityConsumed,
+    string Unit,
+    decimal UnitRate,
+    decimal TotalPrice,
+    DateTime ConsumptionDate,
+    DateTime CreatedAtUtc,
+    string? CreatedBy,
+    string? Remarks);
+
+public record MaterialLotHistoryDto(
+    MaterialLotDto Lot,
+    decimal TotalQuantityConsumed,
+    decimal TotalConsumptionCost,
+    int TotalConsumptionCount,
+    IReadOnlyList<MaterialConsumptionHistoryItemDto> Consumptions);
 
 public record StepDashboardLotDto(
     Guid LotId,
@@ -109,7 +134,8 @@ public record MaterialLotDto(
     string? MaterialName,
     decimal InitialQuantity,
     decimal RemainingQuantity,
-    string Unit);
+    string Unit,
+    decimal UnitRate);
 
 
 // 2. Queries & Handlers
@@ -278,11 +304,90 @@ public class GetMaterialTraceabilityQueryHandler : IRequestHandler<GetMaterialTr
                 step?.Name ?? "Unknown Step",
                 c.QuantityConsumed,
                 c.Unit.ToString(),
+                c.UnitRate,
+                c.TotalPrice,
                 c.ConsumptionDate,
                 c.Remarks));
         }
 
-        return new MaterialTraceabilityDto(lot.Id, lot.LotNumber.Value, traces);
+        var totalMaterialCost = traces.Sum(t => t.TotalPrice);
+        return new MaterialTraceabilityDto(lot.Id, lot.LotNumber.Value, totalMaterialCost, traces);
+    }
+}
+
+// GetMaterialLotHistoryQuery
+public record GetMaterialLotHistoryQuery(Guid MaterialLotId) : IRequest<MaterialLotHistoryDto>;
+
+public class GetMaterialLotHistoryQueryHandler : IRequestHandler<GetMaterialLotHistoryQuery, MaterialLotHistoryDto>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+    private readonly IProductionLotRepository _productionLotRepository;
+    private readonly IManufacturingStepRepository _stepRepository;
+
+    public GetMaterialLotHistoryQueryHandler(
+        IMaterialLotRepository materialLotRepository,
+        IMaterialConsumptionRepository consumptionRepository,
+        IProductionLotRepository productionLotRepository,
+        IManufacturingStepRepository stepRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+        _consumptionRepository = consumptionRepository;
+        _productionLotRepository = productionLotRepository;
+        _stepRepository = stepRepository;
+    }
+
+    public async Task<MaterialLotHistoryDto> Handle(GetMaterialLotHistoryQuery request, CancellationToken cancellationToken)
+    {
+        var matLot = await _materialLotRepository.GetByIdAsync(request.MaterialLotId, cancellationToken);
+        if (matLot is null) throw new DomainException($"Material Lot ID '{request.MaterialLotId}' not found.");
+
+        var lotDto = new MaterialLotDto(
+            matLot.Id,
+            matLot.LotNumber.Value,
+            matLot.MaterialItemId,
+            matLot.MaterialName,
+            matLot.InitialQuantity.Value,
+            matLot.CurrentQuantity.Value,
+            matLot.InitialQuantity.Unit.ToString(),
+            matLot.UnitRate);
+
+        var consumptions = await _consumptionRepository.GetByMaterialLotIdAsync(request.MaterialLotId, cancellationToken);
+        var prodLots = (await _productionLotRepository.GetAllAsync(cancellationToken)).ToDictionary(l => l.Id);
+        var steps = (await _stepRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.Id);
+
+        var historyList = new List<MaterialConsumptionHistoryItemDto>();
+        foreach (var c in consumptions)
+        {
+            prodLots.TryGetValue(c.ProductionLotId, out var prodLot);
+            steps.TryGetValue(c.StepId, out var step);
+
+            historyList.Add(new MaterialConsumptionHistoryItemDto(
+                c.Id,
+                c.ProductionLotId,
+                prodLot?.LotNumber.Value ?? "UNKNOWN",
+                c.StepId,
+                step?.Name ?? "Unknown Step",
+                c.QuantityConsumed,
+                c.Unit.ToString(),
+                c.UnitRate,
+                c.TotalPrice,
+                c.ConsumptionDate,
+                c.CreatedAtUtc,
+                c.CreatedBy,
+                c.Remarks));
+        }
+
+        var sortedHistory = historyList.OrderByDescending(h => h.ConsumptionDate).ThenByDescending(h => h.CreatedAtUtc).ToList();
+        var totalQtyConsumed = sortedHistory.Sum(h => h.QuantityConsumed);
+        var totalCost = sortedHistory.Sum(h => h.TotalPrice);
+
+        return new MaterialLotHistoryDto(
+            lotDto,
+            totalQtyConsumed,
+            totalCost,
+            sortedHistory.Count,
+            sortedHistory);
     }
 }
 
@@ -475,8 +580,8 @@ public class GetAllMaterialLotsQueryHandler : IRequestHandler<GetAllMaterialLots
             m.MaterialName,
             m.InitialQuantity.Value,
             m.CurrentQuantity.Value,
-            m.InitialQuantity.Unit.ToString()
-        )).OrderByDescending(m => m.Id).ToList();
+            m.InitialQuantity.Unit.ToString(),
+            m.UnitRate)).OrderByDescending(m => m.Id).ToList();
     }
 }
 

@@ -34,6 +34,9 @@
   let isImportModalOpen = $state(false);
   let importFile = $state(/** @type {File|null} */ (null));
   let importPreviewData = $state(/** @type {Array<any>} */ ([]));
+  let hasStepColumn = $state(false);
+  let selectedGlobalStepId = $state('');
+  let selectedGlobalStepName = $state('');
   let isParsing = $state(false);
   let isImporting = $state(false);
   let importErrorMessage = $state('');
@@ -232,6 +235,9 @@
     isImportModalOpen = true;
     importFile = null;
     importPreviewData = [];
+    hasStepColumn = false;
+    selectedGlobalStepId = '';
+    selectedGlobalStepName = '';
     importErrorMessage = '';
     importSuccessResult = null;
   }
@@ -240,6 +246,9 @@
     isImportModalOpen = false;
     importFile = null;
     importPreviewData = [];
+    hasStepColumn = false;
+    selectedGlobalStepId = '';
+    selectedGlobalStepName = '';
     importErrorMessage = '';
     importSuccessResult = null;
   }
@@ -252,6 +261,9 @@
     importErrorMessage = '';
     importPreviewData = [];
     importSuccessResult = null;
+    hasStepColumn = false;
+    selectedGlobalStepId = '';
+    selectedGlobalStepName = '';
 
     try {
       const data = await file.arrayBuffer();
@@ -279,21 +291,56 @@
         });
       };
 
-      const clientKey = findKey(['client', 'customer', 'buyer', 'name']) || keys[0];
-      const qtyKey = findKey(['quantity', 'qty', 'count', 'pcs', 'amount']) || keys[1];
-      const lotKey = findKey(['lot', 'batch', 'number', 'code']) || keys[2];
+      const clientKey = findKey(['client', 'customer', 'buyer', 'name']);
+      const qtyKey = findKey(['quantity', 'qty', 'count', 'pcs', 'amount']);
+      const lotKey = findKey(['lot', 'batch', 'number', 'code']);
+      const stepKey = findKey(['step', 'steps', 'stage', 'process', 'manufacturingstep']);
+
+      const defaultClientKey = clientKey || keys[0];
+      const defaultQtyKey = qtyKey || keys[1];
+      const defaultLotKey = lotKey || keys[2];
+
+      hasStepColumn = Boolean(stepKey);
+
+      if (!hasStepColumn) {
+        // Default global step to 'IMPORT' or first available step
+        const defaultStep = steps.find(s => s.code.toUpperCase() === 'IMPORT') || steps[0];
+        selectedGlobalStepId = defaultStep ? defaultStep.id : '';
+        selectedGlobalStepName = defaultStep ? defaultStep.name : 'Import';
+      }
 
       const parsed = jsonRows.map((row, idx) => {
-        const clientName = String(row[clientKey] ?? row[keys[0]] ?? '').trim();
-        const rawQty = row[qtyKey] ?? row[keys[1]] ?? 0;
-        const lotNumber = String(row[lotKey] ?? row[keys[2]] ?? '').trim();
+        const clientName = String(row[defaultClientKey] ?? '').trim();
+        const rawQty = row[defaultQtyKey] ?? 0;
+        const lotNumber = String(row[defaultLotKey] ?? '').trim();
         const quantity = parseFloat(rawQty) || 0;
+
+        let rowStepId = '';
+        let rowStepName = '';
+
+        if (hasStepColumn && stepKey) {
+          const rawStep = String(row[stepKey] ?? '').trim();
+          if (rawStep) {
+            const matchedStep = steps.find(s =>
+              s.name.toLowerCase() === rawStep.toLowerCase() ||
+              s.code.toLowerCase() === rawStep.toLowerCase()
+            );
+            if (matchedStep) {
+              rowStepId = matchedStep.id;
+              rowStepName = matchedStep.name;
+            } else {
+              rowStepName = rawStep;
+            }
+          }
+        }
 
         return {
           rowNum: idx + 1,
           clientName: clientName || 'General Client',
           quantity,
           lotNumber,
+          stepId: rowStepId,
+          stepName: rowStepName,
           isValid: Boolean(lotNumber && quantity > 0)
         };
       }).filter(r => r.lotNumber || r.quantity > 0);
@@ -325,7 +372,9 @@
         items: validItems.map(item => ({
           clientName: item.clientName,
           quantity: item.quantity,
-          lotNumber: item.lotNumber
+          lotNumber: item.lotNumber,
+          stepId: item.stepId || (!hasStepColumn ? selectedGlobalStepId : null),
+          stepName: item.stepName || (!hasStepColumn ? selectedGlobalStepName : null)
         })),
         createdBy: 'File Import Tool'
       };
@@ -704,16 +753,17 @@
             Expected File Structure
           </div>
           <p class="text-on-surface-variant">
-            File should include headers: <strong class="text-on-surface">Client Name</strong>, <strong class="text-on-surface">Quantity</strong>, and <strong class="text-on-surface">Lot Number</strong>.
+            File headers: <strong class="text-on-surface">Client Name</strong>, <strong class="text-on-surface">Quantity</strong>, <strong class="text-on-surface">Lot Number</strong>, and optional <strong class="text-on-surface">Steps</strong>.
           </p>
-          <div class="grid grid-cols-3 gap-2 font-mono text-[11px] text-center pt-1">
+          <div class="grid grid-cols-4 gap-2 font-mono text-[11px] text-center pt-1">
             <div class="p-2 bg-surface rounded border border-outline-variant">Client Name</div>
             <div class="p-2 bg-surface rounded border border-outline-variant">Quantity</div>
             <div class="p-2 bg-surface rounded border border-outline-variant">Lot Number</div>
+            <div class="p-2 bg-surface rounded border border-outline-variant text-primary font-bold">Steps (Opt)</div>
           </div>
         </div>
 
-        <!-- Parsed Data Preview Table -->
+        <!-- Parsed Data Preview Table & Step Prompt -->
         {#if isParsing}
           <div class="p-8 text-center text-on-surface-variant flex flex-col items-center gap-2 font-mono text-sm">
             <span class="material-symbols-outlined animate-spin text-primary text-[28px]">sync</span>
@@ -721,6 +771,35 @@
           </div>
         {:else if importPreviewData.length > 0}
           <div class="space-y-3">
+            <!-- Step Prompt Banner when Steps column is absent -->
+            {#if !hasStepColumn}
+              <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                  <span class="material-symbols-outlined text-amber-600 dark:text-amber-400">info</span>
+                  <div>
+                    <div class="font-bold">No 'Steps' column detected in file</div>
+                    <div class="text-on-surface-variant text-[11px]">Select the target step under which all import lines should be added:</div>
+                  </div>
+                </div>
+                <div class="min-w-[220px]">
+                  <select
+                    value={selectedGlobalStepId}
+                    onchange={(e) => {
+                      selectedGlobalStepId = e.target.value;
+                      const found = steps.find(s => s.id === e.target.value);
+                      selectedGlobalStepName = found ? found.name : 'Import';
+                    }}
+                    class="w-full px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface font-bold text-xs focus:ring-2 focus:ring-primary outline-none"
+                  >
+                    {#each steps as step}
+                      <option value={step.id}>{step.name} ({step.code})</option>
+                    {/each}
+                    <option value="">Default (IMPORT step)</option>
+                  </select>
+                </div>
+              </div>
+            {/if}
+
             <div class="flex items-center justify-between">
               <h4 class="font-bold text-sm text-on-surface flex items-center gap-2">
                 Preview Data
@@ -728,6 +807,12 @@
                   {importPreviewData.filter(r => r.isValid).length} ready to import
                 </span>
               </h4>
+              {#if hasStepColumn}
+                <span class="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                  Steps column detected in file
+                </span>
+              {/if}
             </div>
 
             <div class="border border-outline-variant rounded-xl overflow-hidden max-h-60 overflow-y-auto">
@@ -751,7 +836,7 @@
                       <td class="p-3 text-right font-mono font-bold">{row.quantity.toLocaleString()} Pcs</td>
                       <td class="p-3 text-center">
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary border border-primary/20">
-                          IMPORT
+                          {row.stepName || (!hasStepColumn ? (selectedGlobalStepName || 'IMPORT') : 'IMPORT')}
                         </span>
                       </td>
                       <td class="p-3 text-center">

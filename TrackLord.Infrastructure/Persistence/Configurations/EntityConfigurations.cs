@@ -86,6 +86,7 @@ public class MaterialLotConfiguration : IEntityTypeConfiguration<MaterialLot>
 
         builder.Property(m => m.MaterialItemId).HasColumnName("material_item_id").IsRequired();
         builder.Property(m => m.MaterialName).HasColumnName("material_name").HasMaxLength(200);
+        builder.Property(m => m.UnitRate).HasColumnName("unit_rate").HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
         builder.Property(m => m.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
 
         builder.OwnsOne(m => m.InitialQuantity, q =>
@@ -176,6 +177,7 @@ public class MaterialConsumptionConfiguration : IEntityTypeConfiguration<Materia
         builder.Property(c => c.StepId).HasColumnName("step_id").IsRequired();
         builder.Property(c => c.QuantityConsumed).HasColumnName("quantity_consumed").HasPrecision(18, 4).IsRequired();
         builder.Property(c => c.Unit).HasColumnName("unit").IsRequired();
+        builder.Property(c => c.UnitRate).HasColumnName("unit_rate").HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
         builder.Property(c => c.ConsumptionDate).HasColumnName("consumption_date").IsRequired();
         builder.Property(c => c.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(c => c.CreatedBy).HasColumnName("created_by").HasMaxLength(100);

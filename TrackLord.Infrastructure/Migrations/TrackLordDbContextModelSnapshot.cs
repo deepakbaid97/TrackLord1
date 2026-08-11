@@ -116,6 +116,13 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("unit");
 
+                    b.Property<decimal>("UnitRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("unit_rate");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MaterialLotId");
@@ -154,6 +161,13 @@ namespace TrackLord.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("unit_rate");
 
                     b.HasKey("Id");
 

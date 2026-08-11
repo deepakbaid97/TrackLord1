@@ -49,6 +49,8 @@ function createAuthStore() {
             id: data.id,
             userId: data.id,
             tenantId: data.tenantId,
+            tenantName: data.tenantName || 'Default Tenant',
+            tenantCode: data.tenantCode || 'DEFAULT',
             phoneNumber: data.phoneNumber,
             name: data.name,
             role: data.role

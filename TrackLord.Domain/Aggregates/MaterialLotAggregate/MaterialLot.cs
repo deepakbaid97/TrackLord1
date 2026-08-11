@@ -16,6 +16,7 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
     public string? MaterialName { get; private set; }
     public Quantity InitialQuantity { get; private set; } = default!;
     public Quantity CurrentQuantity { get; private set; } = default!;
+    public decimal UnitRate { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
     private MaterialLot() { } // EF Core
@@ -26,6 +27,7 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
         Guid materialItemId,
         Quantity initialQuantity,
         string? materialName = null,
+        decimal unitRate = 0m,
         Guid? tenantId = null)
     {
         if (id == Guid.Empty) throw new DomainException("MaterialLot Id cannot be empty.");
@@ -34,6 +36,10 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
         if (initialQuantity is null || initialQuantity.Value <= 0)
         {
             throw new DomainException("Initial material lot quantity must be greater than zero.");
+        }
+        if (unitRate < 0)
+        {
+            throw new DomainException("Material lot unit rate cannot be negative.");
         }
 
         var lot = new MaterialLot
@@ -45,6 +51,7 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
             MaterialName = materialName,
             InitialQuantity = new Quantity(initialQuantity.Value, initialQuantity.Unit),
             CurrentQuantity = new Quantity(initialQuantity.Value, initialQuantity.Unit),
+            UnitRate = unitRate,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -83,5 +90,29 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
         }
 
         CurrentQuantity = new Quantity(CurrentQuantity.Value + quantityToRestore, CurrentQuantity.Unit);
+    }
+
+    public void UpdateDetails(
+        MaterialLotNumber lotNumber,
+        string? materialName,
+        decimal initialQuantity,
+        UnitType unit,
+        decimal unitRate)
+    {
+        if (lotNumber is null) throw new DomainException("MaterialLotNumber cannot be null.");
+        if (initialQuantity <= 0) throw new DomainException("Initial material lot quantity must be greater than zero.");
+        if (unitRate < 0) throw new DomainException("Material lot unit rate cannot be negative.");
+
+        var consumedAmount = InitialQuantity.Value - CurrentQuantity.Value;
+        if (initialQuantity < consumedAmount)
+        {
+            throw new DomainException($"Initial quantity cannot be reduced below already consumed quantity ({consumedAmount} {unit}).");
+        }
+
+        LotNumber = lotNumber;
+        MaterialName = materialName;
+        InitialQuantity = new Quantity(initialQuantity, unit);
+        CurrentQuantity = new Quantity(initialQuantity - consumedAmount, unit);
+        UnitRate = unitRate;
     }
 }

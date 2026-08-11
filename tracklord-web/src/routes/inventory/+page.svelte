@@ -20,7 +20,8 @@
     consumeMaterial,
     editMaterialConsumption,
     rejectItems,
-    reverseMovement
+    reverseMovement,
+    deleteProductionLot
   } from '$lib/api.js';
 
   // App State
@@ -84,7 +85,8 @@
     lotNumber: '',
     materialName: '',
     initialQuantity: 500,
-    unit: 2 // Meters
+    unit: 2, // Meters
+    unitRate: 0
   });
 
   let consumeMaterialForm = $state({
@@ -111,6 +113,17 @@
     reason: 'Damaged during operation - return for rework',
     clientId: '',
     createdBy: 'Inspector'
+  });
+
+  let isReverseModalOpen = $state(false);
+  let reverseForm = $state({
+    movementId: '',
+    fromStep: '',
+    toStep: '',
+    quantity: '',
+    referenceNumber: '',
+    reason: 'Typo correction / Accidental movement',
+    user: 'Supervisor'
   });
 
   let isConsumePiecesUnit = $derived.by(() => {
@@ -432,7 +445,8 @@
         materialItemId: '00000000-0000-0000-0000-000000000002',
         materialName: createMaterialForm.materialName.trim(),
         initialQuantity: Number(createMaterialForm.initialQuantity),
-        unit: Number(createMaterialForm.unit)
+        unit: Number(createMaterialForm.unit),
+        unitRate: Number(createMaterialForm.unitRate) || 0
       };
 
       await createMaterialLot(payload);
@@ -440,6 +454,7 @@
       isCreateMaterialModalOpen = false;
       createMaterialForm.lotNumber = '';
       createMaterialForm.materialName = '';
+      createMaterialForm.unitRate = 0;
 
       const matLots = await getMaterialLots();
       materialLots = matLots || [];
@@ -538,22 +553,68 @@
     }
   }
 
-  /** @param {string} movementId */
-  async function handleReverseMovement(movementId) {
-    if (!confirm('Are you sure you want to reverse this movement transaction?')) return;
+  /** @param {any} m */
+  function openReverseModal(m) {
+    reverseForm.movementId = m.id;
+    reverseForm.fromStep = m.from || 'Source Step';
+    reverseForm.toStep = m.to || 'Destination Step';
+    reverseForm.quantity = m.qty || '';
+    reverseForm.referenceNumber = m.referenceNumber || '-';
+    reverseForm.reason = 'Typo correction / Accidental movement';
+    reverseForm.user = 'Supervisor';
+    isReverseModalOpen = true;
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleReverseSubmit(e) {
+    e.preventDefault();
+    if (!reverseForm.movementId) return;
     errorMessage = '';
     try {
-      await reverseMovement(movementId, {
-        reason: 'Reversal initiated from audit ledger UI',
-        user: 'Supervisor'
+      await reverseMovement(reverseForm.movementId, {
+        reason: reverseForm.reason.trim() || 'Reversal initiated from audit ledger UI',
+        user: reverseForm.user.trim() || 'Supervisor'
       });
       successMessage = 'Movement transaction reversed successfully!';
+      isReverseModalOpen = false;
       await loadSelectedLotDetails(selectedLotId);
     } catch (/** @type {any} */ err) {
-      errorMessage = err.message;
+      errorMessage = err.message || 'Failed to reverse movement transaction.';
+    }
+  }
+
+  async function handleDeleteLot() {
+    if (!selectedLotId || !currentLotJourney) return;
+    const lotNumber = currentLotJourney.lotNumber;
+    const confirmMessage = `Are you sure you want to delete Production Lot '${lotNumber}'?\n\nWARNING:\n• All raw material consumptions will be reversed and stock quantities restored.\n• All manufacturing movements & audit records for this lot will be permanently deleted.\n• The production lot entity will be removed.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    errorMessage = '';
+    try {
+      await deleteProductionLot(selectedLotId);
+      successMessage = `Production Lot '${lotNumber}' deleted successfully and raw material stock restored!`;
+      selectedLotId = '';
+      currentLotJourney = null;
+      currentMaterialTraceability = null;
+      localStorage.removeItem('tracklord_last_lot_id');
+      await refreshAllData();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to delete production lot.';
+    }
+  }
+  let isMoreActionsOpen = $state(false);
+
+  /** @param {MouseEvent} e */
+  function handleDocumentClick(e) {
+    const target = /** @type {HTMLElement} */ (e.target);
+    if (isMoreActionsOpen && target && !target.closest('#more-actions-container')) {
+      isMoreActionsOpen = false;
     }
   }
 </script>
+
+<svelte:window onclick={handleDocumentClick} />
 
 <!-- TopAppBar -->
 <header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
@@ -623,22 +684,98 @@
     </div>
 
     <!-- Quick Action Buttons -->
-    <div class="flex flex-wrap gap-2 w-full md:w-auto">
-      <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
-        New Production Lot
-      </Button>
-      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
-        Move Quantity
-      </Button>
-      <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
-        Register Material
-      </Button>
-      <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
-        Log Consumption
-      </Button>
-      <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
-        Report Rejection
-      </Button>
+    <div class="w-full md:w-auto">
+      <!-- Desktop View (hidden on mobile, visible on md and up) -->
+      <div class="hidden md:flex flex-wrap gap-2">
+        <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
+          New Production Lot
+        </Button>
+        <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
+          Move Quantity
+        </Button>
+        <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
+          Register Material
+        </Button>
+        <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
+          Log Consumption
+        </Button>
+        <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
+          Report Rejection
+        </Button>
+      </div>
+
+      <!-- Mobile View (visible on mobile, hidden on md and up) -->
+      <div class="flex md:hidden items-center gap-2 w-full">
+        <div class="flex-1">
+          <Button variant="primary" icon="add" class="w-full justify-center" onclick={() => isCreateLotModalOpen = true}>
+            New Lot
+          </Button>
+        </div>
+
+        <div id="more-actions-container" class="relative">
+          <Button
+            variant="outline"
+            icon="more_vert"
+            onclick={() => isMoreActionsOpen = !isMoreActionsOpen}
+          >
+            More Actions
+            <span class="material-symbols-outlined text-[16px] transition-transform duration-200 {isMoreActionsOpen ? 'rotate-180' : ''}">expand_more</span>
+          </Button>
+
+          {#if isMoreActionsOpen}
+            <div class="absolute right-0 top-full mt-2 w-56 bg-surface dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-xl z-50 py-1 divide-y divide-outline-variant/40 animate-in fade-in zoom-in-95 duration-100">
+              <div class="py-1">
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; openMoveModal(); }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-primary">move_item</span>
+                  Move Quantity
+                </button>
+
+                <button
+                  onclick={() => { isMoreActionsOpen = false; isCreateMaterialModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-tertiary">inventory</span>
+                  Register Material
+                </button>
+
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; isConsumeMaterialModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-emerald-600">local_mall</span>
+                  Log Consumption
+                </button>
+
+                <button
+                  disabled={!selectedLotId}
+                  onclick={() => { isMoreActionsOpen = false; isRejectModalOpen = true; }}
+                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-amber-600">report_problem</span>
+                  Report Rejection
+                </button>
+              </div>
+
+              {#if selectedLotId}
+                <div class="py-1">
+                  <button
+                    onclick={() => { isMoreActionsOpen = false; handleDeleteLot(); }}
+                    class="w-full px-4 py-2.5 text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    Delete Lot
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </div>
     </div>
   </section>
 
@@ -653,11 +790,11 @@
         Lot Tracking & Journey
       </button>
       <button
-        onclick={() => activeTab = 'materials'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'materials' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        onclick={() => activeTab = 'ledger'}
+        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'ledger' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
       >
-        <span class="material-symbols-outlined text-[18px]">inventory_2</span>
-        Raw Materials Ledger
+        <span class="material-symbols-outlined text-[18px]">history</span>
+        Movements Ledger ({movementsLedgerRows.length})
       </button>
     </div>
   </div>
@@ -678,6 +815,14 @@
             <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
               {currentLotJourney.status}
             </span>
+            <button
+              onclick={handleDeleteLot}
+              title="Delete Production Lot"
+              class="px-2.5 py-1 text-xs bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-[15px]">delete</span>
+              Delete Lot
+            </button>
           </div>
           <p class="text-sm text-on-surface-variant mt-1">
             Lot ID: <span class="font-mono text-xs">{currentLotJourney.lotId}</span>
@@ -731,8 +876,17 @@
 
           <!-- Raw Material Traceability -->
           <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-            <div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-4">
-              <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant pb-2 mb-4 gap-2">
+              <div class="flex items-center gap-3">
+                <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+                {#if currentMaterialTraceability}
+                  {@const totalCost = currentMaterialTraceability.totalMaterialCost ?? (currentMaterialTraceability.consumptions ? currentMaterialTraceability.consumptions.reduce((/** @type {number} */ a, /** @type {any} */ c) => a + (c.totalPrice ?? (c.quantityConsumed * (c.unitRate || 0))), 0) : 0)}
+                  <span class="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center gap-1 font-mono">
+                    <span class="material-symbols-outlined text-[15px]">payments</span>
+                    Total Price: ₹{Number(totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                {/if}
+              </div>
               <button
                 onclick={() => isConsumeMaterialModalOpen = true}
                 class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
@@ -765,6 +919,15 @@
                       </button>
                     </div>
                     <div class="text-2xl font-bold text-primary">{mat.quantityConsumed} {mat.unit}</div>
+                    
+                    {#if mat.unitRate !== undefined && mat.unitRate !== null}
+                      {@const itemTotal = mat.totalPrice ?? (mat.quantityConsumed * mat.unitRate)}
+                      <div class="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-300 mt-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 rounded border border-emerald-200/50 dark:border-emerald-800/50">
+                        <span>@ ₹{Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{mat.unit}</span>
+                        <span class="font-bold text-emerald-800 dark:text-emerald-200">Total: ₹{Number(itemTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    {/if}
+
                     <div class="text-xs text-on-surface-variant mt-2 font-mono flex justify-between items-end">
                       <div>
                         Step: {mat.stepName}<br/>
@@ -785,7 +948,7 @@
               </div>
             {/if}
           </section>
-        </div>
+          </div>
       </div>
     {:else}
       <div class="p-12 text-center text-on-surface-variant bg-surface rounded-xl border border-outline-variant">
@@ -842,7 +1005,7 @@
                   <td class="px-4 py-3 text-right whitespace-nowrap">
                     {#if !m.isReversed && m.type !== 'InitialProduction'}
                       <button
-                        onclick={() => handleReverseMovement(m.id)}
+                        onclick={() => openReverseModal(m)}
                         class="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300 rounded font-semibold transition-colors cursor-pointer"
                       >
                         Reverse
@@ -1040,6 +1203,16 @@
       required={true}
     />
 
+    <Input
+      label="Rate per Unit (₹)"
+      type="number"
+      step="any"
+      bind:value={createMaterialForm.unitRate}
+      placeholder="e.g. 150.00"
+      icon="payments"
+      required={false}
+    />
+
     <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
       <Button variant="outline" onclick={() => isCreateMaterialModalOpen = false}>
         Cancel
@@ -1057,7 +1230,7 @@
     <Select
       label="Select Raw Material Lot"
       bind:value={consumeMaterialForm.materialLotId}
-      options={materialLots.map(m => ({ label: `${m.lotNumber}${m.materialName ? ' (' + m.materialName + ')' : ''} - Avail: ${m.remainingQuantity} ${m.unit}`, value: m.id }))}
+      options={materialLots.map(m => ({ label: `${m.lotNumber}${m.materialName ? ' (' + m.materialName + ')' : ''} - Avail: ${m.remainingQuantity} ${m.unit}${m.unitRate ? ' @ ₹' + m.unitRate + '/' + m.unit : ''}`, value: m.id }))}
       icon="texture"
       required={true}
     />
@@ -1255,6 +1428,42 @@
       </Button>
       <Button variant="primary" type="submit" icon="save">
         Save Client
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal 8: Reverse Movement Transaction -->
+<Modal bind:isOpen={isReverseModalOpen} title="Reverse Movement Transaction">
+  <form onsubmit={handleReverseSubmit} class="space-y-4">
+    <div class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs space-y-1">
+      <div class="font-bold text-red-700 dark:text-red-300">Transaction to Reverse:</div>
+      <div><span class="text-on-surface-variant font-medium">Ref No:</span> <strong class="text-on-surface">{reverseForm.referenceNumber}</strong></div>
+      <div><span class="text-on-surface-variant font-medium">Transfer:</span> <strong class="text-primary">{reverseForm.fromStep} &rarr; {reverseForm.toStep} ({reverseForm.quantity})</strong></div>
+    </div>
+
+    <Input
+      label="Reason for Reversal"
+      bind:value={reverseForm.reason}
+      placeholder="e.g. Typo correction / Accidental movement"
+      icon="report_problem"
+      required={true}
+    />
+
+    <Input
+      label="Authorized By"
+      bind:value={reverseForm.user}
+      placeholder="e.g. Supervisor"
+      icon="person"
+      required={true}
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isReverseModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="undo">
+        Confirm Reversal
       </Button>
     </div>
   </form>

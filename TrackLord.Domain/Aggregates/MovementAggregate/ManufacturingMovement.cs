@@ -146,7 +146,7 @@ public class ManufacturingMovement : AggregateRoot<Guid>, ITenantScopedEntity
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
             CreatedBy = user,
-            Remarks = $"Reversal of Movement {Id}: {reason}",
+            Remarks = reason,
             ReferenceNumber = $"REV-{ReferenceNumber ?? Id.ToString("N")[..8]}",
             IsReversed = false
         };

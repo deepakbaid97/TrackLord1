@@ -86,6 +86,13 @@ export async function getMaterialLots() {
   return await handleResponse(response);
 }
 
+// 3b. Fetch Consumption History for a specific Raw Material Lot
+/** @param {string} materialLotId */
+export async function getMaterialLotHistory(materialLotId) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${materialLotId}/history`);
+  return await handleResponse(response);
+}
+
 // 4. Fetch Lot WIP summary
 /** @param {string} lotId */
 export async function getLotWip(lotId) {
@@ -104,6 +111,15 @@ export async function getLotJourney(lotId) {
 /** @param {string} lotId */
 export async function getMaterialTraceability(lotId) {
   const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}/material-traceability`);
+  return await handleResponse(response);
+}
+
+// 6b. Delete Production Lot (reverses material consumption and deletes movements)
+/** @param {string} lotId */
+export async function deleteProductionLot(lotId) {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}`, {
+    method: 'DELETE'
+  });
   return await handleResponse(response);
 }
 
@@ -147,6 +163,40 @@ export async function createMaterialLot(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 9a. Import Raw Material Lots
+/** @param {any} data */
+export async function importMaterialLots(data) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 9b. Update Raw Material Lot
+/**
+ * @param {string} id
+ * @param {any} data
+ */
+export async function updateMaterialLot(id, data) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 9c. Delete Raw Material Lot
+/** @param {string} id */
+export async function deleteMaterialLot(id) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${id}`, {
+    method: 'DELETE'
   });
   return await handleResponse(response);
 }

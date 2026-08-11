@@ -108,7 +108,9 @@ public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductio
 public record ImportLotItemDto(
     string? ClientName,
     decimal Quantity,
-    string LotNumber);
+    string LotNumber,
+    Guid? StepId = null,
+    string? StepName = null);
 
 public record ImportProductionLotsCommand(
     List<ImportLotItemDto> Items,
@@ -154,7 +156,7 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
             return new ImportProductionLotsResultDto(0, new List<ImportedLotSummaryDto>());
         }
 
-        // 1. Find or create the 'IMPORT' manufacturing step
+        // 1. Find or create the 'IMPORT' manufacturing step (as default fallback)
         var importStep = await _stepRepository.GetByCodeAsync("IMPORT", cancellationToken);
         if (importStep == null)
         {
@@ -169,6 +171,16 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 defaultFactoryId,
                 isTerminating: false);
             await _stepRepository.AddAsync(importStep, cancellationToken);
+        }
+
+        // Load all manufacturing steps for resolution
+        var existingSteps = await _stepRepository.GetAllAsync(cancellationToken);
+        var stepById = existingSteps.ToDictionary(s => s.Id);
+        var stepByNameOrCode = new Dictionary<string, ManufacturingStep>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in existingSteps)
+        {
+            stepByNameOrCode[s.Code.Trim()] = s;
+            stepByNameOrCode[s.Name.Trim()] = s;
         }
 
         // 2. Load existing clients into memory for case-insensitive lookup
@@ -205,6 +217,42 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 clientMap[clientKey] = client;
             }
 
+            // Resolve target step for this item
+            ManufacturingStep targetStep = importStep;
+            if (item.StepId.HasValue && stepById.TryGetValue(item.StepId.Value, out var stepFoundById))
+            {
+                targetStep = stepFoundById;
+            }
+            else if (!string.IsNullOrWhiteSpace(item.StepName))
+            {
+                string cleanStepName = item.StepName.Trim();
+                if (stepByNameOrCode.TryGetValue(cleanStepName, out var stepFoundByName))
+                {
+                    targetStep = stepFoundByName;
+                }
+                else
+                {
+                    // Dynamically create the new manufacturing step
+                    var currentSteps = await _stepRepository.GetAllAsync(cancellationToken);
+                    int nextSeq = currentSteps.Count > 0 ? currentSteps.Max(s => s.SequenceOrder) + 1 : 1;
+                    var defaultFactoryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+                    string code = cleanStepName.ToUpperInvariant().Replace(" ", "_");
+                    if (code.Length > 20) code = code.Substring(0, 20);
+
+                    targetStep = new ManufacturingStep(
+                        Guid.NewGuid(),
+                        code,
+                        cleanStepName,
+                        nextSeq,
+                        defaultFactoryId,
+                        isTerminating: false);
+                    await _stepRepository.AddAsync(targetStep, cancellationToken);
+                    stepById[targetStep.Id] = targetStep;
+                    stepByNameOrCode[targetStep.Code] = targetStep;
+                    stepByNameOrCode[targetStep.Name] = targetStep;
+                }
+            }
+
             // Resolve unique lot number (append -1, -2 if lot number already exists)
             string rawLotNumber = item.LotNumber.Trim();
             string finalLotNumber = await ResolveUniqueLotNumber(rawLotNumber, batchUsedLotNumbers, cancellationToken);
@@ -218,7 +266,7 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 lotNumberObj,
                 defaultItemId,
                 initialQtyObj,
-                importStep.Id,
+                targetStep.Id,
                 request.CreatedBy,
                 $"Imported production lot (Original: '{rawLotNumber}')");
 
@@ -226,14 +274,14 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 Guid.NewGuid(),
                 lotId,
                 fromStepId: null,
-                toStepId: importStep.Id,
+                toStepId: targetStep.Id,
                 quantity: item.Quantity,
                 type: MovementType.InitialProduction,
                 movementDate: now,
                 clientId: client.Id,
                 clientName: client.Name,
                 createdBy: request.CreatedBy,
-                remarks: "Initial imported lot creation movement",
+                remarks: $"Initial imported lot creation movement to step '{targetStep.Name}'",
                 referenceNumber: $"INIT-{finalLotNumber}");
 
             _replayEngine.ReplayLedger(lotId, new[] { initialMovement });
@@ -281,7 +329,8 @@ public record CreateMaterialLotCommand(
     Guid MaterialItemId,
     decimal InitialQuantity,
     UnitType Unit,
-    string? MaterialName = null) : IRequest<Guid>;
+    string? MaterialName = null,
+    decimal UnitRate = 0m) : IRequest<Guid>;
 
 public class CreateMaterialLotCommandHandler : IRequestHandler<CreateMaterialLotCommand, Guid>
 {
@@ -303,10 +352,186 @@ public class CreateMaterialLotCommandHandler : IRequestHandler<CreateMaterialLot
         var lotNumberObj = MaterialLotNumber.Create(request.LotNumber);
         var initialQtyObj = new Quantity(request.InitialQuantity, request.Unit);
 
-        var lot = MaterialLot.Create(lotId, lotNumberObj, request.MaterialItemId, initialQtyObj, request.MaterialName);
+        var lot = MaterialLot.Create(lotId, lotNumberObj, request.MaterialItemId, initialQtyObj, request.MaterialName, request.UnitRate);
 
         await _materialLotRepository.AddAsync(lot, cancellationToken);
         return lotId;
+    }
+}
+
+// 2a. Import Material Lots Command DTOs & Handler
+public record ImportMaterialItemDto(
+    string LotNumber,
+    string? MaterialName,
+    decimal InitialQuantity,
+    UnitType Unit = UnitType.Meters,
+    decimal UnitRate = 0m);
+
+public record ImportMaterialLotsCommand(
+    List<ImportMaterialItemDto> Items) : IRequest<ImportMaterialLotsResultDto>;
+
+public record ImportMaterialLotsResultDto(
+    int TotalImported,
+    List<ImportedMaterialLotSummaryDto> ImportedMaterials);
+
+public record ImportedMaterialLotSummaryDto(
+    Guid Id,
+    string OriginalLotNumber,
+    string FinalLotNumber,
+    string? MaterialName,
+    decimal Quantity,
+    UnitType Unit,
+    decimal UnitRate);
+
+public class ImportMaterialLotsCommandHandler : IRequestHandler<ImportMaterialLotsCommand, ImportMaterialLotsResultDto>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+
+    public ImportMaterialLotsCommandHandler(IMaterialLotRepository materialLotRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+    }
+
+    public async Task<ImportMaterialLotsResultDto> Handle(ImportMaterialLotsCommand request, CancellationToken cancellationToken)
+    {
+        if (request.Items == null || !request.Items.Any())
+        {
+            return new ImportMaterialLotsResultDto(0, new List<ImportedMaterialLotSummaryDto>());
+        }
+
+        var defaultItemId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var batchUsedLotNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var importedSummaries = new List<ImportedMaterialLotSummaryDto>();
+
+        foreach (var item in request.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.LotNumber) || item.InitialQuantity <= 0)
+            {
+                continue; // Skip invalid entries
+            }
+
+            string rawLotNumber = item.LotNumber.Trim();
+            string finalLotNumber = await ResolveUniqueMaterialLotNumber(rawLotNumber, batchUsedLotNumbers, cancellationToken);
+
+            var lotId = Guid.NewGuid();
+            var lotNumberObj = MaterialLotNumber.Create(finalLotNumber);
+            var initialQtyObj = new Quantity(item.InitialQuantity, item.Unit);
+
+            string materialName = string.IsNullOrWhiteSpace(item.MaterialName) ? "General Material" : item.MaterialName.Trim();
+
+            var lot = MaterialLot.Create(
+                lotId,
+                lotNumberObj,
+                defaultItemId,
+                initialQtyObj,
+                materialName,
+                item.UnitRate < 0 ? 0m : item.UnitRate);
+
+            await _materialLotRepository.AddAsync(lot, cancellationToken);
+
+            importedSummaries.Add(new ImportedMaterialLotSummaryDto(
+                lotId,
+                rawLotNumber,
+                finalLotNumber,
+                materialName,
+                item.InitialQuantity,
+                item.Unit,
+                item.UnitRate));
+        }
+
+        return new ImportMaterialLotsResultDto(importedSummaries.Count, importedSummaries);
+    }
+
+    private async Task<string> ResolveUniqueMaterialLotNumber(string baseLotNumber, HashSet<string> batchUsedLotNumbers, CancellationToken cancellationToken)
+    {
+        string candidate = baseLotNumber;
+        if (!await _materialLotRepository.ExistsAsync(candidate, cancellationToken) && !batchUsedLotNumbers.Contains(candidate))
+        {
+            batchUsedLotNumbers.Add(candidate);
+            return candidate;
+        }
+
+        int suffix = 1;
+        while (true)
+        {
+            candidate = $"{baseLotNumber}-{suffix}";
+            if (!await _materialLotRepository.ExistsAsync(candidate, cancellationToken) && !batchUsedLotNumbers.Contains(candidate))
+            {
+                batchUsedLotNumbers.Add(candidate);
+                return candidate;
+            }
+            suffix++;
+        }
+    }
+}
+
+
+// 2b. Update Material Lot Command
+public record UpdateMaterialLotCommand(
+    Guid Id,
+    string LotNumber,
+    decimal InitialQuantity,
+    UnitType Unit,
+    string? MaterialName = null,
+    decimal UnitRate = 0m) : IRequest<bool>;
+
+public class UpdateMaterialLotCommandHandler : IRequestHandler<UpdateMaterialLotCommand, bool>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+
+    public UpdateMaterialLotCommandHandler(IMaterialLotRepository materialLotRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+    }
+
+    public async Task<bool> Handle(UpdateMaterialLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _materialLotRepository.GetByIdAsync(request.Id, cancellationToken);
+        if (lot is null) throw new DomainException($"Material Lot ID '{request.Id}' not found.");
+
+        var existingWithLotNum = await _materialLotRepository.GetByLotNumberAsync(request.LotNumber, cancellationToken);
+        if (existingWithLotNum is not null && existingWithLotNum.Id != request.Id)
+        {
+            throw new DomainException($"Material Lot Number '{request.LotNumber}' is already used by another material lot.");
+        }
+
+        var lotNumberObj = MaterialLotNumber.Create(request.LotNumber);
+        lot.UpdateDetails(lotNumberObj, request.MaterialName, request.InitialQuantity, request.Unit, request.UnitRate);
+
+        await _materialLotRepository.UpdateAsync(lot, cancellationToken);
+        return true;
+    }
+}
+
+// 2c. Delete Material Lot Command
+public record DeleteMaterialLotCommand(Guid MaterialLotId) : IRequest<bool>;
+
+public class DeleteMaterialLotCommandHandler : IRequestHandler<DeleteMaterialLotCommand, bool>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+
+    public DeleteMaterialLotCommandHandler(
+        IMaterialLotRepository materialLotRepository,
+        IMaterialConsumptionRepository consumptionRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+        _consumptionRepository = consumptionRepository;
+    }
+
+    public async Task<bool> Handle(DeleteMaterialLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _materialLotRepository.GetByIdAsync(request.MaterialLotId, cancellationToken);
+        if (lot is null) throw new DomainException($"Material Lot ID '{request.MaterialLotId}' not found.");
+
+        var history = await _consumptionRepository.GetByMaterialLotIdAsync(request.MaterialLotId, cancellationToken);
+        if (history.Count > 0)
+        {
+            throw new DomainException("It's not safe to delete this material lot because it has consumption history.");
+        }
+
+        await _materialLotRepository.DeleteAsync(lot, cancellationToken);
+        return true;
     }
 }
 
@@ -462,7 +687,8 @@ public class ConsumeMaterialCommandHandler : IRequestHandler<ConsumeMaterialComm
             request.Unit,
             request.ConsumptionDate,
             request.CreatedBy,
-            request.Remarks);
+            request.Remarks,
+            matLot.UnitRate);
 
         await _materialLotRepository.UpdateAsync(matLot, cancellationToken);
         await _consumptionRepository.AddAsync(consumption, cancellationToken);
@@ -774,6 +1000,78 @@ public class UpdateManufacturingStepCommandHandler : IRequestHandler<UpdateManuf
         else step.Deactivate();
 
         await _stepRepository.UpdateAsync(step, cancellationToken);
+        return true;
+    }
+}
+
+// 12. Delete Production Lot Command
+public record DeleteProductionLotCommand(Guid ProductionLotId) : IRequest<bool>;
+
+public class DeleteProductionLotCommandHandler : IRequestHandler<DeleteProductionLotCommand, bool>
+{
+    private readonly IProductionLotRepository _productionLotRepository;
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+    private readonly IManufacturingMovementRepository _movementRepository;
+    private readonly IRejectionRecordRepository _rejectionRecordRepository;
+
+    public DeleteProductionLotCommandHandler(
+        IProductionLotRepository productionLotRepository,
+        IMaterialLotRepository materialLotRepository,
+        IMaterialConsumptionRepository consumptionRepository,
+        IManufacturingMovementRepository movementRepository,
+        IRejectionRecordRepository rejectionRecordRepository)
+    {
+        _productionLotRepository = productionLotRepository;
+        _materialLotRepository = materialLotRepository;
+        _consumptionRepository = consumptionRepository;
+        _movementRepository = movementRepository;
+        _rejectionRecordRepository = rejectionRecordRepository;
+    }
+
+    public async Task<bool> Handle(DeleteProductionLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _productionLotRepository.GetByIdAsync(request.ProductionLotId, cancellationToken);
+        if (lot is null)
+        {
+            throw new DomainException($"Production Lot ID '{request.ProductionLotId}' not found.");
+        }
+
+        // 1. Reverse raw material consumptions & restore material lot balances
+        var consumptions = await _consumptionRepository.GetByProductionLotIdAsync(request.ProductionLotId, cancellationToken);
+        foreach (var c in consumptions)
+        {
+            var matLot = await _materialLotRepository.GetByIdAsync(c.MaterialLotId, cancellationToken);
+            if (matLot is not null)
+            {
+                matLot.Restore(c.QuantityConsumed);
+                await _materialLotRepository.UpdateAsync(matLot, cancellationToken);
+            }
+        }
+
+        // Delete all material consumptions for this lot
+        if (consumptions.Count > 0)
+        {
+            await _consumptionRepository.DeleteRangeAsync(consumptions, cancellationToken);
+        }
+
+        // 2. Delete all manufacturing movements related to this lot
+        var movements = await _movementRepository.GetMovementsForLotAsync(request.ProductionLotId, cancellationToken);
+        if (movements.Count > 0)
+        {
+            await _movementRepository.DeleteRangeAsync(movements, cancellationToken);
+        }
+
+        // 3. Delete all rejection records related to this lot
+        var rejections = await _rejectionRecordRepository.GetByProductionLotIdAsync(request.ProductionLotId, cancellationToken);
+        if (rejections.Count > 0)
+        {
+            await _rejectionRecordRepository.DeleteRangeAsync(rejections, cancellationToken);
+        }
+
+        // 4. Delete the production lot itself
+        await _productionLotRepository.DeleteAsync(lot, cancellationToken);
+
         return true;
     }
 }

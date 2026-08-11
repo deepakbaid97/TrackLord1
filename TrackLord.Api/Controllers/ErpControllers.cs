@@ -81,6 +81,16 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
+    /// Deletes a production lot, reverses its material consumptions, and removes all related movements and records.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _mediator.Send(new DeleteProductionLotCommand(id));
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
     /// Rejects a quantity of items from a step due to damage/wastage and returns them to target step.
     /// </summary>
     [HttpPost("{id:guid}/reject")]
@@ -232,6 +242,16 @@ public class MaterialConsumptionsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets detailed consumption history for a specific raw material lot.
+    /// </summary>
+    [HttpGet("lots/{id:guid}/history")]
+    public async Task<IActionResult> GetMaterialLotHistory(Guid id)
+    {
+        var history = await _mediator.Send(new GetMaterialLotHistoryQuery(id));
+        return Ok(history);
+    }
+
+    /// <summary>
     /// Creates a raw material lot.
     /// </summary>
     [HttpPost("lots")]
@@ -239,6 +259,37 @@ public class MaterialConsumptionsController : ControllerBase
     {
         var id = await _mediator.Send(command);
         return Ok(new { id });
+    }
+
+    /// <summary>
+    /// Imports multiple raw material lots from a parsed file structure.
+    /// </summary>
+    [HttpPost("lots/import")]
+    public async Task<IActionResult> ImportMaterialLots([FromBody] ImportMaterialLotsCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Updates a raw material lot.
+    /// </summary>
+    [HttpPut("lots/{id:guid}")]
+    public async Task<IActionResult> UpdateMaterialLot(Guid id, [FromBody] UpdateMaterialLotRequest request)
+    {
+        var command = new UpdateMaterialLotCommand(id, request.LotNumber, request.InitialQuantity, request.Unit, request.MaterialName, request.UnitRate);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Deletes a raw material lot.
+    /// </summary>
+    [HttpDelete("lots/{id:guid}")]
+    public async Task<IActionResult> DeleteMaterialLot(Guid id)
+    {
+        await _mediator.Send(new DeleteMaterialLotCommand(id));
+        return Ok(new { success = true });
     }
 
     /// <summary>
@@ -265,6 +316,7 @@ public class MaterialConsumptionsController : ControllerBase
 }
 
 public record EditMaterialConsumptionRequest(decimal QuantityConsumed, string? Remarks);
+public record UpdateMaterialLotRequest(string LotNumber, decimal InitialQuantity, TrackLord.Domain.Enums.UnitType Unit, string? MaterialName = null, decimal UnitRate = 0m);
 
 [Authorize]
 [ApiController]
