@@ -419,4 +419,51 @@ public class RejectionTests
         snapshot2.StepBalances[finishingStep.Id].Should().Be(100m);
         snapshot2.StepBalances.ContainsKey(washingStep.Id).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task DeleteMaterialLot_WithNoConsumptionHistory_ShouldSucceed()
+    {
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var matLotRepo = new MaterialLotRepository(db);
+        var consumptionRepo = new MaterialConsumptionRepository(db);
+
+        var createMatHandler = new CreateMaterialLotCommandHandler(matLotRepo);
+        var matLotId = await createMatHandler.Handle(new CreateMaterialLotCommand("MAT-DEL-001", Guid.NewGuid(), 200m, UnitType.Meters, "Silk Cloth", 300m), default);
+
+        var deleteMatHandler = new DeleteMaterialLotCommandHandler(matLotRepo, consumptionRepo);
+        var result = await deleteMatHandler.Handle(new DeleteMaterialLotCommand(matLotId), default);
+
+        result.Should().BeTrue();
+        var deletedLot = await matLotRepo.GetByIdAsync(matLotId);
+        deletedLot.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteMaterialLot_WithConsumptionHistory_ShouldThrowDomainException()
+    {
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var matLotRepo = new MaterialLotRepository(db);
+        var consumptionRepo = new MaterialConsumptionRepository(db);
+        var prodLotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+
+        var step = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(step);
+
+        var createMatHandler = new CreateMaterialLotCommandHandler(matLotRepo);
+        var matLotId = await createMatHandler.Handle(new CreateMaterialLotCommand("MAT-DEL-002", Guid.NewGuid(), 200m, UnitType.Meters, "Cotton Cloth", 100m), default);
+
+        var createProdHandler = new CreateProductionLotCommandHandler(prodLotRepo, stepRepo, movementRepo, _replayEngine);
+        var prodLotId = await createProdHandler.Handle(new CreateProductionLotCommand("LOT-DEL-002", Guid.NewGuid(), 50m, UnitType.Pieces, step.Id), default);
+
+        var consumeHandler = new ConsumeMaterialCommandHandler(prodLotRepo, matLotRepo, stepRepo, consumptionRepo);
+        await consumeHandler.Handle(new ConsumeMaterialCommand(prodLotId, matLotId, step.Id, 20m, UnitType.Meters, DateTime.UtcNow), default);
+
+        var deleteMatHandler = new DeleteMaterialLotCommandHandler(matLotRepo, consumptionRepo);
+        var act = async () => await deleteMatHandler.Handle(new DeleteMaterialLotCommand(matLotId), default);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*not safe to delete this material lot because it has consumption history*");
+    }
 }

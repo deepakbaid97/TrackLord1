@@ -5,7 +5,7 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
-  import { getMaterialLots, createMaterialLot } from '$lib/api.js';
+  import { getMaterialLots, createMaterialLot, updateMaterialLot, deleteMaterialLot } from '$lib/api.js';
 
   // App State
   let loading = $state(true);
@@ -26,6 +26,35 @@
     unit: 2, // Meters
     unitRate: 0
   });
+
+  let isEditMaterialModalOpen = $state(false);
+  let isDeletingMaterial = $state(false);
+  let editMaterialForm = $state({
+    id: '',
+    lotNumber: '',
+    materialName: '',
+    initialQuantity: 0,
+    unit: 2,
+    unitRate: 0
+  });
+
+  const unitOptions = [
+    { label: 'Meters', value: 2 },
+    { label: 'Pieces', value: 1 },
+    { label: 'Kilograms', value: 3 },
+    { label: 'Yards', value: 5 }
+  ];
+
+  function getUnitValue(unitInput) {
+    if (typeof unitInput === 'number') return unitInput;
+    if (typeof unitInput === 'string') {
+      const match = unitOptions.find(o => o.label.toLowerCase() === unitInput.toLowerCase());
+      if (match) return match.value;
+      const parsed = parseInt(unitInput, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 2;
+  }
 
   onMount(async () => {
     await fetchMaterials();
@@ -100,6 +129,61 @@
       await fetchMaterials();
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to register material lot.';
+    }
+  }
+
+  /** @param {any} mat */
+  function openEditModal(mat) {
+    errorMessage = '';
+    editMaterialForm = {
+      id: mat.id,
+      lotNumber: mat.lotNumber || '',
+      materialName: mat.materialName || '',
+      initialQuantity: mat.initialQuantity || 0,
+      unit: getUnitValue(mat.unit),
+      unitRate: mat.unitRate || 0
+    };
+    isEditMaterialModalOpen = true;
+  }
+
+  /** @param {SubmitEvent} e */
+  async function handleEditMaterialSubmit(e) {
+    e.preventDefault();
+    errorMessage = '';
+    try {
+      const payload = {
+        lotNumber: editMaterialForm.lotNumber.trim(),
+        materialName: editMaterialForm.materialName.trim(),
+        initialQuantity: Number(editMaterialForm.initialQuantity),
+        unit: Number(editMaterialForm.unit),
+        unitRate: Number(editMaterialForm.unitRate) || 0
+      };
+
+      await updateMaterialLot(editMaterialForm.id, payload);
+      successMessage = `Raw Material Lot '${editMaterialForm.lotNumber}' updated successfully!`;
+      isEditMaterialModalOpen = false;
+
+      await fetchMaterials();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to update material lot.';
+    }
+  }
+
+  async function handleDeleteMaterial() {
+    if (!editMaterialForm.id) return;
+    if (!confirm(`Are you sure you want to delete material lot '${editMaterialForm.lotNumber}'?`)) return;
+
+    errorMessage = '';
+    isDeletingMaterial = true;
+    try {
+      await deleteMaterialLot(editMaterialForm.id);
+      successMessage = `Raw Material Lot '${editMaterialForm.lotNumber}' deleted successfully.`;
+      isEditMaterialModalOpen = false;
+      await fetchMaterials();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to delete raw material lot.';
+    } finally {
+      isDeletingMaterial = false;
     }
   }
 
@@ -286,7 +370,7 @@
             <th class="px-4 py-3.5">Unit</th>
             <th class="px-4 py-3.5 text-right">Unit Rate (₹)</th>
             <th class="px-4 py-3.5 text-right">Stock Valuation</th>
-            <th class="px-4 py-3.5 text-right">Consumption History</th>
+            <th class="px-4 py-3.5 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-outline-variant/50 text-on-surface">
@@ -330,13 +414,23 @@
                 ₹{Number(stockValuation).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
               <td class="px-4 py-3.5 text-right whitespace-nowrap">
-                <button
-                  onclick={(e) => { e.stopPropagation(); viewMaterialHistory(mat.id); }}
-                  class="px-3 py-1 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-colors flex items-center gap-1 ml-auto cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[14px]">history</span>
-                  View History
-                </button>
+                <div class="flex items-center justify-end gap-1.5">
+                  <button
+                    onclick={(e) => { e.stopPropagation(); openEditModal(mat); }}
+                    class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                    title="Edit Material Lot"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                  </button>
+                  <button
+                    onclick={(e) => { e.stopPropagation(); viewMaterialHistory(mat.id); }}
+                    class="px-2.5 py-1 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    title="View Material Consumption History"
+                  >
+                    <span class="material-symbols-outlined text-[14px]">history</span>
+                    History
+                  </button>
+                </div>
               </td>
             </tr>
           {/each}
@@ -385,12 +479,7 @@
     <Select
       label="Unit of Measurement"
       bind:value={createMaterialForm.unit}
-      options={[
-        { label: 'Meters', value: 2 },
-        { label: 'Pieces', value: 1 },
-        { label: 'Kilograms', value: 3 },
-        { label: 'Yards', value: 5 }
-      ]}
+      options={unitOptions}
       icon="square_foot"
       required={true}
     />
@@ -412,6 +501,75 @@
       <Button variant="primary" type="submit" icon="save">
         Register Material
       </Button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Modal: Edit Raw Material Lot -->
+<Modal bind:isOpen={isEditMaterialModalOpen} title="Edit Raw Material Lot">
+  <form onsubmit={handleEditMaterialSubmit} class="space-y-4">
+    <Input
+      label="Material Lot Number"
+      bind:value={editMaterialForm.lotNumber}
+      placeholder="e.g. FAB-2026-001"
+      icon="tag"
+      required={true}
+    />
+
+    <Input
+      label="Product / Material Name"
+      bind:value={editMaterialForm.materialName}
+      placeholder="e.g. Denim Grey Cloth 300GSM"
+      icon="category"
+      required={true}
+    />
+
+    <Input
+      label="Initial Quantity"
+      type="number"
+      step={Number(editMaterialForm.unit) === 1 ? '1' : 'any'}
+      bind:value={editMaterialForm.initialQuantity}
+      placeholder={Number(editMaterialForm.unit) === 1 ? 'e.g. 500' : 'e.g. 500.5'}
+      icon="numbers"
+      required={true}
+    />
+
+    <Select
+      label="Unit of Measurement"
+      bind:value={editMaterialForm.unit}
+      options={unitOptions}
+      icon="square_foot"
+      required={true}
+    />
+
+    <Input
+      label="Rate per Unit (₹)"
+      type="number"
+      step="any"
+      bind:value={editMaterialForm.unitRate}
+      placeholder="e.g. 150.00"
+      icon="payments"
+      required={false}
+    />
+
+    <div class="flex justify-between items-center pt-3 border-t border-outline-variant">
+      <Button
+        variant="danger"
+        icon="delete"
+        disabled={isDeletingMaterial}
+        onclick={handleDeleteMaterial}
+      >
+        {isDeletingMaterial ? 'Deleting...' : 'Delete Material'}
+      </Button>
+
+      <div class="flex gap-3">
+        <Button variant="outline" onclick={() => isEditMaterialModalOpen = false}>
+          Cancel
+        </Button>
+        <Button variant="primary" type="submit" icon="save">
+          Save Changes
+        </Button>
+      </div>
     </div>
   </form>
 </Modal>

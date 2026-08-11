@@ -32,6 +32,7 @@ public interface IMaterialLotRepository
     Task<bool> ExistsAsync(string lotNumber, CancellationToken cancellationToken = default);
     Task AddAsync(MaterialLot lot, CancellationToken cancellationToken = default);
     Task UpdateAsync(MaterialLot lot, CancellationToken cancellationToken = default);
+    Task DeleteAsync(MaterialLot lot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialLot>> GetAllAsync(CancellationToken cancellationToken = default);
 }
 

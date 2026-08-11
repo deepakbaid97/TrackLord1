@@ -167,6 +167,29 @@ export async function createMaterialLot(data) {
   return await handleResponse(response);
 }
 
+// 9b. Update Raw Material Lot
+/**
+ * @param {string} id
+ * @param {any} data
+ */
+export async function updateMaterialLot(id, data) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
+// 9c. Delete Raw Material Lot
+/** @param {string} id */
+export async function deleteMaterialLot(id) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${id}`, {
+    method: 'DELETE'
+  });
+  return await handleResponse(response);
+}
+
 // 10. Consume Raw Material for Production Lot
 /** @param {any} data */
 export async function consumeMaterial(data) {

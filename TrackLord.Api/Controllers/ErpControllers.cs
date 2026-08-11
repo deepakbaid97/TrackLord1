@@ -262,6 +262,27 @@ public class MaterialConsumptionsController : ControllerBase
     }
 
     /// <summary>
+    /// Updates a raw material lot.
+    /// </summary>
+    [HttpPut("lots/{id:guid}")]
+    public async Task<IActionResult> UpdateMaterialLot(Guid id, [FromBody] UpdateMaterialLotRequest request)
+    {
+        var command = new UpdateMaterialLotCommand(id, request.LotNumber, request.InitialQuantity, request.Unit, request.MaterialName, request.UnitRate);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Deletes a raw material lot.
+    /// </summary>
+    [HttpDelete("lots/{id:guid}")]
+    public async Task<IActionResult> DeleteMaterialLot(Guid id)
+    {
+        await _mediator.Send(new DeleteMaterialLotCommand(id));
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
     /// Consumes raw material lot for a production lot at a specific step.
     /// </summary>
     [HttpPost("consume")]
@@ -285,6 +306,7 @@ public class MaterialConsumptionsController : ControllerBase
 }
 
 public record EditMaterialConsumptionRequest(decimal QuantityConsumed, string? Remarks);
+public record UpdateMaterialLotRequest(string LotNumber, decimal InitialQuantity, TrackLord.Domain.Enums.UnitType Unit, string? MaterialName = null, decimal UnitRate = 0m);
 
 [Authorize]
 [ApiController]

@@ -113,6 +113,12 @@ public class MaterialLotRepository : IMaterialLotRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteAsync(MaterialLot lot, CancellationToken cancellationToken = default)
+    {
+        _dbContext.MaterialLots.Remove(lot);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MaterialLot>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.MaterialLots.AsNoTracking().ToListAsync(cancellationToken);

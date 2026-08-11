@@ -311,6 +311,75 @@ public class CreateMaterialLotCommandHandler : IRequestHandler<CreateMaterialLot
     }
 }
 
+// 2b. Update Material Lot Command
+public record UpdateMaterialLotCommand(
+    Guid Id,
+    string LotNumber,
+    decimal InitialQuantity,
+    UnitType Unit,
+    string? MaterialName = null,
+    decimal UnitRate = 0m) : IRequest<bool>;
+
+public class UpdateMaterialLotCommandHandler : IRequestHandler<UpdateMaterialLotCommand, bool>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+
+    public UpdateMaterialLotCommandHandler(IMaterialLotRepository materialLotRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+    }
+
+    public async Task<bool> Handle(UpdateMaterialLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _materialLotRepository.GetByIdAsync(request.Id, cancellationToken);
+        if (lot is null) throw new DomainException($"Material Lot ID '{request.Id}' not found.");
+
+        var existingWithLotNum = await _materialLotRepository.GetByLotNumberAsync(request.LotNumber, cancellationToken);
+        if (existingWithLotNum is not null && existingWithLotNum.Id != request.Id)
+        {
+            throw new DomainException($"Material Lot Number '{request.LotNumber}' is already used by another material lot.");
+        }
+
+        var lotNumberObj = MaterialLotNumber.Create(request.LotNumber);
+        lot.UpdateDetails(lotNumberObj, request.MaterialName, request.InitialQuantity, request.Unit, request.UnitRate);
+
+        await _materialLotRepository.UpdateAsync(lot, cancellationToken);
+        return true;
+    }
+}
+
+// 2c. Delete Material Lot Command
+public record DeleteMaterialLotCommand(Guid MaterialLotId) : IRequest<bool>;
+
+public class DeleteMaterialLotCommandHandler : IRequestHandler<DeleteMaterialLotCommand, bool>
+{
+    private readonly IMaterialLotRepository _materialLotRepository;
+    private readonly IMaterialConsumptionRepository _consumptionRepository;
+
+    public DeleteMaterialLotCommandHandler(
+        IMaterialLotRepository materialLotRepository,
+        IMaterialConsumptionRepository consumptionRepository)
+    {
+        _materialLotRepository = materialLotRepository;
+        _consumptionRepository = consumptionRepository;
+    }
+
+    public async Task<bool> Handle(DeleteMaterialLotCommand request, CancellationToken cancellationToken)
+    {
+        var lot = await _materialLotRepository.GetByIdAsync(request.MaterialLotId, cancellationToken);
+        if (lot is null) throw new DomainException($"Material Lot ID '{request.MaterialLotId}' not found.");
+
+        var history = await _consumptionRepository.GetByMaterialLotIdAsync(request.MaterialLotId, cancellationToken);
+        if (history.Count > 0)
+        {
+            throw new DomainException("It's not safe to delete this material lot because it has consumption history.");
+        }
+
+        await _materialLotRepository.DeleteAsync(lot, cancellationToken);
+        return true;
+    }
+}
+
 // 3. Move Lot Command (Supports full, partial, backdated movements)
 public record MoveLotCommand(
     Guid ProductionLotId,

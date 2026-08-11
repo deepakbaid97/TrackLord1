@@ -91,4 +91,28 @@ public class MaterialLot : AggregateRoot<Guid>, ITenantScopedEntity
 
         CurrentQuantity = new Quantity(CurrentQuantity.Value + quantityToRestore, CurrentQuantity.Unit);
     }
+
+    public void UpdateDetails(
+        MaterialLotNumber lotNumber,
+        string? materialName,
+        decimal initialQuantity,
+        UnitType unit,
+        decimal unitRate)
+    {
+        if (lotNumber is null) throw new DomainException("MaterialLotNumber cannot be null.");
+        if (initialQuantity <= 0) throw new DomainException("Initial material lot quantity must be greater than zero.");
+        if (unitRate < 0) throw new DomainException("Material lot unit rate cannot be negative.");
+
+        var consumedAmount = InitialQuantity.Value - CurrentQuantity.Value;
+        if (initialQuantity < consumedAmount)
+        {
+            throw new DomainException($"Initial quantity cannot be reduced below already consumed quantity ({consumedAmount} {unit}).");
+        }
+
+        LotNumber = lotNumber;
+        MaterialName = materialName;
+        InitialQuantity = new Quantity(initialQuantity, unit);
+        CurrentQuantity = new Quantity(initialQuantity - consumedAmount, unit);
+        UnitRate = unitRate;
+    }
 }
