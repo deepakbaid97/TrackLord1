@@ -200,6 +200,42 @@ public class MaterialConsumptionTests
     }
 
     [Fact]
+    public async Task ImportMaterialLots_WithDuplicateLotNumbers_ShouldAutoIncrementAndCreateLots()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var matLotRepo = new MaterialLotRepository(db);
+
+        var importHandler = new ImportMaterialLotsCommandHandler(matLotRepo);
+
+        var items = new System.Collections.Generic.List<ImportMaterialItemDto>
+        {
+            new ImportMaterialItemDto("MAT-001", "Denim Fabric", 500m, UnitType.Meters, 150m),
+            new ImportMaterialItemDto("MAT-001", "Cotton Fabric", 300m, UnitType.Meters, 120m)
+        };
+
+        // Act
+        var result = await importHandler.Handle(new ImportMaterialLotsCommand(items), default);
+
+        // Assert
+        result.TotalImported.Should().Be(2);
+        result.ImportedMaterials[0].FinalLotNumber.Should().Be("MAT-001");
+        result.ImportedMaterials[1].FinalLotNumber.Should().Be("MAT-001-1");
+
+        var lot1 = await matLotRepo.GetByIdAsync(result.ImportedMaterials[0].Id);
+        lot1.Should().NotBeNull();
+        lot1!.MaterialName.Should().Be("Denim Fabric");
+        lot1.InitialQuantity.Value.Should().Be(500m);
+        lot1.UnitRate.Should().Be(150m);
+
+        var lot2 = await matLotRepo.GetByIdAsync(result.ImportedMaterials[1].Id);
+        lot2.Should().NotBeNull();
+        lot2!.MaterialName.Should().Be("Cotton Fabric");
+        lot2.InitialQuantity.Value.Should().Be(300m);
+        lot2.UnitRate.Should().Be(120m);
+    }
+
+    [Fact]
     public async Task GetMaterialLotHistoryQueryHandler_ShouldReturnCompleteConsumptionHistory()
     {
         // Arrange

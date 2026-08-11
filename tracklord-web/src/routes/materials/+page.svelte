@@ -5,7 +5,8 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
-  import { getMaterialLots, createMaterialLot, updateMaterialLot, deleteMaterialLot } from '$lib/api.js';
+  import { getMaterialLots, createMaterialLot, updateMaterialLot, deleteMaterialLot, importMaterialLots } from '$lib/api.js';
+  import * as XLSX from 'xlsx';
 
   // App State
   let loading = $state(true);
@@ -37,6 +38,15 @@
     unit: 2,
     unitRate: 0
   });
+
+  // Import Modal state
+  let isImportModalOpen = $state(false);
+  let importFile = $state(/** @type {File|null} */ (null));
+  let importPreviewData = $state(/** @type {Array<any>} */ ([]));
+  let isParsing = $state(false);
+  let isImporting = $state(false);
+  let importErrorMessage = $state('');
+  let importSuccessResult = $state(/** @type {any} */ (null));
 
   const unitOptions = [
     { label: 'Meters', value: 2 },
@@ -191,6 +201,143 @@
   function viewMaterialHistory(id) {
     goto(`/materials/${id}`);
   }
+
+  function openImportModal() {
+    isImportModalOpen = true;
+    importFile = null;
+    importPreviewData = [];
+    importErrorMessage = '';
+    importSuccessResult = null;
+  }
+
+  function closeImportModal() {
+    isImportModalOpen = false;
+    importFile = null;
+    importPreviewData = [];
+    importErrorMessage = '';
+    importSuccessResult = null;
+  }
+
+  async function handleFileSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    importFile = file;
+    isParsing = true;
+    importErrorMessage = '';
+    importPreviewData = [];
+    importSuccessResult = null;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error('No worksheets found in file.');
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      if (!jsonRows || jsonRows.length === 0) {
+        throw new Error('Selected file contains no data rows.');
+      }
+
+      const sampleRow = jsonRows[0];
+      const keys = Object.keys(sampleRow);
+
+      const findKey = (candidates) => {
+        return keys.find(k => {
+          const lower = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return candidates.some(c => lower.includes(c));
+        });
+      };
+
+      const lotKey = findKey(['lot', 'batch', 'number', 'code', 'materiallot', 'lotnumber']);
+      const nameKey = findKey(['material', 'name', 'item', 'description', 'materialname']);
+      const qtyKey = findKey(['quantity', 'qty', 'count', 'amount', 'initialquantity']);
+      const unitKey = findKey(['unit', 'uom', 'unitofmeasure']);
+      const rateKey = findKey(['rate', 'unitrate', 'cost', 'price', 'unitprice']);
+
+      const defaultLotKey = lotKey || keys[0];
+      const defaultNameKey = nameKey || keys[1];
+      const defaultQtyKey = qtyKey || keys[2];
+      const defaultUnitKey = unitKey || keys[3];
+      const defaultRateKey = rateKey || keys[4];
+
+      const parseUnit = (val) => {
+        if (!val) return { unitValue: 2, unitLabel: 'Meters' };
+        const s = String(val).trim().toLowerCase();
+        if (s.includes('piece') || s.includes('pcs') || s.includes('pc')) return { unitValue: 1, unitLabel: 'Pieces' };
+        if (s.includes('meter') || s.includes('m')) return { unitValue: 2, unitLabel: 'Meters' };
+        if (s.includes('kilo') || s.includes('kg')) return { unitValue: 3, unitLabel: 'Kilograms' };
+        if (s.includes('yard') || s.includes('yd')) return { unitValue: 5, unitLabel: 'Yards' };
+        return { unitValue: 2, unitLabel: 'Meters' };
+      };
+
+      const parsed = jsonRows.map((row, idx) => {
+        const lotNumber = String(row[defaultLotKey] ?? '').trim();
+        const materialName = String(row[defaultNameKey] ?? '').trim() || 'General Material';
+        const rawQty = row[defaultQtyKey] ?? 0;
+        const initialQuantity = parseFloat(rawQty) || 0;
+        const rawRate = row[defaultRateKey] ?? 0;
+        const unitRate = parseFloat(rawRate) || 0;
+        const { unitValue, unitLabel } = parseUnit(row[defaultUnitKey]);
+
+        return {
+          rowNum: idx + 1,
+          lotNumber,
+          materialName,
+          initialQuantity,
+          unit: unitValue,
+          unitLabel,
+          unitRate,
+          isValid: Boolean(lotNumber && initialQuantity > 0)
+        };
+      }).filter(r => r.lotNumber || r.initialQuantity > 0);
+
+      importPreviewData = parsed;
+      if (parsed.length === 0) {
+        importErrorMessage = 'Could not extract valid material records. Ensure columns: Lot Number, Material Name, Quantity.';
+      }
+    } catch (err) {
+      importErrorMessage = 'Failed to parse file: ' + (err?.message || err);
+    } finally {
+      isParsing = false;
+    }
+  }
+
+  async function handleImportSubmit() {
+    const validItems = importPreviewData.filter(r => r.isValid);
+    if (validItems.length === 0) {
+      importErrorMessage = 'No valid material rows found to import.';
+      return;
+    }
+
+    isImporting = true;
+    importErrorMessage = '';
+    importSuccessResult = null;
+
+    try {
+      const payload = {
+        items: validItems.map(item => ({
+          lotNumber: item.lotNumber,
+          materialName: item.materialName,
+          initialQuantity: item.initialQuantity,
+          unit: item.unit,
+          unitRate: item.unitRate
+        }))
+      };
+
+      const result = await importMaterialLots(payload);
+      importSuccessResult = result;
+
+      await fetchMaterials();
+    } catch (err) {
+      importErrorMessage = err?.message || 'Import failed.';
+    } finally {
+      isImporting = false;
+    }
+  }
 </script>
 
 <!-- Top App Header -->
@@ -255,9 +402,14 @@
       </p>
     </div>
 
-    <Button variant="primary" icon="add" onclick={() => isCreateMaterialModalOpen = true}>
-      Register Raw Material
-    </Button>
+    <div class="flex items-center gap-2">
+      <Button variant="secondary" icon="file_upload" onclick={openImportModal}>
+        Import Materials
+      </Button>
+      <Button variant="primary" icon="add" onclick={() => isCreateMaterialModalOpen = true}>
+        Register Raw Material
+      </Button>
+    </div>
   </section>
 
   <!-- Summary Cards -->
@@ -573,3 +725,191 @@
     </div>
   </form>
 </Modal>
+
+<!-- Modal: Import Raw Materials -->
+{#if isImportModalOpen}
+  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface dark:bg-surface-dim border border-outline-variant rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+
+      <!-- Modal Header -->
+      <div class="px-6 py-5 border-b border-outline-variant flex items-center justify-between bg-surface-container-low/50">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-tertiary/10 text-tertiary flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">upload_file</span>
+          </div>
+          <div>
+            <h3 class="font-bold text-lg text-on-surface">Import Raw Materials</h3>
+            <p class="text-xs text-on-surface-variant">Upload an Excel (.xlsx, .xls) or CSV (.csv) file to bulk register material lots</p>
+          </div>
+        </div>
+        <button
+          onclick={closeImportModal}
+          class="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-5 flex-1">
+
+        {#if importErrorMessage}
+          <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-500">error</span>
+            <span>{importErrorMessage}</span>
+          </div>
+        {/if}
+
+        {#if importSuccessResult}
+          <div class="p-5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-900 dark:text-emerald-200 space-y-3">
+            <div class="flex items-center gap-2 font-bold text-base text-emerald-800 dark:text-emerald-300">
+              <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400">check_circle</span>
+              Successfully Imported {importSuccessResult.totalImported} Raw Material Lots!
+            </div>
+
+            <div class="mt-3 max-h-40 overflow-y-auto border border-emerald-200/60 dark:border-emerald-800/60 rounded-lg p-2 bg-white/50 dark:bg-black/20 text-xs font-mono space-y-1">
+              {#each importSuccessResult.importedMaterials as mat}
+                <div class="flex justify-between items-center px-2 py-1 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 rounded">
+                  <span class="font-bold">{mat.finalLotNumber} {#if mat.originalLotNumber !== mat.finalLotNumber}<span class="text-amber-600 text-[11px] font-sans">(auto-incremented from {mat.originalLotNumber})</span>{/if}</span>
+                  <span class="text-on-surface-variant font-sans">{mat.materialName}</span>
+                  <span class="font-bold text-tertiary">{mat.quantity} Pcs</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- File Upload Zone -->
+        <div class="border-2 border-dashed border-outline-variant hover:border-tertiary rounded-2xl p-6 text-center bg-surface-container-lowest transition-colors relative group">
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            onchange={handleFileSelect}
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-12 h-12 rounded-full bg-tertiary/10 text-tertiary flex items-center justify-center group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-[28px]">upload_file</span>
+            </div>
+            <div>
+              <span class="font-bold text-sm text-tertiary underline">Click to select file</span>
+              <span class="text-xs text-on-surface-variant"> or drag and drop</span>
+            </div>
+            <div class="flex gap-2 mt-1">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLSX</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLS</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.CSV</span>
+            </div>
+            {#if importFile}
+              <div class="mt-2 text-xs font-mono font-bold text-emerald-600 flex items-center gap-1">
+                <span class="material-symbols-outlined text-[16px]">description</span>
+                Selected: {importFile.name}
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Format Rules Guide -->
+        <div class="p-4 bg-surface-container-low rounded-xl text-xs space-y-2 border border-outline-variant/60">
+          <div class="font-bold text-on-surface flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px] text-tertiary">info</span>
+            Expected File Structure
+          </div>
+          <p class="text-on-surface-variant">
+            File headers: <strong class="text-on-surface">Lot Number</strong>, <strong class="text-on-surface">Material Name</strong>, <strong class="text-on-surface">Quantity</strong>, optional <strong class="text-on-surface">Unit</strong>, and optional <strong class="text-on-surface">Unit Rate</strong>.
+          </p>
+          <div class="grid grid-cols-5 gap-2 font-mono text-[11px] text-center pt-1">
+            <div class="p-2 bg-surface rounded border border-outline-variant">Lot Number</div>
+            <div class="p-2 bg-surface rounded border border-outline-variant">Material Name</div>
+            <div class="p-2 bg-surface rounded border border-outline-variant">Quantity</div>
+            <div class="p-2 bg-surface rounded border border-outline-variant text-tertiary">Unit (Opt)</div>
+            <div class="p-2 bg-surface rounded border border-outline-variant text-tertiary">Rate (Opt)</div>
+          </div>
+        </div>
+
+        <!-- Parsed Data Preview Table -->
+        {#if isParsing}
+          <div class="p-8 text-center text-on-surface-variant flex flex-col items-center gap-2 font-mono text-sm">
+            <span class="material-symbols-outlined animate-spin text-tertiary text-[28px]">sync</span>
+            Parsing spreadsheet data...
+          </div>
+        {:else if importPreviewData.length > 0}
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-sm text-on-surface flex items-center gap-2">
+                Preview Data
+                <span class="px-2 py-0.5 bg-tertiary/10 text-tertiary font-mono text-xs rounded-full">
+                  {importPreviewData.filter(r => r.isValid).length} ready to import
+                </span>
+              </h4>
+            </div>
+
+            <div class="border border-outline-variant rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-surface-container-low font-mono font-bold uppercase text-[11px] border-b border-outline-variant sticky top-0">
+                  <tr>
+                    <th class="p-3 w-12 text-center">#</th>
+                    <th class="p-3">Lot Number</th>
+                    <th class="p-3">Material Name</th>
+                    <th class="p-3 text-right">Quantity</th>
+                    <th class="p-3 text-center">Unit</th>
+                    <th class="p-3 text-right">Unit Rate</th>
+                    <th class="p-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/40">
+                  {#each importPreviewData as row}
+                    <tr class="hover:bg-surface-container-low/50">
+                      <td class="p-3 text-center text-on-surface-variant font-mono">{row.rowNum}</td>
+                      <td class="p-3 font-mono font-bold text-tertiary">{row.lotNumber || '—'}</td>
+                      <td class="p-3 font-bold text-on-surface">{row.materialName}</td>
+                      <td class="p-3 text-right font-mono font-bold">{row.initialQuantity.toLocaleString()}</td>
+                      <td class="p-3 text-center font-mono">{row.unitLabel}</td>
+                      <td class="p-3 text-right font-mono">₹{row.unitRate.toFixed(2)}</td>
+                      <td class="p-3 text-center">
+                        {#if row.isValid}
+                          <span class="text-emerald-600 font-bold flex items-center justify-center gap-0.5">
+                            <span class="material-symbols-outlined text-[14px]">check</span> Valid
+                          </span>
+                        {:else}
+                          <span class="text-red-500 font-bold flex items-center justify-center gap-0.5">
+                            <span class="material-symbols-outlined text-[14px]">warning</span> Missing Qty/Lot
+                          </span>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/if}
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-outline-variant bg-surface-container-low/50 flex items-center justify-end gap-3">
+        <button
+          onclick={closeImportModal}
+          class="px-4 py-2 rounded-xl border border-outline-variant hover:bg-surface-container text-on-surface-variant text-xs font-bold transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleImportSubmit}
+          disabled={isImporting || isParsing || importPreviewData.filter(r => r.isValid).length === 0}
+          class="px-5 py-2 rounded-xl bg-tertiary text-on-tertiary font-bold text-xs hover:bg-tertiary/90 disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer"
+        >
+          {#if isImporting}
+            <span class="material-symbols-outlined animate-spin text-[16px]">sync</span>
+            Importing Materials...
+          {:else}
+            <span class="material-symbols-outlined text-[16px]">upload_file</span>
+            Import {importPreviewData.filter(r => r.isValid).length} Material Lots
+          {/if}
+        </button>
+      </div>
+
+    </div>
+  </div>
+{/if}

@@ -167,6 +167,17 @@ export async function createMaterialLot(data) {
   return await handleResponse(response);
 }
 
+// 9a. Import Raw Material Lots
+/** @param {any} data */
+export async function importMaterialLots(data) {
+  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
 // 9b. Update Raw Material Lot
 /**
  * @param {string} id

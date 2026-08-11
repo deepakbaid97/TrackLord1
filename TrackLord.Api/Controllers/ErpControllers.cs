@@ -262,6 +262,16 @@ public class MaterialConsumptionsController : ControllerBase
     }
 
     /// <summary>
+    /// Imports multiple raw material lots from a parsed file structure.
+    /// </summary>
+    [HttpPost("lots/import")]
+    public async Task<IActionResult> ImportMaterialLots([FromBody] ImportMaterialLotsCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates a raw material lot.
     /// </summary>
     [HttpPut("lots/{id:guid}")]
