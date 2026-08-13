@@ -185,66 +185,67 @@
     </div>
   {:else}
     <!-- Header & Add Button -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+    <div class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
       <div>
-        <h2 class="font-headline-md text-headline-md text-primary font-bold flex items-center gap-2">
-          <span class="material-symbols-outlined text-[28px]">groups</span>
-          Client Directory & Customer Registry
+        <h2 class="text-base sm:text-2xl text-primary font-bold flex items-center gap-1.5 sm:gap-2">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">groups</span>
+          <span>Client Directory</span>
         </h2>
-        <p class="text-sm text-on-surface-variant mt-1">
-          Manage buyers, wholesalers, suppliers, and job workers for manufacturing movements.
-        </p>
       </div>
-      <Button variant="primary" icon="person_add" onclick={() => isCreateClientModalOpen = true}>
-        Add New Client
-      </Button>
+      <button
+        onclick={() => isCreateClientModalOpen = true}
+        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-xs cursor-pointer shrink-0"
+      >
+        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">person_add</span>
+        <span>Add Client</span>
+      </button>
     </div>
 
     <!-- Client Statistics Summary -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-primary/10 rounded-lg text-primary">
-          <span class="material-symbols-outlined text-[24px]">group</span>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-primary/10 rounded-lg text-primary shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">group</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Clients</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.length}</div>
-        </div>
-      </div>
-
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
-          <span class="material-symbols-outlined text-[24px]">shopping_bag</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Buyers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Buyer').length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Total Clients</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{clients.length}</div>
         </div>
       </div>
 
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
-          <span class="material-symbols-outlined text-[24px]">storefront</span>
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-blue-500/10 rounded-lg text-blue-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">shopping_bag</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Wholesalers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Wholesaler').length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Buyers</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{clients.filter(c => c.clientType === 'Buyer').length}</div>
         </div>
       </div>
 
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
-          <span class="material-symbols-outlined text-[24px]">precision_manufacturing</span>
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-emerald-500/10 rounded-lg text-emerald-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">storefront</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Job Workers</div>
-          <div class="text-2xl font-bold text-on-surface">{clients.filter(c => c.clientType === 'Job Worker').length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Wholesalers</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{clients.filter(c => c.clientType === 'Wholesaler').length}</div>
+        </div>
+      </div>
+
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-amber-500/10 rounded-lg text-amber-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">precision_manufacturing</span>
+        </div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Job Workers</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{clients.filter(c => c.clientType === 'Job Worker').length}</div>
         </div>
       </div>
     </div>
 
     <!-- Search Bar -->
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
+    <div class="bg-surface p-3 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
       <div class="relative flex-1">
         <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
         <input
@@ -256,9 +257,56 @@
       </div>
     </div>
 
-    <!-- Clients List Table -->
-    <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
-      <div class="w-full overflow-x-auto">
+    <!-- Clients List Table & Cards -->
+    <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden p-4 sm:p-0">
+      <!-- Mobile View: Card Stack Column (below md) -->
+      <div class="block md:hidden space-y-2">
+        {#each filteredClients as client}
+          <div
+            role="button"
+            tabindex="0"
+            onclick={() => window.location.href = `/lots?client=${client.id}`}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/lots?client=${client.id}`)}
+            class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
+            title="View active lots for {client.name}"
+          >
+            <!-- Card Line 1: Icon & Name | Client Type Badge -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="material-symbols-outlined text-[18px] text-primary/80 shrink-0">badge</span>
+                <span class="font-bold text-sm text-primary truncate">{client.name}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0
+                {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
+                 client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                 client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'}">
+                {client.clientType}
+              </span>
+            </div>
+
+            <!-- Card Line 2: Phone, Active Lots & WIP Qty -->
+            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+              <div class="flex items-center gap-1 text-on-surface-variant font-mono">
+                <span class="material-symbols-outlined text-[14px]">call</span>
+                <span>{client.phoneNumber || 'N/A'}</span>
+              </div>
+              <div class="flex items-center gap-2 font-mono">
+                <span class="text-on-surface-variant">{client.activeLotsCount} lots</span>
+                <span class="font-bold text-primary">{client.totalWipQuantity.toLocaleString()} Pcs</span>
+              </div>
+            </div>
+          </div>
+        {/each}
+        {#if clients.length === 0}
+          <div class="p-6 text-center text-on-surface-variant text-xs">
+            No clients registered yet. Click "Add Client" above to create your first client.
+          </div>
+        {/if}
+      </div>
+
+      <!-- Desktop View: Table (md and up) -->
+      <div class="hidden md:block w-full overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
@@ -321,7 +369,7 @@
             {#if clients.length === 0}
               <tr>
                 <td colspan="7" class="p-8 text-center text-on-surface-variant text-sm">
-                  No clients registered yet. Click "Add New Client" above to create your first client.
+                  No clients registered yet. Click "Add Client" above to create your first client.
                 </td>
               </tr>
             {/if}
