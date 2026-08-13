@@ -171,7 +171,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">manage_accounts</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
       <div class="text-xs text-on-surface-variant">User & Access Management</div>
     </div>
   </div>
@@ -233,114 +233,112 @@
     </div>
   {:else}
     <!-- Top Hero Card & Action Banner -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+    <div class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
       <div>
-        <h2 class="font-headline-md text-headline-md text-primary font-bold flex items-center gap-2">
-          <span class="material-symbols-outlined text-[28px]">group_add</span>
-          User Directory & Tenant Access Controls
+        <h2 class="text-base sm:text-2xl text-primary font-bold flex items-center gap-1.5 sm:gap-2">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">group_add</span>
+          <span>User Directory</span>
         </h2>
-        <p class="text-sm text-on-surface-variant mt-1">
-          Manage team members, roles, and verified phone accounts for your organization.
-        </p>
       </div>
 
-      <div class="flex items-center gap-3 w-full sm:w-auto">
+      <div class="flex items-center gap-2 shrink-0">
         {#if isAdmin}
           <button
             onclick={openAddModal}
-            class="px-4 py-2.5 bg-primary hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 w-full sm:w-auto"
+            class="px-2.5 py-1.5 sm:px-4 sm:py-2 bg-primary hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
           >
-            <span class="material-symbols-outlined text-base">person_add</span>
-            <span>+ Add New User</span>
+            <span class="material-symbols-outlined text-[16px] sm:text-[18px]">person_add</span>
+            <span>Add User</span>
           </button>
-        {/if}
-
-        {#if isAuthenticated && currentUser}
-          <!-- Active Session & Tenant Info Card -->
-          <div class="flex items-center gap-3 p-3 bg-surface-container-low dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-sm">
-            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shadow-sm">
-              <span class="material-symbols-outlined text-[22px]">account_circle</span>
-            </div>
-            <div class="text-xs">
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-on-surface text-sm">{currentUser.name || 'Unnamed User'}</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-primary/15 text-primary">
-                  {currentUser.role || 'Operator'}
-                </span>
-              </div>
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-on-surface-variant text-[11px] font-mono mt-0.5">
-                <span>📱 {currentUser.phoneNumber}</span>
-                <span class="text-outline">|</span>
-                <span class="text-tertiary font-semibold">🏢 {currentUser.tenantName || 'Default Tenant'} ({currentUser.tenantCode || 'DEFAULT'})</span>
-              </div>
-            </div>
-          </div>
         {/if}
       </div>
     </div>
 
+    <!-- Active Session & Tenant Info Card (if logged in) -->
+    {#if isAuthenticated && currentUser}
+      <div class="flex items-center justify-between p-3 bg-surface-container-low dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-sm text-xs">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+            <span class="material-symbols-outlined text-[18px]">account_circle</span>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-on-surface text-xs truncate">{currentUser.name || 'User'}</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-primary/15 text-primary shrink-0">
+                {currentUser.role || 'Operator'}
+              </span>
+            </div>
+            <div class="text-on-surface-variant text-[10px] font-mono truncate">📱 {currentUser.phoneNumber}</div>
+          </div>
+        </div>
+        <div class="text-[10px] font-mono text-tertiary font-bold bg-tertiary/10 px-2 py-1 rounded-md shrink-0">
+          🏢 {currentUser.tenantName || 'Tenant'}
+        </div>
+      </div>
+    {/if}
+
     <!-- User KPI Stats Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-primary/10 rounded-lg text-primary">
-          <span class="material-symbols-outlined text-[24px]">group</span>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-primary/10 rounded-lg text-primary shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">group</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Users</div>
-          <div class="text-2xl font-bold text-on-surface">{users.length}</div>
-        </div>
-      </div>
-
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
-          <span class="material-symbols-outlined text-[24px]">verified_user</span>
-        </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Active Accounts</div>
-          <div class="text-2xl font-bold text-on-surface">{users.filter(u => u.isActive).length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Total Users</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{users.length}</div>
         </div>
       </div>
 
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-purple-500/10 rounded-lg text-purple-600">
-          <span class="material-symbols-outlined text-[24px]">admin_panel_settings</span>
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-emerald-500/10 rounded-lg text-emerald-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">verified_user</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Admins</div>
-          <div class="text-2xl font-bold text-on-surface">{users.filter(u => u.role === 'Admin').length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Active</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{users.filter(u => u.isActive).length}</div>
         </div>
       </div>
 
-      <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
-          <span class="material-symbols-outlined text-[24px]">engineering</span>
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-purple-500/10 rounded-lg text-purple-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">admin_panel_settings</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Operators</div>
-          <div class="text-2xl font-bold text-on-surface">{users.filter(u => u.role === 'Operator').length}</div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Admins</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{users.filter(u => u.role === 'Admin').length}</div>
+        </div>
+      </div>
+
+      <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
+        <div class="p-2 sm:p-3 bg-blue-500/10 rounded-lg text-blue-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">engineering</span>
+        </div>
+        <div class="min-w-0">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold truncate">Operators</div>
+          <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{users.filter(u => u.role === 'Operator').length}</div>
         </div>
       </div>
     </div>
 
     <!-- Search & Filter Controls -->
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-center gap-4">
+    <div class="bg-surface p-3 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-3">
       <!-- Search input -->
-      <div class="relative flex-1 w-full">
+      <div class="relative flex-1">
         <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Search by name, phone number, or role..."
+          placeholder="Search by name, phone..."
           class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
       <!-- Role Filter -->
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <span class="text-xs font-mono font-bold uppercase text-on-surface-variant">Role:</span>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <span class="text-xs font-mono font-bold uppercase text-on-surface-variant hidden sm:inline-block">Role:</span>
         <select
           bind:value={roleFilter}
-          class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
+          class="px-2.5 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
         >
           <option value="All">All Roles</option>
           <option value="Admin">Admin</option>
@@ -350,9 +348,80 @@
       </div>
     </div>
 
-    <!-- User Directory Table -->
-    <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
-      <div class="w-full overflow-x-auto">
+    <!-- User Directory Table & Cards -->
+    <div class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden p-4 sm:p-0">
+      <!-- Mobile View: Card Stack Column (below md) -->
+      <div class="block md:hidden space-y-2">
+        {#each filteredUsers as user}
+          {@const isMe = currentUser && currentUser.phoneNumber === user.phoneNumber}
+          {@const canEdit = isMe || isAdmin}
+          <div class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs transition-all space-y-2 select-none">
+            <!-- Card Line 1: Avatar, Name, Role Badge, Edit -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0">
+                  {user.name ? user.name.charAt(0).toUpperCase() : user.phoneNumber ? user.phoneNumber.slice(-2) : 'U'}
+                </div>
+                <div class="min-w-0">
+                  <div class="font-bold text-xs text-on-surface flex items-center gap-1 truncate">
+                    <span class="truncate">{user.name || 'Unnamed Member'}</span>
+                    {#if isMe}
+                      <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-primary text-white shrink-0">You</span>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                  {user.role === 'Admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200' :
+                   user.role === 'Supervisor' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200' :
+                   'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200'}">
+                  {user.role}
+                </span>
+                {#if canEdit}
+                  <button
+                    onclick={() => openEditModal(user)}
+                    class="p-1 rounded-md border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                    title="Edit User"
+                  >
+                    <span class="material-symbols-outlined text-[15px]">edit</span>
+                  </button>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Card Line 2: Phone Number & Status -->
+            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+              <div class="flex items-center gap-1 text-on-surface-variant font-mono">
+                <span class="material-symbols-outlined text-[14px] text-primary">smartphone</span>
+                <span>{user.phoneNumber}</span>
+              </div>
+              <div>
+                {#if user.isActive}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Active</span>
+                  </span>
+                {:else}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    <span>Inactive</span>
+                  </span>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/each}
+        {#if filteredUsers.length === 0}
+          <div class="p-6 text-center text-on-surface-variant text-xs">
+            No team members found.
+          </div>
+        {/if}
+      </div>
+
+      <!-- Desktop View: Table (md and up) -->
+      <div class="hidden md:block w-full overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
@@ -447,7 +516,6 @@
                 </td>
               </tr>
             {/each}
-
             {#if filteredUsers.length === 0}
               <tr>
                 <td colspan="7" class="p-8 text-center text-on-surface-variant text-sm">

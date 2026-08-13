@@ -623,7 +623,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
       <div class="text-xs text-on-surface-variant">Production Lot Inventory</div>
     </div>
   </div>

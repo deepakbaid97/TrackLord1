@@ -90,7 +90,7 @@
     </button>
     <div>
       <div class="font-bold text-lg text-primary leading-none flex items-center gap-2">
-        <span>TRACKLORD ERP</span>
+        <span>TRACKLORD</span>
         <span class="text-xs text-on-surface-variant font-normal">/ Raw Material History</span>
       </div>
       <div class="text-xs text-on-surface-variant font-mono">{lot ? lot.lotNumber : 'Loading...'}</div>
