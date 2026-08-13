@@ -158,8 +158,8 @@
       <!-- ═══════════════════════════════════════════════════════════ -->
       <!-- WIDGET 2: WIP by Manufacturing Step                       -->
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+      <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-5">
           <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
             <span class="material-symbols-outlined text-primary text-[22px]">factory</span>
             WIP by Step
@@ -170,29 +170,29 @@
         </div>
 
         {#if overview.stepSummaries && overview.stepSummaries.length > 0}
-          <div class="space-y-4">
+          <div class="space-y-2 sm:space-y-4">
             {#each overview.stepSummaries as step}
               {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
               {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
               <a
                 href="/lots?step={step.stepId}"
-                class="group block p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                class="group block p-1.5 sm:p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                 title="View {step.stepName} lots in directory"
               >
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
-                    <span class="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
-                    <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
+                <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                  <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
+                    <span class="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
+                    <span class="text-[9px] sm:text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
                   </div>
-                  <div class="flex items-center gap-3">
-                    <span class="text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
-                    <span class="font-bold text-sm text-primary font-mono min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
+                  <div class="flex items-center gap-2 sm:gap-3">
+                    <span class="text-[11px] sm:text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
+                    <span class="font-bold text-xs sm:text-sm text-primary font-mono min-w-[50px] sm:min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
                   </div>
                 </div>
-                <div class="w-full bg-surface-variant/60 rounded-full h-3 overflow-hidden">
+                <div class="w-full bg-surface-variant/60 rounded-full h-1.5 sm:h-2.5 overflow-hidden">
                   <div
-                    class="{barColor} h-3 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
+                    class="{barColor} h-1.5 sm:h-2.5 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
                     style="width: {Math.max(barPercent, step.totalWipQuantity > 0 ? 2 : 0)}%"
                   ></div>
                 </div>

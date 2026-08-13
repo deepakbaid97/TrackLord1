@@ -844,21 +844,21 @@
 
         <div class="md:col-span-8 space-y-6">
           <!-- Current Inventory Distribution -->
-          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">WIP Distribution Across Steps</h2>
-            <div class="space-y-4">
+          <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
+            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-3 sm:mb-4">WIP Distribution Across Steps</h2>
+            <div class="space-y-2.5 sm:space-y-4">
               {#each manufacturingSteps as step}
                 {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
                 {@const qty = balanceObj ? balanceObj.quantity : 0}
                 {@const totalActive = activeWipBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0)}
                 <div>
-                  <div class="flex justify-between font-stat-label text-stat-label mb-1">
+                  <div class="flex justify-between font-stat-label text-xs sm:text-sm mb-1">
                     <span class="font-bold text-on-surface">{step.name} ({step.code})</span>
-                    <span class="font-mono text-primary">{qty} Pcs</span>
+                    <span class="font-mono text-primary font-bold">{qty} Pcs</span>
                   </div>
-                  <div class="w-full bg-surface-variant rounded-full h-2.5">
+                  <div class="w-full bg-surface-variant rounded-full h-1.5 sm:h-2.5 overflow-hidden">
                     <div
-                      class="bg-primary h-2.5 rounded-full transition-all duration-500"
+                      class="bg-primary h-1.5 sm:h-2.5 rounded-full transition-all duration-500"
                       style="width: {totalActive > 0 ? (qty / totalActive) * 100 : 0}%"
                     ></div>
                   </div>
