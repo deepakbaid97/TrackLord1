@@ -623,7 +623,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
       <div class="text-xs text-on-surface-variant">Production Lot Inventory</div>
     </div>
   </div>
@@ -808,35 +808,28 @@
     <!-- LOT TRACKING VIEW -->
     {#if currentLotJourney}
       <!-- Header Info -->
-      <section class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-        <div>
-          <div class="flex items-center gap-3">
-            <h1 class="font-headline-lg text-headline-lg text-primary font-bold">{currentLotJourney.lotNumber}</h1>
-            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
-              {currentLotJourney.status}
-            </span>
-            <button
-              onclick={handleDeleteLot}
-              title="Delete Production Lot"
-              class="px-2.5 py-1 text-xs bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-[15px]">delete</span>
-              Delete Lot
-            </button>
-          </div>
-          <p class="text-sm text-on-surface-variant mt-1">
-            Lot ID: <span class="font-mono text-xs">{currentLotJourney.lotId}</span>
-          </p>
+      <section class="bg-surface p-4 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="text-2xl sm:text-3xl text-primary font-bold">{currentLotJourney.lotNumber}</h1>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
+            {currentLotJourney.status}
+          </span>
+          <button
+            onclick={handleDeleteLot}
+            title="Delete Production Lot"
+            class="px-2.5 py-1 text-xs bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[15px]">delete</span>
+            Delete Lot
+          </button>
         </div>
 
-        <div class="flex flex-wrap gap-3">
-          <div class="bg-surface-container-low border border-outline-variant px-4 py-2 rounded-lg text-center">
-            <div class="text-xs text-on-surface-variant font-mono uppercase">Total WIP Qty</div>
-            <div class="text-xl font-bold text-on-surface">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</div>
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-on-surface-variant font-mono">
+          <div>
+            Total WIP: <span class="text-lg font-bold text-primary ml-1">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</span>
           </div>
-          <div class="bg-surface-container-low border border-outline-variant px-4 py-2 rounded-lg text-center">
-            <div class="text-xs text-on-surface-variant font-mono uppercase">Created At</div>
-            <div class="text-sm font-semibold text-on-surface">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</div>
+          <div>
+            Created: <span class="font-semibold text-on-surface ml-1">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</span>
           </div>
         </div>
       </section>
@@ -851,21 +844,21 @@
 
         <div class="md:col-span-8 space-y-6">
           <!-- Current Inventory Distribution -->
-          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">WIP Distribution Across Steps</h2>
-            <div class="space-y-4">
+          <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
+            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-3 sm:mb-4">WIP Distribution Across Steps</h2>
+            <div class="space-y-2.5 sm:space-y-4">
               {#each manufacturingSteps as step}
                 {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
                 {@const qty = balanceObj ? balanceObj.quantity : 0}
                 {@const totalActive = activeWipBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0)}
                 <div>
-                  <div class="flex justify-between font-stat-label text-stat-label mb-1">
+                  <div class="flex justify-between font-stat-label text-xs sm:text-sm mb-1">
                     <span class="font-bold text-on-surface">{step.name} ({step.code})</span>
-                    <span class="font-mono text-primary">{qty} Pcs</span>
+                    <span class="font-mono text-primary font-bold">{qty} Pcs</span>
                   </div>
-                  <div class="w-full bg-surface-variant rounded-full h-2.5">
+                  <div class="w-full bg-surface-variant rounded-full h-1.5 sm:h-2.5 overflow-hidden">
                     <div
-                      class="bg-primary h-2.5 rounded-full transition-all duration-500"
+                      class="bg-primary h-1.5 sm:h-2.5 rounded-full transition-all duration-500"
                       style="width: {totalActive > 0 ? (qty / totalActive) * 100 : 0}%"
                     ></div>
                   </div>

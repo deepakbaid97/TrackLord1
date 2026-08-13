@@ -82,7 +82,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">dashboard</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
       <div class="text-xs text-on-surface-variant">Dashboard Overview</div>
     </div>
   </div>
@@ -123,31 +123,31 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- WIDGET 1: KPI Summary Cards                                -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <section class="grid grid-cols-2 gap-2.5 sm:gap-4">
       <!-- Active Lots -->
       <a
         href="/lots"
-        class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50"
+        class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50 min-w-0"
         title="View all lots in directory"
       >
-        <div class="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">inventory_2</span>
+        <div class="p-2 sm:p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors shrink-0">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">inventory_2</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider">Active Lots</div>
-          <div class="text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight">{overview.totalActiveLots}</div>
+        <div class="min-w-0">
+          <div class="text-[10px] sm:text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider truncate">Active Lots</div>
+          <div class="text-xl sm:text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight truncate">{overview.totalActiveLots}</div>
         </div>
       </a>
 
       <!-- Total WIP Quantity -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-        <div class="p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">stacks</span>
+      <div class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-shadow min-w-0">
+        <div class="p-2 sm:p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors shrink-0">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">stacks</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total WIP</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveQuantity.toLocaleString()}</div>
-          <div class="text-[11px] text-on-surface-variant font-mono">Pieces</div>
+        <div class="min-w-0">
+          <div class="text-[10px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Total WIP</div>
+          <div class="text-xl sm:text-3xl font-bold text-on-surface leading-tight truncate">{overview.totalActiveQuantity.toLocaleString()}</div>
+          <div class="text-[10px] sm:text-[11px] text-on-surface-variant font-mono truncate">Pieces</div>
         </div>
       </div>
     </section>
@@ -158,8 +158,8 @@
       <!-- ═══════════════════════════════════════════════════════════ -->
       <!-- WIDGET 2: WIP by Manufacturing Step                       -->
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+      <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-5">
           <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
             <span class="material-symbols-outlined text-primary text-[22px]">factory</span>
             WIP by Step
@@ -170,29 +170,29 @@
         </div>
 
         {#if overview.stepSummaries && overview.stepSummaries.length > 0}
-          <div class="space-y-4">
+          <div class="space-y-2 sm:space-y-4">
             {#each overview.stepSummaries as step}
               {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
               {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
               <a
                 href="/lots?step={step.stepId}"
-                class="group block p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                class="group block p-1.5 sm:p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                 title="View {step.stepName} lots in directory"
               >
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
-                    <span class="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
-                    <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
+                <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                  <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
+                    <span class="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
+                    <span class="text-[9px] sm:text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
                   </div>
-                  <div class="flex items-center gap-3">
-                    <span class="text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
-                    <span class="font-bold text-sm text-primary font-mono min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
+                  <div class="flex items-center gap-2 sm:gap-3">
+                    <span class="text-[11px] sm:text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
+                    <span class="font-bold text-xs sm:text-sm text-primary font-mono min-w-[50px] sm:min-w-[60px] text-right">{step.totalWipQuantity.toLocaleString()} Pcs</span>
                   </div>
                 </div>
-                <div class="w-full bg-surface-variant/60 rounded-full h-3 overflow-hidden">
+                <div class="w-full bg-surface-variant/60 rounded-full h-1.5 sm:h-2.5 overflow-hidden">
                   <div
-                    class="{barColor} h-3 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
+                    class="{barColor} h-1.5 sm:h-2.5 rounded-full transition-all duration-700 ease-out group-hover:opacity-90"
                     style="width: {Math.max(barPercent, step.totalWipQuantity > 0 ? 2 : 0)}%"
                   ></div>
                 </div>

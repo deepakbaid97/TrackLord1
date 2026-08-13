@@ -35,3 +35,97 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #737686;
 }
+
+/* Compact Mobile View Styles (< 768px) */
+@media (max-width: 767px) {
+  /* Smaller Icons in Mobile View */
+  .material-symbols-outlined {
+    font-size: 18px;
+  }
+  .material-symbols-outlined.text-\[36px\],
+  .material-symbols-outlined.text-\[32px\],
+  .material-symbols-outlined.text-\[28px\] {
+    font-size: 22px !important;
+  }
+  .material-symbols-outlined.text-\[24px\],
+  .material-symbols-outlined.text-\[22px\],
+  .material-symbols-outlined.text-\[20px\] {
+    font-size: 18px !important;
+  }
+  .material-symbols-outlined.text-\[18px\],
+  .material-symbols-outlined.text-\[16px\],
+  .material-symbols-outlined.text-base,
+  .material-symbols-outlined.text-sm {
+    font-size: 15px !important;
+  }
+
+  /* Compact Spacings & Margins for Containers & Cards */
+  body {
+    padding-bottom: 5rem !important;
+  }
+
+  /* Target main containers, grids, flex gaps and card paddings on mobile */
+  .p-8, .p-6, .p-5 {
+    padding: 0.75rem !important; /* 12px padding */
+  }
+  .px-8, .px-6, .px-5 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  .py-8, .py-6, .py-5 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+  .p-4 {
+    padding: 0.625rem !important; /* 10px padding */
+  }
+  .px-4 {
+    padding-left: 0.625rem !important;
+    padding-right: 0.625rem !important;
+  }
+  .py-4 {
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+  }
+
+  /* Compact Gaps & Spacing Utilities */
+  .gap-8, .gap-6 {
+    gap: 0.625rem !important; /* 10px gap */
+  }
+  .gap-4, .gap-5 {
+    gap: 0.5rem !important; /* 8px gap */
+  }
+  .gap-3 {
+    gap: 0.375rem !important; /* 6px gap */
+  }
+  .space-y-8 > :not([hidden]) ~ :not([hidden]),
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem !important;
+  }
+  .space-y-4 > :not([hidden]) ~ :not([hidden]),
+  .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.5rem !important;
+  }
+
+  /* Compact Bottom & Top Margins */
+  .mb-8, .mb-6 {
+    margin-bottom: 0.75rem !important;
+  }
+  .mb-4, .mb-5 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Compact Buttons & Form Controls */
+  button, input, select, textarea {
+    font-size: 0.8125rem !important; /* 13px font */
+  }
+  
+  /* Compact Table Cells */
+  th, td {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+    font-size: 0.775rem !important;
+  }
+}

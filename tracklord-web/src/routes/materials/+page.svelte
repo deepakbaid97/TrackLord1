@@ -347,7 +347,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">texture</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
       <div class="text-xs text-on-surface-variant">Raw Materials Stock & History</div>
     </div>
   </div>
@@ -391,76 +391,80 @@
   {/if}
 
   <!-- Page Title & Primary Action -->
-  <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface p-6 rounded-2xl border border-outline-variant shadow-sm">
+  <section class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-2xl border border-outline-variant shadow-sm">
     <div>
-      <h1 class="text-2xl font-bold text-primary flex items-center gap-2">
-        <span class="material-symbols-outlined text-tertiary text-[28px]">inventory_2</span>
-        Raw Materials Ledger
+      <h1 class="text-lg sm:text-2xl font-bold text-primary flex items-center gap-1.5 sm:gap-2">
+        <span>Raw Materials Ledger</span>
       </h1>
-      <p class="text-sm text-on-surface-variant mt-1">
-        Monitor raw material stock levels, unit rates, and complete consumption audit trails.
-      </p>
     </div>
 
-    <div class="flex items-center gap-2">
-      <Button variant="secondary" icon="file_upload" onclick={openImportModal}>
-        Import Materials
-      </Button>
-      <Button variant="primary" icon="add" onclick={() => isCreateMaterialModalOpen = true}>
-        Register Raw Material
-      </Button>
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <button
+        onclick={openImportModal}
+        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-emerald-700 dark:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-emerald-800 transition-colors shadow-xs cursor-pointer"
+      >
+        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">file_upload</span>
+        <span>Import</span>
+      </button>
+      <button
+        onclick={() => isCreateMaterialModalOpen = true}
+        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
+      >
+        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">add</span>
+        <span>Register</span>
+      </button>
     </div>
   </section>
 
   <!-- Summary Cards -->
-  <section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-primary/10 text-primary rounded-xl">
-        <span class="material-symbols-outlined text-[28px]">inventory</span>
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
+      <div class="p-2 sm:p-3 bg-primary/10 text-primary rounded-lg sm:rounded-xl shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">inventory</span>
       </div>
-      <div>
-        <div class="text-xs font-mono uppercase text-on-surface-variant">Total Material Lots</div>
-        <div class="text-2xl font-bold text-on-surface">{totalLotsCount}</div>
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Total Material Lots</div>
+        <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{totalLotsCount}</div>
       </div>
     </div>
 
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
-        <span class="material-symbols-outlined text-[28px]">workspaces</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
+      <div class="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg sm:rounded-xl shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">workspaces</span>
       </div>
-      <div>
-        <div class="text-xs font-mono uppercase text-on-surface-variant">Available Stock</div>
-        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Available Stock</div>
+        <div class="text-base sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono truncate">
           {totalAvailableQty.toLocaleString()}
         </div>
       </div>
     </div>
 
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-tertiary/10 text-tertiary rounded-xl">
-        <span class="material-symbols-outlined text-[28px]">payments</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
+      <div class="p-2 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg sm:rounded-xl shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">payments</span>
       </div>
-      <div>
-        <div class="text-xs font-mono uppercase text-on-surface-variant">Inventory Valuation</div>
-        <div class="text-2xl font-bold text-on-surface font-mono">
-          ₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Valuation</div>
+        <div class="text-base sm:text-2xl font-bold text-on-surface font-mono truncate">
+          ₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
         </div>
       </div>
     </div>
 
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
-        <span class="material-symbols-outlined text-[28px]">warning</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
+      <div class="p-2 sm:p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg sm:rounded-xl shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">warning</span>
       </div>
-      <div>
-        <div class="text-xs font-mono uppercase text-on-surface-variant">Depleted Lots</div>
-        <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">{depletedCount}</div>
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Depleted Lots</div>
+        <div class="text-base sm:text-2xl font-bold text-amber-600 dark:text-amber-400 truncate">{depletedCount}</div>
       </div>
     </div>
   </section>
 
   <!-- Search & Filtering Bar -->
-  <section class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+  <section class="bg-surface p-3 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 md:gap-4">
     <!-- Search Box -->
     <div class="relative flex-1 max-w-md">
       <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
@@ -481,23 +485,23 @@
     </div>
 
     <!-- Status Filters -->
-    <div class="flex items-center gap-2">
-      <span class="text-xs font-semibold text-on-surface-variant mr-1">Filter:</span>
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
+      <span class="text-xs font-semibold text-on-surface-variant mr-1 shrink-0">Filter:</span>
       <button
         onclick={() => filterStatus = 'all'}
-        class="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer {filterStatus === 'all' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'all' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
       >
         All Materials ({totalLotsCount})
       </button>
       <button
         onclick={() => filterStatus = 'available'}
-        class="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer {filterStatus === 'available' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'available' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
       >
         In Stock ({totalLotsCount - depletedCount})
       </button>
       <button
         onclick={() => filterStatus = 'depleted'}
-        class="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer {filterStatus === 'depleted' ? 'bg-amber-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'depleted' ? 'bg-amber-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
       >
         Depleted ({depletedCount})
       </button>
@@ -511,7 +515,61 @@
       <span>Fetching materials inventory...</span>
     </div>
   {:else if filteredMaterials.length > 0}
-    <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+    <!-- Mobile View: Card Stack Column (below md) -->
+    <div class="block md:hidden space-y-2">
+      {#each filteredMaterials as mat}
+        {@const remaining = mat.remainingQuantity ?? mat.initialQuantity ?? 0}
+        {@const initial = mat.initialQuantity ?? 0}
+        {@const usagePercent = initial > 0 ? (remaining / initial) * 100 : 0}
+        {@const stockValuation = remaining * (mat.unitRate || 0)}
+        <div
+          role="button"
+          tabindex="0"
+          onclick={() => viewMaterialHistory(mat.id)}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && viewMaterialHistory(mat.id)}
+          class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
+          title="View {mat.lotNumber} consumption history"
+        >
+          <!-- Card Line 1: Icon | Lot # & Material Name | Edit -->
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="p-1 bg-primary/10 text-primary rounded-md shrink-0">
+                <span class="material-symbols-outlined text-[16px]">texture</span>
+              </div>
+              <div class="min-w-0">
+                <span class="font-bold text-sm text-primary font-mono">{mat.lotNumber}</span>
+                {#if mat.materialName}
+                  <span class="text-xs text-on-surface font-medium truncate ml-1">• {mat.materialName}</span>
+                {/if}
+              </div>
+            </div>
+            <button
+              onclick={(e) => { e.stopPropagation(); openEditModal(mat); }}
+              title="Edit Material Lot"
+              class="p-1 text-on-surface-variant hover:text-primary rounded-md border border-outline-variant transition-colors cursor-pointer shrink-0"
+            >
+              <span class="material-symbols-outlined text-[15px]">edit</span>
+            </button>
+          </div>
+
+          <!-- Card Line 2: Remaining Stock & Stock Valuation -->
+          <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+            <div class="flex items-center gap-1.5">
+              <span class="text-on-surface-variant font-mono">Stock:</span>
+              <span class="font-bold font-mono {remaining <= 0 ? 'text-red-500' : usagePercent < 25 ? 'text-amber-600' : 'text-emerald-600'}">
+                {Number(remaining).toLocaleString()} {mat.unit}
+              </span>
+            </div>
+            <div class="font-mono text-on-surface-variant">
+              Value: <span class="font-bold text-emerald-700 dark:text-emerald-400">₹{Number(stockValuation).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+
+    <!-- Desktop View: Table (md and up) -->
+    <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
       <table class="w-full text-left border-collapse text-sm">
         <thead>
           <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
