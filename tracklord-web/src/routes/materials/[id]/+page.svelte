@@ -91,7 +91,6 @@
     <div>
       <div class="font-bold text-lg text-primary leading-none flex items-center gap-2">
         <span>TRACKLORD</span>
-        <span class="text-xs text-on-surface-variant font-normal">/ Raw Material History</span>
       </div>
       <div class="text-xs text-on-surface-variant font-mono">{lot ? lot.lotNumber : 'Loading...'}</div>
     </div>
@@ -142,70 +141,118 @@
     </div>
   {:else if historyData && lot}
     <!-- Material Lot Header Card -->
-    <section class="bg-surface p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-      <div class="space-y-1">
-        <div class="flex items-center gap-3">
-          <h1 class="text-3xl font-bold text-primary font-mono">{lot.lotNumber}</h1>
-          <span class="px-3 py-1 rounded-full text-xs font-bold font-mono uppercase tracking-wider {remainingQty <= 0 ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}">
-            {remainingQty <= 0 ? 'Depleted' : 'In Stock'}
-          </span>
+    <section class="bg-surface p-4 sm:p-6 rounded-2xl border border-outline-variant shadow-sm space-y-4">
+      <div class="flex flex-row justify-between items-center gap-2">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-3xl font-bold text-primary font-mono">{lot.lotNumber}</h1>
+            <span class="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold font-mono uppercase tracking-wider {remainingQty <= 0 ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}">
+              {remainingQty <= 0 ? 'Depleted' : 'In Stock'}
+            </span>
+          </div>
+          {#if lot.materialName}
+            <p class="text-xs sm:text-base font-semibold text-on-surface flex items-center gap-1">
+              <span class="material-symbols-outlined text-tertiary text-[16px] sm:text-[20px]">category</span>
+              {lot.materialName}
+            </p>
+          {/if}
         </div>
-        {#if lot.materialName}
-          <p class="text-base font-semibold text-on-surface flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-tertiary text-[20px]">category</span>
-            {lot.materialName}
-          </p>
-        {/if}
       </div>
 
-      <div class="flex flex-wrap gap-4 w-full md:w-auto">
-        <div class="bg-surface-container-low border border-outline-variant p-4 rounded-xl text-center flex-1 min-w-[120px]">
-          <div class="text-xs text-on-surface-variant font-mono uppercase">Initial Qty</div>
-          <div class="text-xl font-bold text-on-surface font-mono">{initialQty.toLocaleString()} {lot.unit}</div>
+      <!-- Top Summary Metrics Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
+        <div class="bg-surface-container-low border border-outline-variant p-2.5 sm:p-4 rounded-xl text-center">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant font-mono uppercase font-bold truncate">Initial Qty</div>
+          <div class="text-base sm:text-xl font-bold text-on-surface font-mono truncate">{initialQty.toLocaleString()} {lot.unit}</div>
         </div>
 
-        <div class="bg-surface-container-low border border-outline-variant p-4 rounded-xl text-center flex-1 min-w-[120px]">
-          <div class="text-xs text-on-surface-variant font-mono uppercase">Remaining Stock</div>
-          <div class="text-xl font-bold font-mono {remainingQty <= 0 ? 'text-red-500' : 'text-emerald-600'}">
+        <div class="bg-surface-container-low border border-outline-variant p-2.5 sm:p-4 rounded-xl text-center">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant font-mono uppercase font-bold truncate">Remaining Stock</div>
+          <div class="text-base sm:text-xl font-bold font-mono truncate {remainingQty <= 0 ? 'text-red-500' : 'text-emerald-600'}">
             {remainingQty.toLocaleString()} {lot.unit}
           </div>
         </div>
 
-        <div class="bg-surface-container-low border border-outline-variant p-4 rounded-xl text-center flex-1 min-w-[120px]">
-          <div class="text-xs text-on-surface-variant font-mono uppercase">Rate per Unit</div>
-          <div class="text-xl font-bold text-on-surface font-mono">
-            {lot.unitRate ? `₹${Number(lot.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+        <div class="bg-surface-container-low border border-outline-variant p-2.5 sm:p-4 rounded-xl text-center">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant font-mono uppercase font-bold truncate">Rate per Unit</div>
+          <div class="text-base sm:text-xl font-bold text-on-surface font-mono truncate">
+            {lot.unitRate ? `₹${Number(lot.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 0 })}` : '—'}
           </div>
         </div>
 
-        <div class="bg-surface-container-low border border-outline-variant p-4 rounded-xl text-center flex-1 min-w-[140px]">
-          <div class="text-xs text-on-surface-variant font-mono uppercase">Total Consumed Value</div>
-          <div class="text-xl font-bold text-emerald-700 dark:text-emerald-400 font-mono">
-            ₹{Number(historyData.totalConsumptionCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div class="bg-surface-container-low border border-outline-variant p-2.5 sm:p-4 rounded-xl text-center">
+          <div class="text-[9px] sm:text-xs text-on-surface-variant font-mono uppercase font-bold truncate">Consumed Value</div>
+          <div class="text-base sm:text-xl font-bold text-emerald-700 dark:text-emerald-400 font-mono truncate">
+            ₹{Number(historyData.totalConsumptionCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
         </div>
       </div>
     </section>
 
     <!-- Consumption History Ledger -->
-    <section class="bg-surface p-6 rounded-2xl border border-outline-variant shadow-sm space-y-4">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant pb-3 gap-2">
+    <section class="bg-surface p-4 sm:p-6 rounded-2xl border border-outline-variant shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant pb-3 gap-1 sm:gap-2">
         <div>
-          <h2 class="text-xl font-bold text-on-surface flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-[24px]">history</span>
-            Material Consumption History
+          <h2 class="text-base sm:text-xl font-bold text-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[20px] sm:text-[24px]">history</span>
+            <span>Consumption History</span>
           </h2>
-          <p class="text-xs text-on-surface-variant mt-0.5">
-            Audit trail of all manufacturing steps that consumed this raw material lot.
-          </p>
         </div>
-        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-3 py-1 rounded-full border border-outline-variant">
-          Total Entries: {historyData.totalConsumptionCount}
+        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant w-fit">
+          {historyData.totalConsumptionCount} entries
         </span>
       </div>
 
       {#if consumptions.length > 0}
-        <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <!-- Mobile View: Card Stack Column (below md) -->
+        <div class="block md:hidden space-y-2">
+          {#each consumptions as c}
+            {@const totalPrice = c.totalPrice || (c.quantityConsumed * (c.unitRate || 0))}
+            <div class="bg-surface p-3 rounded-lg border border-outline-variant shadow-xs space-y-2 select-none">
+              <!-- Card Line 1: Production Lot, Step Name & Edit Button -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <a
+                    href="/inventory?lot={c.productionLotId}"
+                    class="font-bold text-sm text-primary hover:underline font-mono flex items-center gap-0.5 truncate"
+                  >
+                    <span class="material-symbols-outlined text-[15px]">tag</span>
+                    <span>{c.productionLotNumber}</span>
+                  </a>
+                  <span class="px-2 py-0.5 bg-surface-container-high rounded text-[10px] font-semibold truncate">
+                    {c.stepName}
+                  </span>
+                </div>
+                <button
+                  onclick={() => openEditModal(c)}
+                  class="p-1 rounded-md border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
+                  title="Edit Record"
+                >
+                  <span class="material-symbols-outlined text-[15px]">edit</span>
+                </button>
+              </div>
+
+              <!-- Card Line 2: Quantity & Price -->
+              <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+                <div class="font-bold text-primary font-mono">
+                  {c.quantityConsumed} {c.unit}
+                </div>
+                <div class="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                  ₹{Number(totalPrice).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </div>
+              </div>
+
+              <!-- Card Line 3: Date & Operator -->
+              <div class="flex items-center justify-between text-[10px] text-on-surface-variant font-mono">
+                <span>📅 {new Date(c.consumptionDate).toLocaleDateString()}</span>
+                <span>👤 {c.createdBy || 'Operator'}</span>
+              </div>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Desktop View: Table (md and up) -->
+        <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
           <table class="w-full text-left border-collapse text-sm">
             <thead>
               <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
@@ -265,7 +312,6 @@
                   </td>
                 </tr>
               {/each}
-            </tbody>
           </table>
         </div>
       {:else}
