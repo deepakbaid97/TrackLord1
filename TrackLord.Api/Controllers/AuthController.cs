@@ -1,9 +1,7 @@
-using System;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.DTOs;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Repositories;
@@ -285,7 +283,3 @@ public class AuthController : ControllerBase
         });
     }
 }
-
-public record VerifyOtpRequest(string IdToken, string? PhoneNumber);
-public record CreateUserRequest(string PhoneNumber, string? Name, string? Role);
-public record UpdateUserRequest(string? Name, string? Role);
