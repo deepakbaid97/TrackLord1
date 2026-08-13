@@ -628,13 +628,15 @@
   </section>
 
   <!-- Production Lots Directory Table -->
-  <section class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden space-y-4 p-6">
-    <div class="flex justify-between items-center border-b border-outline-variant pb-3">
-      <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">format_list_bulleted</span>
-        Lots Directory ({filteredLots.length})
+  <section class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant pb-2.5 sm:pb-3 gap-1 sm:gap-2">
+      <h2 class="text-base sm:text-xl font-bold flex items-center gap-1.5 whitespace-nowrap text-on-surface">
+        <span>Lots Directory</span>
+        <span class="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-0.5">
+          {filteredLots.length}
+        </span>
       </h2>
-      <span class="text-xs text-on-surface-variant font-mono">
+      <span class="text-[11px] sm:text-xs text-on-surface-variant font-mono">
         Showing {filteredLots.length} of {enrichedLots.length} total lots
       </span>
     </div>
@@ -645,7 +647,60 @@
         <span>Loading production lots...</span>
       </div>
     {:else}
-      <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+      <!-- Mobile View: Card Stack Column (below md) -->
+      <div class="block md:hidden space-y-1.5">
+        {#if filteredLots.length === 0}
+          <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-lg border border-dashed border-outline-variant text-xs">
+            <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40 mb-1 block">filter_alt_off</span>
+            No production lots match your filter criteria.
+          </div>
+        {:else}
+          {#each filteredLots as lot}
+            <div
+              role="button"
+              tabindex="0"
+              onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/inventory?lot=${lot.id}`)}
+              class="bg-surface px-3 py-2 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-1.5 active:scale-[0.99] select-none"
+              title="View lot {lot.lotNumber} details"
+            >
+              <!-- Card Line 1: Lot #, Client, Quantity & Date -->
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0">
+                    <span class="material-symbols-outlined text-[15px]">tag</span>
+                    <span>{lot.lotNumber}</span>
+                  </div>
+                  <span class="text-on-surface-variant text-[11px] truncate">• {lot.clientNamesDisplay}</span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0 font-mono">
+                  <span class="font-bold text-xs text-primary">{lot.totalWipQty.toLocaleString()} Pcs</span>
+                  <span class="text-[10px] text-on-surface-variant">• {lot.createdDate.toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <!-- Card Line 2: Active Steps Pill List -->
+              {#if lot.activeSteps && lot.activeSteps.length > 0}
+                <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50">
+                  {#each lot.activeSteps as step}
+                    {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[11px]">{stepIconMap[step.stepCode] || 'work'}</span>
+                      {step.stepName}: {step.quantity} Pcs
+                      {#if stepObj?.isTerminating}
+                        <span class="text-[8px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
+                      {/if}
+                    </span>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+
+      <!-- Desktop View: Table (md and up) -->
+      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
