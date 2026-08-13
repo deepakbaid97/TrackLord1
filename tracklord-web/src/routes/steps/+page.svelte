@@ -255,59 +255,56 @@
   {/if}
 
   <!-- Summary Cards -->
-  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <section class="grid grid-cols-3 gap-1.5 sm:gap-4">
     <!-- Total Steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-primary/10 rounded-xl text-primary">
-        <span class="material-symbols-outlined text-[28px]">alt_route</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
+      <div class="p-1.5 sm:p-3 bg-primary/10 rounded-lg sm:rounded-xl text-primary shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">alt_route</span>
       </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total Steps</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">{steps.length}</div>
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Total Steps</div>
+        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate">{steps.length}</div>
       </div>
     </div>
 
     <!-- Active Quantity across steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-        <span class="material-symbols-outlined text-[28px]">stacks</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
+      <div class="p-1.5 sm:p-3 bg-emerald-500/10 rounded-lg sm:rounded-xl text-emerald-600 shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">stacks</span>
       </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Active Steps Qty</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Active Qty</div>
+        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate font-mono">
           {steps.filter(s => !s.isTerminating).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} Pcs
         </div>
       </div>
     </div>
 
     <!-- Terminating Steps -->
-    <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4">
-      <div class="p-3 bg-amber-500/10 rounded-xl text-amber-600">
-        <span class="material-symbols-outlined text-[28px]">flag_circle</span>
+    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
+      <div class="p-1.5 sm:p-3 bg-amber-500/10 rounded-lg sm:rounded-xl text-amber-600 shrink-0">
+        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">flag_circle</span>
       </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Terminating Steps</div>
-        <div class="text-3xl font-bold text-on-surface leading-tight">
+      <div class="min-w-0">
+        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Terminating</div>
+        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate">
           {steps.filter(s => s.isTerminating).length}
         </div>
-        <div class="text-[10px] text-on-surface-variant font-mono">Excluded from Active WIP</div>
+        <div class="hidden sm:block text-[10px] text-on-surface-variant font-mono truncate">Excluded from Active WIP</div>
       </div>
     </div>
   </section>
 
   <!-- Steps Table / Directory -->
-  <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
-    <div class="flex items-center justify-between border-b border-outline-variant pb-4">
+  <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant pb-3 gap-1 sm:gap-2">
       <div>
-        <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary text-[22px]">view_timeline</span>
+        <h2 class="text-base sm:text-xl font-bold flex items-center gap-2 text-on-surface">
+          <span class="material-symbols-outlined text-primary text-[20px] sm:text-[22px]">view_timeline</span>
           Manufacturing Sequence & WIP
         </h2>
-        <p class="text-xs text-on-surface-variant mt-0.5">
-          Overview of manufacturing steps, lots present, and current quantities at each stage.
-        </p>
       </div>
-      <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant">
+      <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant w-fit">
         {steps.length} steps configured
       </span>
     </div>
@@ -318,7 +315,64 @@
         <span>Loading manufacturing steps & lots...</span>
       </div>
     {:else if steps.length > 0}
-      <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+      <!-- Mobile View: Card Stack Column (below md) -->
+      <div class="block md:hidden space-y-2">
+        {#each steps as step}
+          <div
+            role="button"
+            tabindex="0"
+            onclick={() => window.location.href = `/lots?step=${step.id}`}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/lots?step=${step.id}`)}
+            class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
+            title="Click to view lots at '{step.name}' in Lots Directory"
+          >
+            <!-- Card Line 1: Seq # | Icon | Code & Name | Terminating Badge | Edit -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs shrink-0">
+                  {step.sequenceOrder}
+                </span>
+                <span class="material-symbols-outlined text-[18px] text-primary/80 shrink-0">
+                  {stepIconMap[step.code] || 'work'}
+                </span>
+                <div class="min-w-0">
+                  <span class="font-bold text-sm text-on-surface truncate">{step.name}</span>
+                  <span class="font-mono text-xs text-primary font-bold ml-1">({step.code})</span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                {#if step.isTerminating}
+                  <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300">
+                    <span class="material-symbols-outlined text-[12px] text-amber-600">flag</span>
+                    Terminating
+                  </span>
+                {/if}
+                <button
+                  onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
+                  title="Edit Step"
+                  class="p-1 rounded-md border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[15px]">edit</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Line 2: WIP Quantity & Lot Count -->
+            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+              <span class="text-on-surface-variant font-mono">
+                {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'active lot' : 'active lots'}
+              </span>
+              <span class="font-mono font-bold text-sm text-primary">
+                {(step.totalQuantity || 0).toLocaleString()} Pcs
+              </span>
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      <!-- Desktop View: Table (md and up) -->
+      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
@@ -326,7 +380,6 @@
               <th class="px-4 py-3">Code</th>
               <th class="px-4 py-3">Step Name</th>
               <th class="px-4 py-3 text-right">Total Qty</th>
-
               <th class="px-4 py-3 text-center">Terminating Step?</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -371,8 +424,6 @@
                     {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
                   </div>
                 </td>
-
-
 
                 <!-- Terminating Indicator -->
                 <td class="px-4 py-3.5 text-center">
