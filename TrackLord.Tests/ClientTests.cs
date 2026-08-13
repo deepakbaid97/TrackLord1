@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using FluentAssertions;
 using TrackLord.Application.Commands;
+using TrackLord.Application.Queries;
 using TrackLord.Domain.Aggregates.ClientAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Enums;

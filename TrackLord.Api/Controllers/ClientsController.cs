@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TrackLord.Application.Commands;
+using TrackLord.Application.Queries;
 
 namespace TrackLord.Api.Controllers;
 
