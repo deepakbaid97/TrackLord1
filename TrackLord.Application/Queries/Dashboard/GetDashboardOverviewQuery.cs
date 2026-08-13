@@ -39,14 +39,20 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
 
     public async Task<DashboardOverviewDto> Handle(GetDashboardOverviewQuery request, CancellationToken cancellationToken)
     {
-        var allLots = await _lotRepository.GetAllAsync(cancellationToken);
-        var activeLots = allLots.Where(l => l.Status == LotStatus.Active).ToList();
+        var activeLots = await _lotRepository.GetByStatusAsync(LotStatus.Active, cancellationToken);
+        var activeLotIds = activeLots.Select(l => l.Id).ToList();
+
+        var allMovements = await _movementRepository.GetMovementsForLotsAsync(activeLotIds, cancellationToken);
+        var movementsLookup = allMovements.ToLookup(m => m.ProductionLotId);
+
         var steps = (await _stepRepository.GetAllAsync(cancellationToken)).OrderBy(s => s.SequenceOrder).ToList();
         var stepsDict = steps.ToDictionary(s => s.Id);
         var terminatingStepIds = steps.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
+
+        var totalClients = await _clientRepository.GetCountAsync(cancellationToken);
+        var totalMaterialLots = await _materialLotRepository.GetCountAsync(cancellationToken);
         var clients = await _clientRepository.GetAllAsync(cancellationToken);
         var clientsDict = clients.ToDictionary(c => c.Id);
-        var materialLots = await _materialLotRepository.GetAllAsync(cancellationToken);
 
         var stepWipTotals = steps.ToDictionary(s => s.Id, _ => 0m);
         var stepLotCounts = steps.ToDictionary(s => s.Id, _ => 0);
@@ -58,7 +64,7 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
 
         foreach (var lot in activeLots)
         {
-            var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
+            var movements = movementsLookup[lot.Id].ToList();
             var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
 
             decimal lotWipTotal = 0m;
@@ -145,8 +151,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
             nonTerminatedLotCount,
             totalActiveQty,
             totalTerminatedQty,
-            clients.Count,
-            materialLots.Count,
+            totalClients,
+            totalMaterialLots,
             stepSummaries,
             clientSummaries,
             activeLotSummaries);

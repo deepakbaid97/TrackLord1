@@ -12,6 +12,8 @@ using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
 
+using TrackLord.Domain.Enums;
+
 namespace TrackLord.Domain.Repositories;
 
 public interface IProductionLotRepository
@@ -23,6 +25,7 @@ public interface IProductionLotRepository
     Task UpdateAsync(ProductionLot lot, CancellationToken cancellationToken = default);
     Task DeleteAsync(ProductionLot lot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductionLot>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductionLot>> GetByStatusAsync(LotStatus status, CancellationToken cancellationToken = default);
 }
 
 public interface IMaterialLotRepository
@@ -34,12 +37,14 @@ public interface IMaterialLotRepository
     Task UpdateAsync(MaterialLot lot, CancellationToken cancellationToken = default);
     Task DeleteAsync(MaterialLot lot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MaterialLot>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<int> GetCountAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IManufacturingMovementRepository
 {
     Task<ManufacturingMovement?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotAsync(Guid productionLotId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotsAsync(IEnumerable<Guid> productionLotIds, CancellationToken cancellationToken = default);
     Task AddAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
     Task UpdateAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
     Task DeleteRangeAsync(IEnumerable<ManufacturingMovement> movements, CancellationToken cancellationToken = default);
@@ -75,6 +80,7 @@ public interface IClientRepository
 {
     Task<Client?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Client>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<int> GetCountAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Client client, CancellationToken cancellationToken = default);
     Task UpdateAsync(Client client, CancellationToken cancellationToken = default);
 }

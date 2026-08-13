@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using TrackLord.Domain.Enums;
 using TrackLord.Domain.Exceptions;
 using TrackLord.Domain.Repositories;
 using TrackLord.Domain.Services;
@@ -39,12 +40,17 @@ public class GetStepDashboardQueryHandler : IRequestHandler<GetStepDashboardQuer
         var allSteps = await _stepRepository.GetAllAsync(cancellationToken);
         var terminatingStepIds = allSteps.Where(s => s.IsTerminating).Select(s => s.Id).ToHashSet() as IReadOnlySet<Guid>;
 
-        var lots = await _lotRepository.GetAllAsync(cancellationToken);
+        var activeLots = await _lotRepository.GetByStatusAsync(LotStatus.Active, cancellationToken);
+        var activeLotIds = activeLots.Select(l => l.Id).ToList();
+
+        var allMovements = await _movementRepository.GetMovementsForLotsAsync(activeLotIds, cancellationToken);
+        var movementsLookup = allMovements.ToLookup(m => m.ProductionLotId);
+
         var lotsAtStep = new List<StepDashboardLotDto>();
 
-        foreach (var lot in lots)
+        foreach (var lot in activeLots)
         {
-            var movements = await _movementRepository.GetMovementsForLotAsync(lot.Id, cancellationToken);
+            var movements = movementsLookup[lot.Id].ToList();
             var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
 
             if (snapshot.StepBalances.TryGetValue(request.StepId, out var qtyAtStep) && qtyAtStep > 0)
