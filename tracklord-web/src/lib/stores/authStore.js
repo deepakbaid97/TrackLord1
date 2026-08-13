@@ -64,9 +64,13 @@ function createAuthStore() {
             isLoading: false,
             error: null
           }));
-        } else {
-          // Token expired or invalid
+        } else if (res.status === 401 || res.status === 403) {
+          // Token is genuinely expired or invalid
           this.logout();
+        } else {
+          // Transient server error (e.g., 500, 502, 503) - retain token and end loading state
+          console.warn(`Server returned ${res.status} during auth check. Retaining session.`);
+          update(s => ({ ...s, isLoading: false }));
         }
       } catch (err) {
         console.warn('Network error checking auth status, retaining local token if present:', err);

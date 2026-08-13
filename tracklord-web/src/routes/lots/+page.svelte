@@ -29,6 +29,23 @@
   let selectedDateRange = $state('ALL'); // ALL, TODAY, 7DAYS, 30DAYS, CUSTOM
   let customStartDate = $state('');
   let customEndDate = $state('');
+  let isFilterExpanded = $state(false); // Collapsed by default on mobile
+
+  let activeFilterCount = $derived(
+    (searchQuery.trim() ? 1 : 0) +
+    (selectedStepId !== 'ALL' ? 1 : 0) +
+    (selectedClientId !== 'ALL' ? 1 : 0) +
+    (selectedDateRange !== 'ALL' ? 1 : 0)
+  );
+
+  function resetFilters() {
+    searchQuery = '';
+    selectedStepId = 'ALL';
+    selectedClientId = 'ALL';
+    selectedDateRange = 'ALL';
+    customStartDate = '';
+    customEndDate = '';
+  }
 
   // Import Modal state
   let isImportModalOpen = $state(false);
@@ -399,8 +416,7 @@
       <span class="material-symbols-outlined text-primary text-[24px]">reorder</span>
     </div>
     <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD ERP</div>
-      <div class="text-xs text-on-surface-variant">Production Lots Directory</div>
+      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
     </div>
   </div>
 
@@ -483,86 +499,132 @@
   </div>
 
   <!-- Filter Toolbar -->
-  <section class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm space-y-4">
-    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-outline-variant pb-4">
+  <section class="bg-surface p-4 sm:p-5 rounded-xl border border-outline-variant shadow-sm space-y-4">
+    <!-- Filter Header (Entire header clickable on mobile) -->
+    <div
+      role="button"
+      tabindex="0"
+      onclick={() => isFilterExpanded = !isFilterExpanded}
+      onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (isFilterExpanded = !isFilterExpanded)}
+      class="flex items-center justify-between gap-3 cursor-pointer md:cursor-default select-none {isFilterExpanded ? 'border-b border-outline-variant pb-3 md:pb-4' : 'md:border-b md:border-outline-variant md:pb-4'}"
+    >
       <div class="flex items-center gap-2 font-bold text-primary text-base">
-        <span class="material-symbols-outlined">filter_alt</span>
+        <span class="material-symbols-outlined text-[22px]">filter_alt</span>
         <span>Filter Production Lots</span>
+        {#if activeFilterCount > 0}
+          <span class="px-2 py-0.5 rounded-full text-xs bg-primary text-on-primary font-mono font-bold">
+            {activeFilterCount}
+          </span>
+        {/if}
       </div>
 
-      <!-- Search Input -->
-      <div class="relative flex-1 max-w-md">
-        <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
-        <input
-          type="text"
-          bind:value={searchQuery}
-          placeholder="Search by lot number, client, or item..."
-          class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+      <div class="flex items-center gap-2">
+        {#if activeFilterCount > 0}
+          <button
+            type="button"
+            onclick={(e) => { e.stopPropagation(); resetFilters(); }}
+            class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-300 text-xs font-semibold transition-colors cursor-pointer"
+            title="Reset all active filters"
+          >
+            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span>Reset</span>
+          </button>
+        {/if}
+        <!-- Chevron indicator on mobile -->
+        <span class="md:hidden material-symbols-outlined text-[20px] text-on-surface-variant transition-transform duration-200 {isFilterExpanded ? 'rotate-180' : ''}">
+          expand_more
+        </span>
+      </div>
+    </div>
+
+    <!-- Filter Body: Collapsed by default on mobile, always visible on md+ -->
+    <div class="{isFilterExpanded ? 'block' : 'hidden md:block'} space-y-4 pt-1 md:pt-0">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Search Input -->
+        <div class="relative w-full max-w-md">
+          <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+          <input
+            type="text"
+            bind:value={searchQuery}
+            placeholder="Search by lot number, client, or item..."
+            class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        {#if activeFilterCount > 0}
+          <button
+            type="button"
+            onclick={resetFilters}
+            class="hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-300 text-xs font-semibold transition-colors cursor-pointer shrink-0"
+          >
+            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span>Clear Filters ({activeFilterCount})</span>
+          </button>
+        {/if}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <!-- 1. Step Filter -->
+        <Select
+          label="Manufacturing Step"
+          bind:value={selectedStepId}
+          options={[
+            { label: 'All Steps (Any active WIP)', value: 'ALL' },
+            ...steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))
+          ]}
         />
-      </div>
-    </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-      <!-- 1. Step Filter -->
-      <Select
-        label="Manufacturing Step"
-        bind:value={selectedStepId}
-        options={[
-          { label: 'All Steps (Any active WIP)', value: 'ALL' },
-          ...steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))
-        ]}
-      />
+        <!-- 2. Client Filter -->
+        <Select
+          label="Client / Customer"
+          bind:value={selectedClientId}
+          options={[
+            { label: 'All Clients', value: 'ALL' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+        />
 
-      <!-- 2. Client Filter -->
-      <Select
-        label="Client / Customer"
-        bind:value={selectedClientId}
-        options={[
-          { label: 'All Clients', value: 'ALL' },
-          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
-        ]}
-      />
-
-      <!-- 3. Date Range Filter -->
-      <div class="space-y-1">
-        <label for="filter-daterange" class="text-xs font-bold text-on-surface-variant uppercase font-mono">Creation Date</label>
-        <select
-          id="filter-daterange"
-          bind:value={selectedDateRange}
-          class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-        >
-          <option value="ALL">All Time</option>
-          <option value="TODAY">Today</option>
-          <option value="7DAYS">Last 7 Days</option>
-          <option value="30DAYS">Last 30 Days</option>
-          <option value="CUSTOM">Custom Date Range...</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Custom Date Range Controls -->
-    {#if selectedDateRange === 'CUSTOM'}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-dashed border-outline-variant/60">
+        <!-- 3. Date Range Filter -->
         <div class="space-y-1">
-          <label for="custom-start" class="text-xs text-on-surface-variant font-mono">Start Date</label>
-          <input
-            id="custom-start"
-            type="date"
-            bind:value={customStartDate}
-            class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
-        <div class="space-y-1">
-          <label for="custom-end" class="text-xs text-on-surface-variant font-mono">End Date</label>
-          <input
-            id="custom-end"
-            type="date"
-            bind:value={customEndDate}
-            class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
-          />
+          <label for="filter-daterange" class="text-xs font-bold text-on-surface-variant uppercase font-mono">Creation Date</label>
+          <select
+            id="filter-daterange"
+            bind:value={selectedDateRange}
+            class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+          >
+            <option value="ALL">All Time</option>
+            <option value="TODAY">Today</option>
+            <option value="7DAYS">Last 7 Days</option>
+            <option value="30DAYS">Last 30 Days</option>
+            <option value="CUSTOM">Custom Date Range...</option>
+          </select>
         </div>
       </div>
-    {/if}
+
+      <!-- Custom Date Range Controls -->
+      {#if selectedDateRange === 'CUSTOM'}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-dashed border-outline-variant/60">
+          <div class="space-y-1">
+            <label for="custom-start" class="text-xs text-on-surface-variant font-mono">Start Date</label>
+            <input
+              id="custom-start"
+              type="date"
+              bind:value={customStartDate}
+              class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="custom-end" class="text-xs text-on-surface-variant font-mono">End Date</label>
+            <input
+              id="custom-end"
+              type="date"
+              bind:value={customEndDate}
+              class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+      {/if}
+    </div>
   </section>
 
   <!-- Production Lots Directory Table -->

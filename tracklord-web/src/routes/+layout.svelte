@@ -18,10 +18,10 @@
 </script>
 
 <!-- Top App Header -->
-<Header title="TRACKLORD ERP" />
+<Header title="TRACKLORD" />
 
 <!-- Main Content Area -->
-<main class="pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+<main class="pt-4 pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
   {@render children()}
 </main>
 

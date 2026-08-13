@@ -123,31 +123,31 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- WIDGET 1: KPI Summary Cards                                -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <section class="grid grid-cols-2 gap-2.5 sm:gap-4">
       <!-- Active Lots -->
       <a
         href="/lots"
-        class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50"
+        class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50 min-w-0"
         title="View all lots in directory"
       >
-        <div class="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">inventory_2</span>
+        <div class="p-2 sm:p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary/15 transition-colors shrink-0">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">inventory_2</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider">Active Lots</div>
-          <div class="text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight">{overview.totalActiveLots}</div>
+        <div class="min-w-0">
+          <div class="text-[10px] sm:text-xs text-on-surface-variant group-hover:text-primary transition-colors uppercase font-mono font-bold tracking-wider truncate">Active Lots</div>
+          <div class="text-xl sm:text-3xl font-bold text-on-surface group-hover:text-primary transition-colors leading-tight truncate">{overview.totalActiveLots}</div>
         </div>
       </a>
 
       <!-- Total WIP Quantity -->
-      <div class="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-        <div class="p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors">
-          <span class="material-symbols-outlined text-[28px]">stacks</span>
+      <div class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-shadow min-w-0">
+        <div class="p-2 sm:p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors shrink-0">
+          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">stacks</span>
         </div>
-        <div>
-          <div class="text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">Total WIP</div>
-          <div class="text-3xl font-bold text-on-surface leading-tight">{overview.totalActiveQuantity.toLocaleString()}</div>
-          <div class="text-[11px] text-on-surface-variant font-mono">Pieces</div>
+        <div class="min-w-0">
+          <div class="text-[10px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Total WIP</div>
+          <div class="text-xl sm:text-3xl font-bold text-on-surface leading-tight truncate">{overview.totalActiveQuantity.toLocaleString()}</div>
+          <div class="text-[10px] sm:text-[11px] text-on-surface-variant font-mono truncate">Pieces</div>
         </div>
       </div>
     </section>
