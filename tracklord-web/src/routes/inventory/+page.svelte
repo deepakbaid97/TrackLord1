@@ -5,6 +5,9 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
+  import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
+  import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   import {
     getManufacturingSteps,
@@ -62,7 +65,8 @@
     unit: 1, // Pieces
     initialStepId: '',
     createdBy: 'Operator',
-    remarks: ''
+    remarks: '',
+    clientId: ''
   });
 
   let moveForm = $state({
@@ -207,10 +211,6 @@
       const clientData = await getClients();
       clients = clientData || [];
       if (clients.length > 0) {
-        if (!moveForm.clientId) {
-          moveForm.clientId = clients[0].id;
-          moveForm.clientName = clients[0].name;
-        }
         if (!rejectForm.clientId) {
           rejectForm.clientId = clients[0].id;
         }
@@ -268,6 +268,8 @@
     }
 
     updateMoveQuantityFromStep(moveForm.fromStepId);
+    moveForm.clientId = '';
+    moveForm.clientName = '';
     isMoveModalOpen = true;
   }
 
@@ -308,12 +310,16 @@
         subtitle = 'Completed';
       }
 
-      // Find latest non-reversed movement associated with this step to extract Client Name
+      // Find client name associated with this step (LotLevel or StepLevel)
       let stepClientName = '';
-      if (currentLotJourney && currentLotJourney.movementHistory) {
+      if ($tenantConfigStore.clientMode === 'lot') {
+        stepClientName = currentLotJourney?.clientName || '';
+      } else if (currentLotJourney && currentLotJourney.movementHistory) {
         const stepMovements = currentLotJourney.movementHistory.filter((/** @type {any} */ m) => m.toStepName === step.name && !m.isReversed);
         if (stepMovements.length > 0) {
           stepClientName = stepMovements[stepMovements.length - 1].clientName || '';
+        } else if (currentLotJourney.clientName) {
+          stepClientName = currentLotJourney.clientName;
         }
       }
 
@@ -351,6 +357,7 @@
     e.preventDefault();
     errorMessage = '';
     try {
+      const selectedClient = clients.find((/** @type {any} */ c) => c.id === createLotForm.clientId);
       const payload = {
         lotNumber: createLotForm.lotNumber.trim(),
         itemId: '00000000-0000-0000-0000-000000000001',
@@ -358,13 +365,16 @@
         unit: Number(createLotForm.unit),
         initialStepId: createLotForm.initialStepId,
         createdBy: createLotForm.createdBy,
-        remarks: createLotForm.remarks
+        remarks: createLotForm.remarks,
+        clientId: createLotForm.clientId || null,
+        clientName: selectedClient ? selectedClient.name : null
       };
 
       const res = await createProductionLot(payload);
       successMessage = `Production Lot '${createLotForm.lotNumber}' created successfully!`;
       isCreateLotModalOpen = false;
       createLotForm.lotNumber = '';
+      createLotForm.clientId = '';
 
       await refreshAllData();
       if (res && res.id) {
@@ -400,6 +410,8 @@
       isMoveModalOpen = false;
       moveForm.remarks = '';
       moveForm.referenceNumber = '';
+      moveForm.clientId = '';
+      moveForm.clientName = '';
 
       await loadSelectedLotDetails(selectedLotId);
     } catch (/** @type {any} */ err) {
@@ -414,7 +426,7 @@
     try {
       const payload = {
         name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim(),
+        phoneNumber: createClientForm.phoneNumber ? createClientForm.phoneNumber.trim() : '',
         clientType: createClientForm.clientType
       };
 
@@ -428,6 +440,7 @@
       const clientData = await getClients();
       clients = clientData || [];
       if (newClientId) {
+        createLotForm.clientId = newClientId;
         moveForm.clientId = newClientId;
       }
     } catch (/** @type {any} */ err) {
@@ -630,6 +643,14 @@
 
   <div class="flex items-center gap-2">
     <button
+      onclick={() => tenantConfigStore.openModal()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+      title="Tenant Configuration & Feature Visibility"
+    >
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span>Settings</span>
+    </button>
+    <button
       onclick={() => refreshAllData()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
     >
@@ -828,6 +849,11 @@
           <div>
             Total WIP: <span class="text-lg font-bold text-primary ml-1">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</span>
           </div>
+          {#if currentLotJourney.clientName}
+            <div class="flex items-center gap-1">
+              Client: <span class="font-semibold text-primary ml-1">{currentLotJourney.clientName}</span>
+            </div>
+          {/if}
           <div>
             Created: <span class="font-semibold text-on-surface ml-1">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</span>
           </div>
@@ -1045,6 +1071,32 @@
       required={true}
     />
 
+    <ClientModeGate mode="lot">
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <label for="create-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
+          <button
+            type="button"
+            onclick={() => isCreateClientModalOpen = true}
+            class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[14px]">add_circle</span>
+            Add New Client
+          </button>
+        </div>
+        <Select
+          id="create-client-select"
+          bind:value={createLotForm.clientId}
+          options={[
+            { label: 'None (Direct / Internal Factory)', value: '' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+          placeholder="Select Client (Optional)..."
+          icon="badge"
+        />
+      </div>
+    </ClientModeGate>
+
     <Input
       label="Created By"
       bind:value={createLotForm.createdBy}
@@ -1103,26 +1155,31 @@
       required={true}
     />
 
-    <div class="space-y-1">
-      <div class="flex items-center justify-between">
-        <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer</label>
-        <button
-          type="button"
-          onclick={() => isCreateClientModalOpen = true}
-          class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-[14px]">add_circle</span>
-          Add New Client
-        </button>
+    <ClientModeGate mode="step">
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Subcontractor / Client (Optional)</label>
+          <button
+            type="button"
+            onclick={() => isCreateClientModalOpen = true}
+            class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[14px]">add_circle</span>
+            Add New Client
+          </button>
+        </div>
+        <Select
+          id="move-client-select"
+          bind:value={moveForm.clientId}
+          options={[
+            { label: 'None (Direct / Internal Factory)', value: '' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+          placeholder="Select Client (Optional)..."
+          icon="badge"
+        />
       </div>
-      <Select
-        id="move-client-select"
-        bind:value={moveForm.clientId}
-        options={clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))}
-        icon="badge"
-        required={true}
-      />
-    </div>
+    </ClientModeGate>
 
     <Input
       label="Reference Number"
@@ -1391,12 +1448,12 @@
     />
 
     <Input
-      label="Phone Number"
+      label="Phone Number (Optional)"
       type="tel"
       bind:value={createClientForm.phoneNumber}
       placeholder="e.g. +91 98765 43210"
       icon="call"
-      required={true}
+      required={false}
     />
 
     <Select

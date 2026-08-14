@@ -9,6 +9,9 @@
   } from '$lib/api.js';
   import * as XLSX from 'xlsx';
   import Select from '$lib/components/ui/Select.svelte';
+  import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
+  import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -100,6 +103,8 @@
       rawLots = lotsData || [];
 
       // 2. Fetch journeys for each lot to gather active steps, quantities, and client associations
+      const clientTrackingMode = $tenantConfigStore.clientMode; // 'lot' | 'step' | 'none'
+
       const enriched = await Promise.all(
         rawLots.map(async (lot) => {
           let journey = null;
@@ -129,11 +134,26 @@
 
               totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
             }
+          }
 
+          const lotClientId = lot.clientId || journey?.clientId;
+          const lotClientName = lot.clientName || journey?.clientName;
+
+          if (clientTrackingMode === 'lot') {
+            // ── Strategy A: Per Production Lot ──
+            // The entire lot belongs to lot.clientId across all steps
+            if (lotClientId) {
+              activeLotClientsSet.add(lotClientId);
+            }
+            if (lotClientName) {
+              clientNamesList.push(lotClientName);
+            }
+          } else {
+            // ── Strategy B: Per Step Movement / Subcontracting ──
             // Extract clients specifically associated with steps that currently hold active WIP quantity
             const activeStepIds = new Set(activeSteps.map((/** @type {any} */ s) => s.stepId));
 
-            if (journey.movementHistory) {
+            if (journey && journey.movementHistory) {
               journey.movementHistory.forEach((/** @type {any} */ m) => {
                 if (!m.isReversed && m.toStepName && activeStepIds.size > 0) {
                   // Find if this movement moved items into one of the currently active WIP steps
@@ -144,6 +164,12 @@
                   }
                 }
               });
+            }
+
+            // Fallback: If no step movements have a client, but the lot had an initial client assigned
+            if (activeLotClientsSet.size === 0 && lotClientId) {
+              activeLotClientsSet.add(lotClientId);
+              if (lotClientName) clientNamesList.push(lotClientName);
             }
           }
 
@@ -160,6 +186,8 @@
             createdDate: new Date(lot.createdAtUtc),
             activeSteps,
             totalWipQty: journey ? totalWipQty : lot.initialQuantity,
+            clientId: lotClientId,
+            clientName: lotClientName,
             clientIds: activeClientIdsArray,
             clientNamesDisplay: uniqueClientNames.length > 0 ? uniqueClientNames.join(', ') : 'Direct Factory'
           };
@@ -422,12 +450,22 @@
 
   <div class="flex items-center gap-2">
     <button
-      onclick={openImportModal}
-      class="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+      onclick={() => tenantConfigStore.openModal()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+      title="Tenant Configuration & Feature Visibility"
     >
-      <span class="material-symbols-outlined text-[18px]">file_upload</span>
-      Import Lots
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span>Settings</span>
     </button>
+    <FeatureGate feature="forms.lots.import">
+      <button
+        onclick={openImportModal}
+        class="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+      >
+        <span class="material-symbols-outlined text-[18px]">file_upload</span>
+        Import Lots
+      </button>
+    </FeatureGate>
     <button
       onclick={() => refreshData()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
@@ -485,17 +523,21 @@
       </div>
     </div>
 
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
-        <span class="material-symbols-outlined text-[24px]">groups</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Clients Filtered</div>
-        <div class="text-2xl font-bold text-on-surface">
-          {new Set(filteredLots.flatMap(l => l.clientIds)).size}
+    <FeatureGate feature="fields.lots.client">
+      <ClientModeGate mode="any">
+        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
+          <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
+            <span class="material-symbols-outlined text-[24px]">groups</span>
+          </div>
+          <div>
+            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Clients Filtered</div>
+            <div class="text-2xl font-bold text-on-surface">
+              {new Set(filteredLots.flatMap(l => l.clientIds)).size}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </ClientModeGate>
+    </FeatureGate>
   </div>
 
   <!-- Filter Toolbar -->
@@ -575,14 +617,18 @@
         />
 
         <!-- 2. Client Filter -->
-        <Select
-          label="Client / Customer"
-          bind:value={selectedClientId}
-          options={[
-            { label: 'All Clients', value: 'ALL' },
-            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
-          ]}
-        />
+        <FeatureGate feature="fields.lots.client">
+          <ClientModeGate mode="any">
+            <Select
+              label="Client / Customer"
+              bind:value={selectedClientId}
+              options={[
+                { label: 'All Clients', value: 'ALL' },
+                ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+              ]}
+            />
+          </ClientModeGate>
+        </FeatureGate>
 
         <!-- 3. Date Range Filter -->
         <div class="space-y-1">

@@ -17,6 +17,8 @@ public class ProductionLot : AggregateRoot<Guid>, ITenantScopedEntity
     public Guid InitialStepId { get; private set; }
     public LotStatus Status { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
+    public Guid? ClientId { get; private set; }
+    public string? ClientName { get; private set; }
     public string? CreatedBy { get; private set; }
     public string? Remarks { get; private set; }
 
@@ -30,7 +32,9 @@ public class ProductionLot : AggregateRoot<Guid>, ITenantScopedEntity
         Guid initialStepId,
         string? createdBy = null,
         string? remarks = null,
-        Guid? tenantId = null)
+        Guid? tenantId = null,
+        Guid? clientId = null,
+        string? clientName = null)
     {
         if (id == Guid.Empty) throw new DomainException("ProductionLot Id cannot be empty.");
         if (lotNumber is null) throw new DomainException("ProductionLotNumber cannot be null.");
@@ -52,7 +56,9 @@ public class ProductionLot : AggregateRoot<Guid>, ITenantScopedEntity
             Status = LotStatus.Active,
             CreatedAtUtc = DateTime.UtcNow,
             CreatedBy = createdBy,
-            Remarks = remarks
+            Remarks = remarks,
+            ClientId = clientId,
+            ClientName = clientName
         };
 
         lot.AddDomainEvent(new ProductionLotCreatedEvent(

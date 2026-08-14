@@ -4,6 +4,7 @@
   import Header from '$lib/components/ui/Header.svelte';
   import Navbar from '$lib/components/ui/Navbar.svelte';
   import PhoneAuthModal from '$lib/components/ui/PhoneAuthModal.svelte';
+  import TenantSettingsModal from '$lib/components/ui/TenantSettingsModal.svelte';
   import { authStore } from '$lib/stores/authStore.js';
 
   let { children } = $props();
@@ -27,6 +28,9 @@
 
 <!-- Floating Bottom Navbar -->
 <Navbar />
+
+<!-- Tenant Settings & Feature Configuration Modal -->
+<TenantSettingsModal />
 
 <!-- Phone Authentication Modal -->
 {#if showModal || (!isAuthenticated && !isLoading)}

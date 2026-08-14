@@ -73,6 +73,14 @@ public class ProductionLotRepository : IProductionLotRepository
     {
         return await _dbContext.ProductionLots.AsNoTracking().ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ProductionLot>> GetByStatusAsync(TrackLord.Domain.Enums.LotStatus status, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ProductionLots
+            .AsNoTracking()
+            .Where(p => p.Status == status)
+            .ToListAsync(cancellationToken);
+    }
 }
 
 public class MaterialLotRepository : IMaterialLotRepository
@@ -123,6 +131,11 @@ public class MaterialLotRepository : IMaterialLotRepository
     {
         return await _dbContext.MaterialLots.AsNoTracking().ToListAsync(cancellationToken);
     }
+
+    public async Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.MaterialLots.CountAsync(cancellationToken);
+    }
 }
 
 public class ManufacturingMovementRepository : IManufacturingMovementRepository
@@ -144,6 +157,23 @@ public class ManufacturingMovementRepository : IManufacturingMovementRepository
         return await _dbContext.ManufacturingMovements
             .AsNoTracking()
             .Where(m => m.ProductionLotId == productionLotId)
+            .OrderBy(m => m.MovementDate)
+            .ThenBy(m => m.CreatedAtUtc)
+            .ThenBy(m => m.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotsAsync(IEnumerable<Guid> productionLotIds, CancellationToken cancellationToken = default)
+    {
+        var lotIdList = productionLotIds as ICollection<Guid> ?? productionLotIds.ToList();
+        if (lotIdList.Count == 0)
+        {
+            return Array.Empty<ManufacturingMovement>();
+        }
+
+        return await _dbContext.ManufacturingMovements
+            .AsNoTracking()
+            .Where(m => lotIdList.Contains(m.ProductionLotId))
             .OrderBy(m => m.MovementDate)
             .ThenBy(m => m.CreatedAtUtc)
             .ThenBy(m => m.Id)
@@ -347,6 +377,13 @@ public class ClientRepository : IClientRepository
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Clients
+            .Where(c => c.IsActive)
+            .CountAsync(cancellationToken);
     }
 
     public async Task AddAsync(Client client, CancellationToken cancellationToken = default)

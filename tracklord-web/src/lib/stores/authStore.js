@@ -1,4 +1,5 @@
 import { writable, get } from 'svelte/store';
+import { tenantConfigStore } from './tenantConfigStore.js';
 
 const TOKEN_KEY = 'tracklord_jwt_token';
 const USER_KEY = 'tracklord_user_info';
@@ -53,9 +54,13 @@ function createAuthStore() {
             tenantCode: data.tenantCode || 'DEFAULT',
             phoneNumber: data.phoneNumber,
             name: data.name,
-            role: data.role
+            role: data.role,
+            tenantSettings: data.tenantSettings
           };
           localStorage.setItem(USER_KEY, JSON.stringify(user));
+          if (data.tenantSettings) {
+            tenantConfigStore.initSettings(data.tenantSettings);
+          }
           update(s => ({
             ...s,
             token,
@@ -104,6 +109,10 @@ function createAuthStore() {
 
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+        if (user?.tenantSettings) {
+          tenantConfigStore.initSettings(user.tenantSettings);
+        }
 
         update(s => ({
           ...s,

@@ -311,4 +311,21 @@ export async function updateUser(userId, data) {
   return await handleResponse(response);
 }
 
+// 20. Fetch Current Tenant Settings
+export async function getTenantSettings() {
+  const response = await authFetch(`${API_BASE_URL}/Tenants/current/settings`);
+  return await handleResponse(response);
+}
+
+// 21. Update Current Tenant Settings
+/** @param {{ clientMode?: string, featureOverrides?: Record<string, boolean> }} data */
+export async function updateTenantSettings(data) {
+  const response = await authFetch(`${API_BASE_URL}/Tenants/current/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return await handleResponse(response);
+}
+
 

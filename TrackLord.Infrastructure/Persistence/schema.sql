@@ -8,12 +8,13 @@ CREATE TABLE IF NOT EXISTS tenants (
     name VARCHAR(150) NOT NULL,
     code VARCHAR(50) NOT NULL UNIQUE,
     created_at_utc TIMESTAMP WITH TIME ZONE NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    settings_json TEXT NOT NULL DEFAULT '{}'
 );
 
 -- Seed Default Tenant if not existing
-INSERT INTO tenants (id, name, code, created_at_utc, is_active)
-VALUES ('11111111-1111-1111-1111-111111111111', 'Default Tenant', 'DEFAULT', NOW(), TRUE)
+INSERT INTO tenants (id, name, code, created_at_utc, is_active, settings_json)
+VALUES ('11111111-1111-1111-1111-111111111111', 'Default Tenant', 'DEFAULT', NOW(), TRUE, '{}')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS manufacturing_steps (
@@ -40,6 +41,8 @@ CREATE TABLE IF NOT EXISTS production_lots (
     created_at_utc TIMESTAMP WITH TIME ZONE NOT NULL,
     created_by VARCHAR(100),
     remarks VARCHAR(500),
+    client_id UUID REFERENCES clients(id),
+    client_name VARCHAR(200),
     CONSTRAINT uq_production_lots_tenant_lot_number UNIQUE (tenant_id, lot_number)
 );
 

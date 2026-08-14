@@ -1,9 +1,9 @@
-using System;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.DTOs;
+using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Repositories;
@@ -74,6 +74,7 @@ public class AuthController : ControllerBase
 
         var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber, user.TenantId);
         var tenant = await _tenantRepository.GetByIdAsync(user.TenantId);
+        var tenantSettings = ParseTenantSettings(tenant?.SettingsJson);
 
         return Ok(new
         {
@@ -89,7 +90,12 @@ public class AuthController : ControllerBase
                 name = user.Name,
                 role = user.Role,
                 createdAtUtc = user.CreatedAtUtc,
-                lastLoginAtUtc = user.LastLoginAtUtc
+                lastLoginAtUtc = user.LastLoginAtUtc,
+                tenantSettings = new
+                {
+                    clientMode = FormatClientMode(tenantSettings.ClientMode),
+                    featureOverrides = tenantSettings.FeatureOverrides ?? new Dictionary<string, bool>()
+                }
             }
         });
     }
@@ -117,6 +123,7 @@ public class AuthController : ControllerBase
 
         var targetTenantId = user?.TenantId ?? _tenantContext.TenantId;
         var tenant = await _tenantRepository.GetByIdAsync(targetTenantId);
+        var tenantSettings = ParseTenantSettings(tenant?.SettingsJson);
 
         return Ok(new
         {
@@ -127,9 +134,35 @@ public class AuthController : ControllerBase
             phoneNumber = user?.PhoneNumber ?? phoneNumber ?? "Unknown",
             name = user?.Name,
             role = user?.Role ?? "Operator",
-            isAuthenticated = true
+            isAuthenticated = true,
+            tenantSettings = new
+            {
+                clientMode = FormatClientMode(tenantSettings.ClientMode),
+                featureOverrides = tenantSettings.FeatureOverrides ?? new Dictionary<string, bool>()
+            }
         });
     }
+
+    private static TenantSettings ParseTenantSettings(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new TenantSettings();
+        try
+        {
+            return JsonSerializer.Deserialize<TenantSettings>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new TenantSettings();
+        }
+        catch
+        {
+            return new TenantSettings();
+        }
+    }
+
+    private static string FormatClientMode(ClientTrackingMode mode) => mode switch
+    {
+        ClientTrackingMode.LotLevel => "lot",
+        ClientTrackingMode.StepLevel => "step",
+        ClientTrackingMode.None => "none",
+        _ => "step"
+    };
 
     /// <summary>
     /// Gets users in the tenant. Admins/Supervisors receive all tenant users; non-admins receive only themselves.
@@ -285,7 +318,3 @@ public class AuthController : ControllerBase
         });
     }
 }
-
-public record VerifyOtpRequest(string IdToken, string? PhoneNumber);
-public record CreateUserRequest(string PhoneNumber, string? Name, string? Role);
-public record UpdateUserRequest(string? Name, string? Role);
