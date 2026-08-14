@@ -166,53 +166,46 @@
 </script>
 
 <!-- Top Header Navigation -->
-<header class="fixed top-0 w-full z-40 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">manage_accounts</span>
+<header class="fixed top-0 w-full z-40 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-14 sm:h-16 border-b border-outline-variant">
+  <div class="flex items-center gap-2.5 min-w-0">
+    <div class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 bg-primary/10 rounded-full text-primary shrink-0">
+      <span class="material-symbols-outlined text-[20px] sm:text-[24px]">manage_accounts</span>
     </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">User & Access Management</div>
+    <div class="min-w-0">
+      <div class="font-bold text-base sm:text-lg text-primary leading-none">TRACKLORD</div>
+      <div class="text-[10px] sm:text-xs text-on-surface-variant truncate">User & Access Management</div>
     </div>
   </div>
 
-  <div class="flex items-center gap-2 sm:gap-3">
-    <button
-      onclick={() => tenantConfigStore.openModal()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
-      title="Tenant Configuration & Feature Visibility"
-    >
-      <span class="material-symbols-outlined text-[16px]">settings</span>
-      <span>Settings</span>
-    </button>
-
+  <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
     <button
       onclick={() => refreshUsers()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
+      class="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer transition-colors"
+      title="Refresh User Directory"
     >
       <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
+      <span class="hidden sm:inline">Refresh</span>
     </button>
 
     {#if isAuthenticated && currentUser}
       <button
         onclick={handleLogout}
-        class="px-3.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/50 dark:hover:bg-red-900/60 dark:text-red-300 font-semibold text-xs border border-red-200 dark:border-red-800 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
+        class="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/50 dark:hover:bg-red-900/60 dark:text-red-300 font-semibold text-xs border border-red-200 dark:border-red-800 flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+        title="Sign Out"
       >
-        <span class="material-symbols-outlined text-[18px]">logout</span>
-        <span>Logout</span>
+        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">logout</span>
+        <span class="hidden sm:inline">Logout</span>
       </button>
     {/if}
   </div>
 </header>
 
 <!-- Main Container -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
+<main class="max-w-[1440px] mx-auto p-3.5 sm:p-6 md:p-8 space-y-4 sm:space-y-6 pt-8 sm:pt-10">
 
   <!-- Success Notification -->
   {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fadeIn">
+    <div class="p-3.5 sm:p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fadeIn">
       <div class="flex items-center gap-2">
         <span class="material-symbols-outlined text-emerald-600">check_circle</span>
         <span class="font-medium">{successMessage}</span>
@@ -225,7 +218,7 @@
 
   <!-- Error Banner -->
   {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
+    <div class="p-3.5 sm:p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
       <div class="flex items-center gap-2">
         <span class="material-symbols-outlined text-red-500">error</span>
         <span>{errorMessage}</span>
@@ -243,19 +236,31 @@
     </div>
   {:else}
     <!-- Top Hero Card & Action Banner -->
-    <div class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
-      <div>
-        <h2 class="text-base sm:text-2xl text-primary font-bold flex items-center gap-1.5 sm:gap-2">
-          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">group_add</span>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm">
+      <div class="flex items-center gap-2">
+        <div class="p-1.5 bg-primary/10 rounded-lg text-primary sm:hidden">
+          <span class="material-symbols-outlined text-[20px]">groups</span>
+        </div>
+        <h2 class="text-lg sm:text-2xl text-primary font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined text-[26px] hidden sm:inline">groups</span>
           <span>User Directory</span>
         </h2>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <button
+          onclick={() => tenantConfigStore.openModal()}
+          class="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-surface-container-low hover:bg-primary/10 hover:text-primary dark:bg-slate-800 dark:hover:bg-primary/20 text-on-surface font-semibold text-xs sm:text-sm rounded-lg border border-outline-variant shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+          title="Configure Tenant Settings, Visibility & Modes"
+        >
+          <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">settings</span>
+          <span>Tenant Settings</span>
+        </button>
+
         {#if isAdmin}
           <button
             onclick={openAddModal}
-            class="px-2.5 py-1.5 sm:px-4 sm:py-2 bg-primary hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+            class="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-primary hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
           >
             <span class="material-symbols-outlined text-[16px] sm:text-[18px]">person_add</span>
             <span>Add User</span>
