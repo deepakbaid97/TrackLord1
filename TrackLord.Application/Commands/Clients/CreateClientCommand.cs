@@ -10,7 +10,7 @@ namespace TrackLord.Application.Commands;
 
 public record CreateClientCommand(
     string Name,
-    string PhoneNumber,
+    string? PhoneNumber,
     string ClientType) : IRequest<Guid>;
 
 public class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, Guid>
@@ -32,7 +32,7 @@ public class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, G
         var client = new Client(
             Guid.NewGuid(),
             request.Name,
-            request.PhoneNumber,
+            request.PhoneNumber ?? string.Empty,
             request.ClientType);
 
         await _clientRepository.AddAsync(client, cancellationToken);

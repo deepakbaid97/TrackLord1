@@ -62,7 +62,8 @@
     unit: 1, // Pieces
     initialStepId: '',
     createdBy: 'Operator',
-    remarks: ''
+    remarks: '',
+    clientId: ''
   });
 
   let moveForm = $state({
@@ -207,10 +208,6 @@
       const clientData = await getClients();
       clients = clientData || [];
       if (clients.length > 0) {
-        if (!moveForm.clientId) {
-          moveForm.clientId = clients[0].id;
-          moveForm.clientName = clients[0].name;
-        }
         if (!rejectForm.clientId) {
           rejectForm.clientId = clients[0].id;
         }
@@ -268,6 +265,8 @@
     }
 
     updateMoveQuantityFromStep(moveForm.fromStepId);
+    moveForm.clientId = '';
+    moveForm.clientName = '';
     isMoveModalOpen = true;
   }
 
@@ -351,6 +350,7 @@
     e.preventDefault();
     errorMessage = '';
     try {
+      const selectedClient = clients.find((/** @type {any} */ c) => c.id === createLotForm.clientId);
       const payload = {
         lotNumber: createLotForm.lotNumber.trim(),
         itemId: '00000000-0000-0000-0000-000000000001',
@@ -358,13 +358,16 @@
         unit: Number(createLotForm.unit),
         initialStepId: createLotForm.initialStepId,
         createdBy: createLotForm.createdBy,
-        remarks: createLotForm.remarks
+        remarks: createLotForm.remarks,
+        clientId: createLotForm.clientId || null,
+        clientName: selectedClient ? selectedClient.name : null
       };
 
       const res = await createProductionLot(payload);
       successMessage = `Production Lot '${createLotForm.lotNumber}' created successfully!`;
       isCreateLotModalOpen = false;
       createLotForm.lotNumber = '';
+      createLotForm.clientId = '';
 
       await refreshAllData();
       if (res && res.id) {
@@ -400,6 +403,8 @@
       isMoveModalOpen = false;
       moveForm.remarks = '';
       moveForm.referenceNumber = '';
+      moveForm.clientId = '';
+      moveForm.clientName = '';
 
       await loadSelectedLotDetails(selectedLotId);
     } catch (/** @type {any} */ err) {
@@ -414,7 +419,7 @@
     try {
       const payload = {
         name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim(),
+        phoneNumber: createClientForm.phoneNumber ? createClientForm.phoneNumber.trim() : '',
         clientType: createClientForm.clientType
       };
 
@@ -428,6 +433,7 @@
       const clientData = await getClients();
       clients = clientData || [];
       if (newClientId) {
+        createLotForm.clientId = newClientId;
         moveForm.clientId = newClientId;
       }
     } catch (/** @type {any} */ err) {
@@ -1045,6 +1051,30 @@
       required={true}
     />
 
+    <div class="space-y-1">
+      <div class="flex items-center justify-between">
+        <label for="create-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
+        <button
+          type="button"
+          onclick={() => isCreateClientModalOpen = true}
+          class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-[14px]">add_circle</span>
+          Add New Client
+        </button>
+      </div>
+      <Select
+        id="create-client-select"
+        bind:value={createLotForm.clientId}
+        options={[
+          { label: 'None (Direct / Internal Factory)', value: '' },
+          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+        ]}
+        placeholder="Select Client (Optional)..."
+        icon="badge"
+      />
+    </div>
+
     <Input
       label="Created By"
       bind:value={createLotForm.createdBy}
@@ -1105,7 +1135,7 @@
 
     <div class="space-y-1">
       <div class="flex items-center justify-between">
-        <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer</label>
+        <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
         <button
           type="button"
           onclick={() => isCreateClientModalOpen = true}
@@ -1118,9 +1148,12 @@
       <Select
         id="move-client-select"
         bind:value={moveForm.clientId}
-        options={clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))}
+        options={[
+          { label: 'None (Direct / Internal Factory)', value: '' },
+          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+        ]}
+        placeholder="Select Client (Optional)..."
         icon="badge"
-        required={true}
       />
     </div>
 
@@ -1391,12 +1424,12 @@
     />
 
     <Input
-      label="Phone Number"
+      label="Phone Number (Optional)"
       type="tel"
       bind:value={createClientForm.phoneNumber}
       placeholder="e.g. +91 98765 43210"
       icon="call"
-      required={true}
+      required={false}
     />
 
     <Select

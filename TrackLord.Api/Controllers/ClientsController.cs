@@ -42,4 +42,4 @@ public class ClientsController : ControllerBase
     }
 }
 
-public record CreateClientRequest(string Name, string PhoneNumber, string ClientType);
+public record CreateClientRequest(string Name, string? PhoneNumber, string ClientType);

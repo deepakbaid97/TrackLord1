@@ -103,7 +103,7 @@
     try {
       const payload = {
         name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim(),
+        phoneNumber: createClientForm.phoneNumber ? createClientForm.phoneNumber.trim() : '',
         clientType: createClientForm.clientType
       };
 
@@ -392,12 +392,12 @@
     />
 
     <Input
-      label="Phone Number"
+      label="Phone Number (Optional)"
       type="tel"
       bind:value={createClientForm.phoneNumber}
       placeholder="e.g. +91 98765 43210"
       icon="call"
-      required={true}
+      required={false}
     />
 
     <Select
