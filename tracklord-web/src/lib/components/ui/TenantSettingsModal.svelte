@@ -80,16 +80,16 @@
     aria-modal="true"
   >
     <div
-      class="relative w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+      class="relative w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] max-h-[850px] animate-in zoom-in-95 duration-200"
     >
       <!-- Modal Header -->
-      <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur flex items-center justify-between">
+      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 text-primary flex items-center justify-center">
+          <div class="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 text-primary flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-[24px]">tune</span>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 font-['Inter']">
+            <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 font-['Inter']">
               Tenant Settings & Feature Visibility
             </h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -100,7 +100,7 @@
 
         <button
           onclick={handleClose}
-          class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+          class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors shrink-0"
           title="Close Settings"
         >
           <span class="material-symbols-outlined text-xl">close</span>
@@ -108,9 +108,9 @@
       </div>
 
       <!-- Quick Action / Status Bar & Search -->
-      <div class="px-6 py-3.5 bg-slate-100/60 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div class="px-6 py-3 bg-slate-100/60 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <!-- Search Input -->
-        <div class="relative flex-1 min-w-[240px]">
+        <div class="relative flex-1 min-w-[220px]">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
           <input
             type="text"
@@ -129,7 +129,7 @@
         </div>
 
         <!-- Active Feature Counter Badge & Quick Toggles -->
-        <div class="flex items-center gap-2 text-xs">
+        <div class="flex items-center gap-2 text-xs shrink-0">
           <span class="px-2.5 py-1 rounded-lg bg-primary/10 text-primary font-semibold font-['JetBrains_Mono']">
             {enabledCount} / {totalAvailableFeatures} Active
           </span>
@@ -149,42 +149,42 @@
       </div>
 
       <!-- Navigation Category Tabs -->
-      <div class="px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-1 overflow-x-auto">
+      <div class="px-6 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-2 overflow-x-auto shrink-0 scrollbar-none items-center">
         <button
           onclick={() => activeTab = 'all'}
-          class="px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap
+          class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0
             {activeTab === 'all'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              ? 'bg-primary text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}"
         >
-          All Settings
+          <span>All Settings</span>
         </button>
         <button
           onclick={() => activeTab = 'clientMode'}
-          class="px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5
+          class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0
             {activeTab === 'clientMode'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              ? 'bg-primary text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}"
         >
-          <span class="material-symbols-outlined text-[16px]">hub</span>
+          <span class="material-symbols-outlined text-[18px]">hub</span>
           <span>Client Operating Mode</span>
         </button>
         {#each CONFIG_SCHEMA as cat}
           <button
             onclick={() => activeTab = cat.categoryId}
-            class="px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5
+            class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0
               {activeTab === cat.categoryId
-                ? 'border-primary text-primary'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}"
           >
-            <span class="material-symbols-outlined text-[16px]">{cat.icon}</span>
+            <span class="material-symbols-outlined text-[18px]">{cat.icon}</span>
             <span>{cat.categoryName}</span>
           </button>
         {/each}
       </div>
 
       <!-- Scrollable Settings Body -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/50 dark:bg-slate-950/20">
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 bg-slate-50/50 dark:bg-slate-950/20">
 
         <!-- 1. Client Operating Mode Section (Shown if 'all' or 'clientMode') -->
         {#if activeTab === 'all' || activeTab === 'clientMode'}
@@ -312,7 +312,7 @@
       </div>
 
       <!-- Modal Footer -->
-      <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
+      <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between shrink-0">
         <div>
           {#if saveSuccess}
             <div class="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold animate-in fade-in">
