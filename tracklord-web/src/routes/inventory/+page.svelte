@@ -310,12 +310,16 @@
         subtitle = 'Completed';
       }
 
-      // Find latest non-reversed movement associated with this step to extract Client Name
+      // Find client name associated with this step (LotLevel or StepLevel)
       let stepClientName = '';
-      if (currentLotJourney && currentLotJourney.movementHistory) {
+      if ($tenantConfigStore.clientMode === 'lot') {
+        stepClientName = currentLotJourney?.clientName || '';
+      } else if (currentLotJourney && currentLotJourney.movementHistory) {
         const stepMovements = currentLotJourney.movementHistory.filter((/** @type {any} */ m) => m.toStepName === step.name && !m.isReversed);
         if (stepMovements.length > 0) {
           stepClientName = stepMovements[stepMovements.length - 1].clientName || '';
+        } else if (currentLotJourney.clientName) {
+          stepClientName = currentLotJourney.clientName;
         }
       }
 
@@ -845,6 +849,11 @@
           <div>
             Total WIP: <span class="text-lg font-bold text-primary ml-1">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</span>
           </div>
+          {#if currentLotJourney.clientName}
+            <div class="flex items-center gap-1">
+              Client: <span class="font-semibold text-primary ml-1">{currentLotJourney.clientName}</span>
+            </div>
+          {/if}
           <div>
             Created: <span class="font-semibold text-on-surface ml-1">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</span>
           </div>

@@ -26,7 +26,9 @@ public class GetAllProductionLotsQueryHandler : IRequestHandler<GetAllProduction
             l.LotNumber.Value,
             l.InitialQuantity.Value,
             l.Status.ToString(),
-            l.CreatedAtUtc
+            l.CreatedAtUtc,
+            l.ClientId,
+            l.ClientName
         )).OrderByDescending(l => l.CreatedAtUtc).ToList();
     }
 }

@@ -6,7 +6,7 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
-  import { getClients, createClient, getProductionLots, getLotJourney } from '$lib/api.js';
+  import { getClients, createClient, getProductionLots, getLotJourney, getManufacturingSteps } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -31,13 +31,16 @@
     loading = true;
     errorMessage = '';
     try {
-      const [clientData, rawLots] = await Promise.all([
+      const [clientData, rawLots, rawSteps] = await Promise.all([
         getClients(),
-        getProductionLots()
+        getProductionLots(),
+        getManufacturingSteps()
       ]);
 
       const baseClients = clientData || [];
       const lots = rawLots || [];
+      const steps = rawSteps || [];
+      const clientTrackingMode = $tenantConfigStore.clientMode; // 'lot' | 'step' | 'none'
 
       // Map client stats: active lots count and active WIP quantity
       // Key: clientId, Value: { activeLotIds: Set, totalWip: number }
@@ -58,24 +61,57 @@
               ? journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0)
               : [];
 
-            if (activeSteps.length === 0 || !journey.movementHistory) return;
+            if (activeSteps.length === 0) return;
 
-            const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+            // Non-terminating active WIP sum for this lot
+            const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
+              const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
+              return !stepObj?.isTerminating;
+            });
+            const lotActiveWip = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
 
-            // Trace movements into active WIP steps to calculate client active lots & WIP quantity
-            journey.movementHistory.forEach((/** @type {any} */ m) => {
-              if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
-                const stats = clientStats.get(m.clientId);
+            const lotClientId = lot.clientId || journey.clientId;
+
+            if (clientTrackingMode === 'lot') {
+              // ── Strategy A: Per Production Lot ──
+              // In lot mode, the lot's active WIP belongs directly to the lot's client
+              if (lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
+                const stats = clientStats.get(lotClientId);
                 if (stats) {
                   stats.activeLotIds.add(lot.id);
-                  // Find step quantity
-                  const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
-                  if (stepObj) {
-                    stats.totalWip += stepObj.quantity;
+                  stats.totalWip += lotActiveWip;
+                }
+              }
+            } else {
+              // ── Strategy B: Per Step Movement / Subcontracting ──
+              if (journey.movementHistory) {
+                const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+                let foundMovementClient = false;
+
+                journey.movementHistory.forEach((/** @type {any} */ m) => {
+                  if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
+                    const stats = clientStats.get(m.clientId);
+                    if (stats) {
+                      stats.activeLotIds.add(lot.id);
+                      foundMovementClient = true;
+                      const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
+                      if (stepObj) {
+                        stats.totalWip += stepObj.quantity;
+                      }
+                    }
+                  }
+                });
+
+                // Fallback: If no movements had clients, but the lot had an initial client
+                if (!foundMovementClient && lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
+                  const stats = clientStats.get(lotClientId);
+                  if (stats) {
+                    stats.activeLotIds.add(lot.id);
+                    stats.totalWip += lotActiveWip;
                   }
                 }
               }
-            });
+            }
           } catch {
             // Ignore single lot fetch error
           }

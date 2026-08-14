@@ -74,6 +74,8 @@ public class GetLotJourneyQueryHandler : IRequestHandler<GetLotJourneyQuery, Lot
             lot.Status.ToString(),
             lot.CreatedAtUtc,
             timeline,
-            activeWips);
+            activeWips,
+            lot.ClientId,
+            lot.ClientName);
     }
 }

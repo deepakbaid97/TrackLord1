@@ -42,7 +42,9 @@ public record LotJourneyDto(
     string Status,
     DateTime CreatedAtUtc,
     IReadOnlyList<MovementTimelineDto> MovementHistory,
-    IReadOnlyList<StepWipDto> ActiveBalances);
+    IReadOnlyList<StepWipDto> ActiveBalances,
+    Guid? ClientId = null,
+    string? ClientName = null);
 
 public record MaterialConsumptionTraceDto(
     Guid Id,
@@ -125,7 +127,9 @@ public record ProductionLotSummaryDto(
     string LotNumber,
     decimal InitialQuantity,
     string Status,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    Guid? ClientId = null,
+    string? ClientName = null);
 
 public record ManufacturingStepDto(
     Guid Id,
