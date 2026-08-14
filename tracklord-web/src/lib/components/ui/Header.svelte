@@ -1,5 +1,6 @@
 <script>
   import { authStore } from '../../stores/authStore.js';
+  import { tenantConfigStore } from '../../stores/tenantConfigStore.js';
 
   /** @type {{ title?: string }} */
   let { title = 'PRO-FAB ERP' } = $props();
@@ -14,18 +15,37 @@
   function handleLogoutClick() {
     authStore.logout();
   }
+
+  function handleSettingsClick() {
+    tenantConfigStore.openModal();
+  }
 </script>
 
 <header class="fixed top-0 w-full z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm flex justify-between items-center px-4 md:px-8 h-14 border-b border-slate-200 dark:border-slate-800">
   <div class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors p-2 rounded-xl active:opacity-80">
     <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
-    <span class="font-bold text-base tracking-tight text-slate-900 dark:text-white font-['Inter']">{title}</span>
+    <div class="flex flex-col">
+      <span class="font-bold text-base tracking-tight text-slate-900 dark:text-white font-['Inter'] leading-none">{title}</span>
+      {#if user?.tenantName}
+        <span class="text-[10px] font-semibold text-slate-500 font-['JetBrains_Mono'] tracking-wider uppercase">{user.tenantName}</span>
+      {/if}
+    </div>
   </div>
 
   <div class="flex items-center gap-2 sm:gap-3">
     {#if isAuthenticated && user}
+      <!-- Tenant Settings Button -->
+      <button
+        onclick={handleSettingsClick}
+        title="Tenant Configuration & Feature Visibility"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-primary/10 text-slate-700 hover:text-primary dark:bg-slate-800 dark:hover:bg-primary/20 dark:text-slate-200 dark:hover:text-primary text-xs font-semibold transition-all border border-slate-200 dark:border-slate-700 active:scale-95 group"
+      >
+        <span class="material-symbols-outlined text-base transition-transform group-hover:rotate-45 duration-300">settings</span>
+        <span class="hidden sm:inline">Settings</span>
+      </button>
+
       <!-- User Phone Badge -->
-      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full">
+      <div class="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full">
         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span class="text-xs font-semibold text-slate-700 dark:text-slate-200 font-['JetBrains_Mono']">{user.phoneNumber}</span>
       </div>
@@ -50,9 +70,12 @@
       </button>
     {/if}
 
-    <button class="relative flex items-center justify-center p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300">
-      <span class="material-symbols-outlined text-[22px]">notifications</span>
-      <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary"></span>
+    <button
+      onclick={handleSettingsClick}
+      title="Settings"
+      class="sm:hidden relative flex items-center justify-center p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300"
+    >
+      <span class="material-symbols-outlined text-[22px]">settings</span>
     </button>
   </div>
 </header>

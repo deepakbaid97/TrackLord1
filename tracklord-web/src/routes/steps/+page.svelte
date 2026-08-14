@@ -7,6 +7,7 @@
     getProductionLots,
     getLotJourney
   } from '$lib/api.js';
+  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -208,6 +209,14 @@
   </div>
 
   <div class="flex items-center gap-2">
+    <button
+      onclick={() => tenantConfigStore.openModal()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+      title="Tenant Configuration & Feature Visibility"
+    >
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span>Settings</span>
+    </button>
     <button
       onclick={() => fetchSteps()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"

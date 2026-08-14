@@ -13,9 +13,11 @@ public class Tenant : AggregateRoot<Guid>
     public DateTime CreatedAtUtc { get; private set; }
     public bool IsActive { get; private set; }
 
+    public string SettingsJson { get; private set; } = "{}";
+
     private Tenant() { } // EF Core
 
-    public Tenant(Guid id, string name, string code, DateTime? createdAtUtc = null)
+    public Tenant(Guid id, string name, string code, DateTime? createdAtUtc = null, string? settingsJson = null)
     {
         if (id == Guid.Empty) throw new DomainException("Tenant Id cannot be empty.");
         if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Tenant name is required.");
@@ -26,6 +28,7 @@ public class Tenant : AggregateRoot<Guid>
         Code = code.Trim().ToUpperInvariant();
         CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow;
         IsActive = true;
+        SettingsJson = string.IsNullOrWhiteSpace(settingsJson) ? "{}" : settingsJson;
     }
 
     public void UpdateDetails(string name, string code)
@@ -35,6 +38,11 @@ public class Tenant : AggregateRoot<Guid>
 
         Name = name.Trim();
         Code = code.Trim().ToUpperInvariant();
+    }
+
+    public void UpdateSettings(string settingsJson)
+    {
+        SettingsJson = string.IsNullOrWhiteSpace(settingsJson) ? "{}" : settingsJson.Trim();
     }
 
     public void Deactivate() => IsActive = false;

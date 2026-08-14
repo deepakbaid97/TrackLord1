@@ -67,7 +67,9 @@ public class CreateProductionLotCommandHandler : IRequestHandler<CreateProductio
             initialQtyObj,
             request.InitialStepId,
             request.CreatedBy,
-            request.Remarks);
+            request.Remarks,
+            clientId: request.ClientId,
+            clientName: request.ClientName);
 
         var creationDate = request.CreationDate ?? DateTime.UtcNow;
 

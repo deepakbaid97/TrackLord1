@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using TrackLord.Application.Queries.Dashboard.Strategies;
+using TrackLord.Domain.Aggregates.TenantAggregate;
+using TrackLord.Domain.Common;
 using TrackLord.Domain.Enums;
 using TrackLord.Domain.Repositories;
 using TrackLord.Domain.Services;
@@ -19,6 +23,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
     private readonly IManufacturingMovementRepository _movementRepository;
     private readonly IMaterialLotRepository _materialLotRepository;
     private readonly IClientRepository _clientRepository;
+    private readonly ITenantRepository _tenantRepository;
+    private readonly ITenantContext _tenantContext;
     private readonly ILedgerReplayEngine _replayEngine;
 
     public GetDashboardOverviewQueryHandler(
@@ -27,6 +33,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         IManufacturingMovementRepository movementRepository,
         IMaterialLotRepository materialLotRepository,
         IClientRepository clientRepository,
+        ITenantRepository tenantRepository,
+        ITenantContext tenantContext,
         ILedgerReplayEngine replayEngine)
     {
         _lotRepository = lotRepository;
@@ -34,11 +42,25 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         _movementRepository = movementRepository;
         _materialLotRepository = materialLotRepository;
         _clientRepository = clientRepository;
+        _tenantRepository = tenantRepository;
+        _tenantContext = tenantContext;
         _replayEngine = replayEngine;
     }
 
     public async Task<DashboardOverviewDto> Handle(GetDashboardOverviewQuery request, CancellationToken cancellationToken)
     {
+        var tenant = await _tenantRepository.GetByIdAsync(_tenantContext.TenantId, cancellationToken);
+        TenantSettings? settings = null;
+        if (tenant != null && !string.IsNullOrWhiteSpace(tenant.SettingsJson))
+        {
+            try
+            {
+                settings = JsonSerializer.Deserialize<TenantSettings>(tenant.SettingsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch { }
+        }
+        settings ??= new TenantSettings();
+
         var activeLots = await _lotRepository.GetByStatusAsync(LotStatus.Active, cancellationToken);
         var activeLotIds = activeLots.Select(l => l.Id).ToList();
 
@@ -57,15 +79,15 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
         var stepWipTotals = steps.ToDictionary(s => s.Id, _ => 0m);
         var stepLotCounts = steps.ToDictionary(s => s.Id, _ => 0);
         var activeLotSummaries = new List<DashboardActiveLotDto>();
+        var lotSnapshots = new Dictionary<Guid, LotLedgerSnapshot>();
         decimal totalTerminatedQty = 0m;
         int nonTerminatedLotCount = 0;
-
-        var clientAggregation = new Dictionary<Guid, (HashSet<Guid> lots, decimal totalQty)>();
 
         foreach (var lot in activeLots)
         {
             var movements = movementsLookup[lot.Id].ToList();
             var snapshot = _replayEngine.ReplayLedger(lot.Id, movements, terminatingStepIds);
+            lotSnapshots[lot.Id] = snapshot;
 
             decimal lotWipTotal = 0m;
             string primaryStepName = "—";
@@ -105,17 +127,6 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
                 snapshot.TotalActiveQuantity,
                 primaryStepName,
                 lot.CreatedAtUtc));
-
-            foreach (var m in movements.Where(m => !m.IsReversed && m.ClientId.HasValue))
-            {
-                var cid = m.ClientId!.Value;
-                if (!clientAggregation.ContainsKey(cid))
-                    clientAggregation[cid] = (new HashSet<Guid>(), 0m);
-
-                var (lots, totalQty) = clientAggregation[cid];
-                lots.Add(lot.Id);
-                clientAggregation[cid] = (lots, totalQty + m.Quantity);
-            }
         }
 
         var stepSummaries = steps.Select(s => new DashboardStepSummaryDto(
@@ -127,19 +138,9 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
             s.IsTerminating
         )).ToList();
 
-        var clientSummaries = clientAggregation
-            .Select(kvp =>
-            {
-                clientsDict.TryGetValue(kvp.Key, out var client);
-                return new DashboardClientSummaryDto(
-                    kvp.Key,
-                    client?.Name ?? "Unknown",
-                    client?.ClientType ?? "Unknown",
-                    kvp.Value.lots.Count,
-                    kvp.Value.totalQty);
-            })
-            .OrderByDescending(c => c.TotalQuantityMoved)
-            .ToList();
+        // Delegate Client Summary Aggregation to Tenant's Strategy
+        var clientStrategy = ClientAggregationStrategyFactory.Create(settings.ClientMode);
+        var clientSummaries = clientStrategy.AggregateClientSummaries(activeLots, movementsLookup, clientsDict, lotSnapshots);
 
         activeLotSummaries = activeLotSummaries
             .OrderByDescending(l => l.CreatedAtUtc)

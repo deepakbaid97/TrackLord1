@@ -26,6 +26,7 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
         builder.Property(t => t.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(t => t.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(t => t.SettingsJson).HasColumnName("settings_json").HasDefaultValue("{}").IsRequired();
 
         builder.HasIndex(t => t.Code).IsUnique();
     }
@@ -56,6 +57,13 @@ public class ProductionLotConfiguration : IEntityTypeConfiguration<ProductionLot
         builder.Property(p => p.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(p => p.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(p => p.Remarks).HasColumnName("remarks").HasMaxLength(500);
+        builder.Property(p => p.ClientId).HasColumnName("client_id");
+        builder.Property(p => p.ClientName).HasColumnName("client_name").HasMaxLength(200);
+
+        builder.HasOne<Client>()
+            .WithMany()
+            .HasForeignKey(p => p.ClientId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.OwnsOne(p => p.InitialQuantity, q =>
         {

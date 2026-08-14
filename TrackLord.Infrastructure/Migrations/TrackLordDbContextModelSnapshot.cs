@@ -275,6 +275,15 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<string>("ClientName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("client_name");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -312,6 +321,8 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
 
                     b.HasIndex("TenantId", "LotNumber")
                         .IsUnique();
@@ -394,6 +405,13 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("name");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("settings_json");
 
                     b.HasKey("Id");
 
@@ -581,6 +599,11 @@ namespace TrackLord.Infrastructure.Migrations
 
             modelBuilder.Entity("TrackLord.Domain.Aggregates.ProductionLotAggregate.ProductionLot", b =>
                 {
+                    b.HasOne("TrackLord.Domain.Aggregates.ClientAggregate.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.OwnsOne("TrackLord.Domain.ValueObjects.Quantity", "InitialQuantity", b1 =>
                         {
                             b1.Property<Guid>("ProductionLotId")

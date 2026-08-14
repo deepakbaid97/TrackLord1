@@ -5,6 +5,9 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
+  import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
+  import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   import {
     getManufacturingSteps,
@@ -636,6 +639,14 @@
 
   <div class="flex items-center gap-2">
     <button
+      onclick={() => tenantConfigStore.openModal()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+      title="Tenant Configuration & Feature Visibility"
+    >
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span>Settings</span>
+    </button>
+    <button
       onclick={() => refreshAllData()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
     >
@@ -1051,29 +1062,31 @@
       required={true}
     />
 
-    <div class="space-y-1">
-      <div class="flex items-center justify-between">
-        <label for="create-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
-        <button
-          type="button"
-          onclick={() => isCreateClientModalOpen = true}
-          class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-[14px]">add_circle</span>
-          Add New Client
-        </button>
+    <ClientModeGate mode="lot">
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <label for="create-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
+          <button
+            type="button"
+            onclick={() => isCreateClientModalOpen = true}
+            class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[14px]">add_circle</span>
+            Add New Client
+          </button>
+        </div>
+        <Select
+          id="create-client-select"
+          bind:value={createLotForm.clientId}
+          options={[
+            { label: 'None (Direct / Internal Factory)', value: '' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+          placeholder="Select Client (Optional)..."
+          icon="badge"
+        />
       </div>
-      <Select
-        id="create-client-select"
-        bind:value={createLotForm.clientId}
-        options={[
-          { label: 'None (Direct / Internal Factory)', value: '' },
-          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
-        ]}
-        placeholder="Select Client (Optional)..."
-        icon="badge"
-      />
-    </div>
+    </ClientModeGate>
 
     <Input
       label="Created By"
@@ -1133,29 +1146,31 @@
       required={true}
     />
 
-    <div class="space-y-1">
-      <div class="flex items-center justify-between">
-        <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
-        <button
-          type="button"
-          onclick={() => isCreateClientModalOpen = true}
-          class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-[14px]">add_circle</span>
-          Add New Client
-        </button>
+    <ClientModeGate mode="step">
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <label for="move-client-select" class="text-xs font-semibold text-on-surface-variant">Subcontractor / Client (Optional)</label>
+          <button
+            type="button"
+            onclick={() => isCreateClientModalOpen = true}
+            class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[14px]">add_circle</span>
+            Add New Client
+          </button>
+        </div>
+        <Select
+          id="move-client-select"
+          bind:value={moveForm.clientId}
+          options={[
+            { label: 'None (Direct / Internal Factory)', value: '' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+          placeholder="Select Client (Optional)..."
+          icon="badge"
+        />
       </div>
-      <Select
-        id="move-client-select"
-        bind:value={moveForm.clientId}
-        options={[
-          { label: 'None (Direct / Internal Factory)', value: '' },
-          ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
-        ]}
-        placeholder="Select Client (Optional)..."
-        icon="badge"
-      />
-    </div>
+    </ClientModeGate>
 
     <Input
       label="Reference Number"

@@ -1,6 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { getDashboardOverview, getMaterialLots } from '$lib/api.js';
+  import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
+  import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -88,6 +91,14 @@
   </div>
 
   <div class="flex items-center gap-2">
+    <button
+      onclick={() => tenantConfigStore.openModal()}
+      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low hover:text-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+      title="Tenant Configuration & Feature Visibility"
+    >
+      <span class="material-symbols-outlined text-[16px]">settings</span>
+      <span>Settings</span>
+    </button>
     <button
       onclick={() => refreshDashboard()}
       class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
@@ -207,66 +218,70 @@
       </section>
 
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <!-- WIDGET 3: Client Distribution                              -->
+      <!-- WIDGET 3: Client Distribution (Declaratively Gated)        -->
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
-          <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-[22px]">groups</span>
-            Client Distribution
-          </h2>
-          <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
-            {overview.clientSummaries?.length || 0} active
-          </span>
-        </div>
+      <FeatureGate feature="pages.clients">
+        <ClientModeGate mode="any">
+          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
+              <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[22px]">groups</span>
+                Client Distribution
+              </h2>
+              <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+                {overview.clientSummaries?.length || 0} active
+              </span>
+            </div>
 
-        {#if overview.clientSummaries && overview.clientSummaries.length > 0}
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr class="border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-                  <th class="pb-2 pr-4">Client</th>
-                  <th class="pb-2 pr-4">Type</th>
-                  <th class="pb-2 pr-4 text-right">Lots</th>
-                  <th class="pb-2 text-right">Qty Moved</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-outline-variant/50">
-                {#each overview.clientSummaries as client}
-                  <tr
-                    onclick={() => window.location.href = `/lots?client=${client.clientId}`}
-                    class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
-                    title="View lots associated with {client.clientName}"
-                  >
-                    <td class="py-3 pr-4">
-                      <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-[18px] text-primary/70 group-hover:text-primary transition-colors">badge</span>
-                        <span class="font-bold text-on-surface group-hover:text-primary transition-colors">{client.clientName}</span>
-                      </div>
-                    </td>
-                    <td class="py-3 pr-4">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
-                        {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800' :
-                         client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800' :
-                         client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800' :
-                         'bg-purple-100 text-purple-800'}">
-                        {client.clientType}
-                      </span>
-                    </td>
-                    <td class="py-3 pr-4 text-right font-mono text-on-surface-variant">{client.totalLotsAssociated}</td>
-                    <td class="py-3 text-right font-bold text-primary font-mono">{client.totalQuantityMoved.toLocaleString()} Pcs</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {:else}
-          <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-            <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">groups</span>
-            No client activity recorded yet. Movements with assigned clients will appear here.
-          </div>
-        {/if}
-      </section>
+            {#if overview.clientSummaries && overview.clientSummaries.length > 0}
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr class="border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                      <th class="pb-2 pr-4">Client</th>
+                      <th class="pb-2 pr-4">Type</th>
+                      <th class="pb-2 pr-4 text-right">Lots</th>
+                      <th class="pb-2 text-right">Qty Moved / WIP</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/50">
+                    {#each overview.clientSummaries as client}
+                      <tr
+                        onclick={() => window.location.href = `/lots?client=${client.clientId}`}
+                        class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
+                        title="View lots associated with {client.clientName}"
+                      >
+                        <td class="py-3 pr-4">
+                          <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-primary/70 group-hover:text-primary transition-colors">badge</span>
+                            <span class="font-bold text-on-surface group-hover:text-primary transition-colors">{client.clientName}</span>
+                          </div>
+                        </td>
+                        <td class="py-3 pr-4">
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                            {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800' :
+                             client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800' :
+                             client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800' :
+                             'bg-purple-100 text-purple-800'}">
+                            {client.clientType}
+                          </span>
+                        </td>
+                        <td class="py-3 pr-4 text-right font-mono text-on-surface-variant">{client.totalLotsAssociated}</td>
+                        <td class="py-3 text-right font-bold text-primary font-mono">{client.totalQuantityMoved.toLocaleString()} Pcs</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {:else}
+              <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+                <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">groups</span>
+                No client activity recorded yet. Movements or lots with assigned clients will appear here.
+              </div>
+            {/if}
+          </section>
+        </ClientModeGate>
+      </FeatureGate>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
