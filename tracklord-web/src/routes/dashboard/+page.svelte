@@ -187,6 +187,9 @@
                     <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
                     <span class="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
                     <span class="text-[9px] sm:text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
+                    {#if step.isActive === false}
+                      <span class="text-[9px] font-mono font-bold text-zinc-500 bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded">Inactive</span>
+                    {/if}
                   </div>
                   <div class="flex items-center gap-2 sm:gap-3">
                     <span class="text-[11px] sm:text-xs text-on-surface-variant font-mono">{step.activeLotsCount} lots</span>
