@@ -137,7 +137,8 @@ public record ManufacturingStepDto(
     string Name,
     int SequenceOrder,
     bool IsTerminating,
-    Guid FactoryId);
+    Guid FactoryId,
+    bool IsActive = true);
 
 public record DashboardStepSummaryDto(
     Guid StepId,
@@ -145,7 +146,8 @@ public record DashboardStepSummaryDto(
     string StepName,
     decimal TotalWipQuantity,
     int ActiveLotsCount,
-    bool IsTerminating);
+    bool IsTerminating,
+    bool IsActive = true);
 
 public record DashboardClientSummaryDto(
     Guid ClientId,

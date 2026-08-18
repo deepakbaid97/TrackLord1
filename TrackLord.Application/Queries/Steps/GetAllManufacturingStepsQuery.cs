@@ -27,7 +27,8 @@ public class GetAllManufacturingStepsQueryHandler : IRequestHandler<GetAllManufa
             s.Name,
             s.SequenceOrder,
             s.IsTerminating,
-            s.FactoryId
+            s.FactoryId,
+            s.IsActive
         )).OrderBy(s => s.SequenceOrder).ToList();
     }
 }

@@ -126,10 +126,10 @@
             if (journey.activeBalances) {
               activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
 
-              // Exclude terminating step quantities from total active WIP calculation
+              // Exclude terminating step quantities and inactive step quantities from total active WIP calculation
               const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
                 const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
-                return !stepObj?.isTerminating;
+                return !stepObj?.isTerminating && (stepObj?.isActive !== false);
               });
 
               totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
@@ -279,6 +279,8 @@
   let totalWipSum = $derived(
     filteredLots.reduce((acc, l) => {
       if (selectedStepId !== 'ALL') {
+        const stepObj = steps.find(s => s.id === selectedStepId);
+        if (stepObj?.isActive === false) return acc;
         const stepBalance = l.activeSteps.find((/** @type {any} */ s) => s.stepId === selectedStepId);
         return acc + (stepBalance ? stepBalance.quantity : 0);
       }
@@ -616,7 +618,7 @@
           options={[
             { label: 'All Steps (Active WIP)', value: 'ALL' },
             ...steps.map(s => ({
-              label: `${s.name} (${s.code})${s.isTerminating ? ' (Terminating)' : ''}`,
+              label: `${s.name} (${s.code})${s.isTerminating ? ' (Terminating)' : ''}${s.isActive === false ? ' (Inactive)' : ''}`,
               value: s.id
             }))
           ]}
@@ -738,11 +740,13 @@
                 <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50">
                   {#each lot.activeSteps as step}
                     {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
                       <span class="material-symbols-outlined text-[11px]">{stepIconMap[step.stepCode] || 'work'}</span>
                       {step.stepName}: {step.quantity} Pcs
                       {#if stepObj?.isTerminating}
                         <span class="text-[8px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
+                      {:else if stepObj?.isActive === false}
+                        <span class="text-[8px] uppercase tracking-wider font-extrabold text-zinc-500 ml-0.5">(Inactive)</span>
                       {/if}
                     </span>
                   {/each}
@@ -795,11 +799,13 @@
                     <div class="flex flex-wrap gap-1.5 items-center">
                       {#each lot.activeSteps as step}
                         {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
                           <span class="material-symbols-outlined text-[12px]">{stepIconMap[step.stepCode] || 'work'}</span>
                           {step.stepName}: {step.quantity} Pcs
                           {#if stepObj?.isTerminating}
                             <span class="text-[9px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
+                          {:else if stepObj?.isActive === false}
+                            <span class="text-[9px] uppercase tracking-wider font-extrabold text-zinc-500 ml-0.5">(Inactive)</span>
                           {/if}
                         </span>
                       {/each}

@@ -184,9 +184,33 @@
         if (!rejectForm.targetStepId) rejectForm.targetStepId = manufacturingSteps[0].id;
       }
 
-      // 2. Fetch Lots
+      // 2. Fetch Lots & Filter out lots whose items are all in terminating steps
       const lots = await getProductionLots();
-      productionLots = lots || [];
+      const rawLots = lots || [];
+      const terminatingStepIds = new Set(
+        manufacturingSteps
+          .filter((s) => s.isTerminating)
+          .map((s) => s.id)
+      );
+
+      const enrichedLots = await Promise.all(
+        rawLots.map(async (lot) => {
+          try {
+            const journey = await getLotJourney(lot.id);
+            if (journey && journey.activeBalances) {
+              const activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
+              const isTerminated = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => terminatingStepIds.has(b.stepId));
+              return { ...lot, isTerminated };
+            }
+          } catch {
+            // Ignore single lot journey failure
+          }
+          return { ...lot, isTerminated: false };
+        })
+      );
+
+      // Exclude lots where all quantities are in terminating steps (preserve if specifically selected via query param)
+      productionLots = enrichedLots.filter((l) => !l.isTerminated || l.id === selectedLotId);
 
       if (productionLots.length > 0) {
         if (!selectedLotId || !productionLots.some((/** @type {any} */ l) => l.id === selectedLotId)) {

@@ -105,28 +105,43 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
                     stepLotCounts[stepId]++;
                 }
 
-                if (qty > maxStepQty)
+                // Primary step prefers active, non-terminating steps with largest quantity
+                if (stepsDict.TryGetValue(stepId, out var s) && s.IsActive && !s.IsTerminating)
                 {
-                    maxStepQty = qty;
-                    primaryStepName = stepsDict.TryGetValue(stepId, out var s) ? s.Name : "Unknown";
+                    if (qty > maxStepQty)
+                    {
+                        maxStepQty = qty;
+                        primaryStepName = s.Name;
+                    }
                 }
+            }
+
+            if (primaryStepName == "—" && snapshot.StepBalances.Any(sb => sb.Value > 0))
+            {
+                var topStep = snapshot.StepBalances.OrderByDescending(sb => sb.Value).First();
+                primaryStepName = stepsDict.TryGetValue(topStep.Key, out var s) ? s.Name : "Unknown";
             }
 
             totalTerminatedQty += snapshot.TotalTerminatedQuantity;
 
-            bool lotHasActiveQuantity = snapshot.TotalActiveQuantity > 0;
+            // Only count quantity residing in active, non-terminating manufacturing steps as active WIP
+            decimal lotActiveWipQuantity = snapshot.StepBalances
+                .Where(sb => stepsDict.TryGetValue(sb.Key, out var s) && s.IsActive && !s.IsTerminating)
+                .Sum(sb => sb.Value);
+
+            bool lotHasActiveQuantity = lotActiveWipQuantity > 0;
             if (lotHasActiveQuantity)
             {
                 nonTerminatedLotCount++;
-            }
 
-            activeLotSummaries.Add(new DashboardActiveLotDto(
-                lot.Id,
-                lot.LotNumber.Value,
-                lot.InitialQuantity.Value,
-                snapshot.TotalActiveQuantity,
-                primaryStepName,
-                lot.CreatedAtUtc));
+                activeLotSummaries.Add(new DashboardActiveLotDto(
+                    lot.Id,
+                    lot.LotNumber.Value,
+                    lot.InitialQuantity.Value,
+                    lotActiveWipQuantity,
+                    primaryStepName,
+                    lot.CreatedAtUtc));
+            }
         }
 
         var stepSummaries = steps.Select(s => new DashboardStepSummaryDto(
@@ -135,7 +150,8 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
             s.Name,
             stepWipTotals[s.Id],
             stepLotCounts[s.Id],
-            s.IsTerminating
+            s.IsTerminating,
+            s.IsActive
         )).ToList();
 
         // Delegate Client Summary Aggregation to Tenant's Strategy
