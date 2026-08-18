@@ -57,6 +57,7 @@ public interface IManufacturingStepRepository
     Task<IReadOnlyList<ManufacturingStep>> GetAllAsync(CancellationToken cancellationToken = default);
     Task AddAsync(ManufacturingStep step, CancellationToken cancellationToken = default);
     Task UpdateAsync(ManufacturingStep step, CancellationToken cancellationToken = default);
+    Task UpdateRangeAsync(IEnumerable<ManufacturingStep> steps, CancellationToken cancellationToken = default);
 }
 
 public interface IMaterialConsumptionRepository

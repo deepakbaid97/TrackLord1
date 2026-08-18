@@ -74,6 +74,19 @@ export async function updateManufacturingStep(id, data) {
   return await handleResponse(response);
 }
 
+// 1d. Reorder Manufacturing Steps
+/**
+ * @param {Array<{id: string, sequenceOrder: number}>} steps
+ */
+export async function reorderManufacturingSteps(steps) {
+  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ steps })
+  });
+  return await handleResponse(response);
+}
+
 // 2. Fetch all Production Lots
 export async function getProductionLots() {
   const response = await authFetch(`${API_BASE_URL}/ProductionLots`);
