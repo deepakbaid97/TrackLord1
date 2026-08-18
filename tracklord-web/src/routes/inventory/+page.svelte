@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import Button from '$lib/components/ui/Button.svelte';
   import Timeline from '$lib/components/ui/Timeline.svelte';
   import Input from '$lib/components/ui/Input.svelte';
@@ -150,7 +151,15 @@
     'PACK': 'inventory_2'
   };
 
-  import { page } from '$app/stores';
+  let lastUrlLotParam = '';
+  $effect(() => {
+    const currentParam = $page.url.searchParams.get('lot');
+    if (currentParam && currentParam !== lastUrlLotParam && !loading) {
+      lastUrlLotParam = currentParam;
+      selectedLotId = currentParam;
+      refreshAllData();
+    }
+  });
 
   onMount(async () => {
     // Priority: 1. URL query parameter ('?lot=...'), 2. localStorage ('tracklord_last_lot_id')
@@ -158,6 +167,7 @@
     const lotParam = urlParams.get('lot');
     if (lotParam) {
       selectedLotId = lotParam;
+      lastUrlLotParam = lotParam;
     } else {
       const savedLotId = localStorage.getItem('tracklord_last_lot_id');
       if (savedLotId) selectedLotId = savedLotId;
@@ -190,16 +200,27 @@
       const terminatingStepIds = new Set(
         manufacturingSteps
           .filter((s) => s.isTerminating)
-          .map((s) => s.id)
+          .map((s) => (s.id || '').toLowerCase())
       );
+      const terminatingStepCodes = new Set(
+        manufacturingSteps
+          .filter((s) => s.isTerminating)
+          .map((s) => (s.code || '').toUpperCase())
+      );
+
+      const urlLotParam = $page.url.searchParams.get('lot');
 
       const enrichedLots = await Promise.all(
         rawLots.map(async (lot) => {
           try {
             const journey = await getLotJourney(lot.id);
             if (journey && journey.activeBalances) {
-              const activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
-              const isTerminated = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => terminatingStepIds.has(b.stepId));
+              const activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => Number(b.quantity) > 0);
+              const isTerminated = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => {
+                const stepIdLower = (b.stepId || '').toLowerCase();
+                const stepCodeUpper = (b.stepCode || '').toUpperCase();
+                return terminatingStepIds.has(stepIdLower) || terminatingStepCodes.has(stepCodeUpper);
+              });
               return { ...lot, isTerminated };
             }
           } catch {
@@ -209,10 +230,14 @@
         })
       );
 
-      // Exclude lots where all quantities are in terminating steps (preserve if specifically selected via query param)
-      productionLots = enrichedLots.filter((l) => !l.isTerminated || l.id === selectedLotId);
+      // Exclude lots where all quantities are in terminating steps (preserve if specifically requested via URL query param)
+      productionLots = enrichedLots.filter((l) => !l.isTerminated || (urlLotParam && l.id === urlLotParam));
 
-      if (productionLots.length > 0) {
+      if (urlLotParam && enrichedLots.some((l) => l.id === urlLotParam)) {
+        selectedLotId = urlLotParam;
+        localStorage.setItem('tracklord_last_lot_id', selectedLotId);
+        await loadSelectedLotDetails(selectedLotId);
+      } else if (productionLots.length > 0) {
         if (!selectedLotId || !productionLots.some((/** @type {any} */ l) => l.id === selectedLotId)) {
           selectedLotId = productionLots[0].id;
         }
@@ -222,6 +247,7 @@
         selectedLotId = '';
         currentLotJourney = null;
         currentMaterialTraceability = null;
+        localStorage.removeItem('tracklord_last_lot_id');
       }
 
       // 3. Fetch Raw Material Lots
@@ -437,7 +463,7 @@
       moveForm.clientId = '';
       moveForm.clientName = '';
 
-      await loadSelectedLotDetails(selectedLotId);
+      await refreshAllData();
     } catch (/** @type {any} */ err) {
       errorMessage = err.message;
     }
@@ -584,7 +610,7 @@
       successMessage = 'Item rejection & return transfer recorded successfully!';
       isRejectModalOpen = false;
 
-      await loadSelectedLotDetails(selectedLotId);
+      await refreshAllData();
     } catch (/** @type {any} */ err) {
       errorMessage = err.message;
     }
@@ -614,7 +640,7 @@
       });
       successMessage = 'Movement transaction reversed successfully!';
       isReverseModalOpen = false;
-      await loadSelectedLotDetails(selectedLotId);
+      await refreshAllData();
     } catch (/** @type {any} */ err) {
       errorMessage = err.message || 'Failed to reverse movement transaction.';
     }
