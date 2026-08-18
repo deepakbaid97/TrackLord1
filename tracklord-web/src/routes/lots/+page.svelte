@@ -136,6 +136,12 @@
             }
           }
 
+          // Lot is completely in terminating stage if it has 0 items in non-terminating active steps
+          const allInTerminatingStage = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => {
+            const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
+            return stepObj?.isTerminating;
+          });
+
           const lotClientId = lot.clientId || journey?.clientId;
           const lotClientName = lot.clientName || journey?.clientName;
 
@@ -186,6 +192,7 @@
             createdDate: new Date(lot.createdAtUtc),
             activeSteps,
             totalWipQty: journey ? totalWipQty : lot.initialQuantity,
+            allInTerminatingStage,
             clientId: lotClientId,
             clientName: lotClientName,
             clientIds: activeClientIdsArray,
@@ -214,8 +221,12 @@
         if (!matchesNumber && !matchesClient && !matchesItem) return false;
       }
 
-      // Step Filter
-      if (selectedStepId !== 'ALL') {
+      // Step Filter & Terminating Stage Exclusion
+      if (selectedStepId === 'ALL') {
+        // By default, hide lots where all items are in terminating stage
+        if (lot.allInTerminatingStage) return false;
+      } else {
+        // When a specific step is explicitly selected (including terminating steps):
         const hasStep = lot.activeSteps.some((/** @type {any} */ s) => s.stepId === selectedStepId);
         if (!hasStep) return false;
       }
@@ -603,8 +614,11 @@
           label="Manufacturing Step"
           bind:value={selectedStepId}
           options={[
-            { label: 'All Steps (Any active WIP)', value: 'ALL' },
-            ...steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))
+            { label: 'All Steps (Active WIP)', value: 'ALL' },
+            ...steps.map(s => ({
+              label: `${s.name} (${s.code})${s.isTerminating ? ' (Terminating)' : ''}`,
+              value: s.id
+            }))
           ]}
         />
 
@@ -712,7 +726,9 @@
                   <span class="text-on-surface-variant text-[11px] truncate">• {lot.clientNamesDisplay}</span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0 font-mono">
-                  <span class="font-bold text-xs text-primary">{lot.totalWipQty.toLocaleString()} Pcs</span>
+                  <span class="font-bold text-xs text-primary">
+                    {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
+                  </span>
                   <span class="text-[10px] text-on-surface-variant">• {lot.createdDate.toLocaleDateString()}</span>
                 </div>
               </div>
@@ -773,7 +789,7 @@
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
                   <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
-                    {lot.totalWipQty.toLocaleString()} Pcs
+                    {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1.5 items-center">
