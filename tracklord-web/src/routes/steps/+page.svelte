@@ -4,6 +4,7 @@
     getManufacturingSteps,
     createManufacturingStep,
     updateManufacturingStep,
+    reorderManufacturingSteps,
     getProductionLots,
     getLotJourney
   } from '$lib/api.js';
@@ -15,6 +16,16 @@
 
   /** @type {any[]} */
   let steps = $state([]);
+
+  // Drag & drop reorder state
+  let draggedStepIndex = $state(/** @type {number|null} */ (null));
+  let dragOverStepIndex = $state(/** @type {number|null} */ (null));
+
+  // Reorder confirmation modal state
+  let showReorderConfirmModal = $state(false);
+  /** @type {{ movedStep: any, fromIndex: number, toIndex: number, newSteps: any[] } | null} */
+  let pendingReorder = $state(null);
+  let submittingReorder = $state(false);
 
   // Modals state
   let showCreateModal = $state(false);
@@ -182,6 +193,210 @@
     }, 4000);
   }
 
+  let isDragging = false;
+
+  /**
+   * @param {number} index
+   * @param {DragEvent} e
+   */
+  function handleDragStart(index, e) {
+    draggedStepIndex = index;
+    isDragging = true;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', index.toString());
+    }
+  }
+
+  /**
+   * @param {DragEvent} e
+   */
+  function handleDragOver(e) {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  /**
+   * @param {number} index
+   * @param {DragEvent} e
+   */
+  function handleDragEnter(index, e) {
+    e.preventDefault();
+    if (draggedStepIndex !== null && dragOverStepIndex !== index) {
+      dragOverStepIndex = index;
+    }
+  }
+
+  function handleDragEnd() {
+    draggedStepIndex = null;
+    dragOverStepIndex = null;
+    setTimeout(() => {
+      isDragging = false;
+    }, 150);
+  }
+
+  /**
+   * @param {number} targetIndex
+   * @param {DragEvent} e
+   */
+  function handleDrop(targetIndex, e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let from = draggedStepIndex;
+    if (from === null && e.dataTransfer) {
+      const data = e.dataTransfer.getData('text/plain');
+      if (data !== '') from = parseInt(data, 10);
+    }
+
+    draggedStepIndex = null;
+    dragOverStepIndex = null;
+    setTimeout(() => {
+      isDragging = false;
+    }, 150);
+
+    if (from === null || isNaN(from) || from === targetIndex) {
+      return;
+    }
+
+    const to = targetIndex;
+    if (from < 0 || from >= steps.length || to < 0 || to >= steps.length) return;
+
+    const moved = steps[from];
+    const reordered = [...steps];
+    const [item] = reordered.splice(from, 1);
+    reordered.splice(to, 0, item);
+
+    const proposedSteps = reordered.map((s, idx) => ({
+      ...s,
+      sequenceOrder: idx + 1
+    }));
+
+    pendingReorder = {
+      movedStep: moved,
+      fromIndex: from,
+      toIndex: to,
+      newSteps: proposedSteps
+    };
+    showReorderConfirmModal = true;
+  }
+
+  // Touch handlers for mobile devices
+  let touchFromIndex = /** @type {number|null} */ (null);
+  let touchTargetIndex = /** @type {number|null} */ (null);
+
+  /**
+   * @param {number} index
+   * @param {TouchEvent} e
+   */
+  function handleTouchStart(index, e) {
+    if (e.touches.length !== 1) return;
+    touchFromIndex = index;
+    touchTargetIndex = index;
+    draggedStepIndex = index;
+    isDragging = true;
+  }
+
+  /**
+   * @param {TouchEvent} e
+   */
+  function handleTouchMove(e) {
+    if (touchFromIndex === null || e.touches.length !== 1) return;
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const stepEl = element.closest('[data-step-index]');
+    if (stepEl instanceof HTMLElement && stepEl.dataset.stepIndex !== undefined) {
+      const idx = parseInt(stepEl.dataset.stepIndex, 10);
+      if (!isNaN(idx) && idx >= 0 && idx < steps.length) {
+        touchTargetIndex = idx;
+        if (dragOverStepIndex !== idx) {
+          dragOverStepIndex = idx;
+        }
+      }
+    }
+  }
+
+  /**
+   * @param {TouchEvent} e
+   */
+  function handleTouchEnd(e) {
+    if (touchFromIndex === null) return;
+    const from = touchFromIndex;
+    const to = touchTargetIndex;
+
+    touchFromIndex = null;
+    touchTargetIndex = null;
+    draggedStepIndex = null;
+    dragOverStepIndex = null;
+    setTimeout(() => {
+      isDragging = false;
+    }, 150);
+
+    if (to === null || from === to || from < 0 || from >= steps.length || to < 0 || to >= steps.length) {
+      return;
+    }
+
+    const moved = steps[from];
+    const reordered = [...steps];
+    const [item] = reordered.splice(from, 1);
+    reordered.splice(to, 0, item);
+
+    const proposedSteps = reordered.map((s, idx) => ({
+      ...s,
+      sequenceOrder: idx + 1
+    }));
+
+    pendingReorder = {
+      movedStep: moved,
+      fromIndex: from,
+      toIndex: to,
+      newSteps: proposedSteps
+    };
+    showReorderConfirmModal = true;
+  }
+
+  function handleTouchCancel() {
+    touchFromIndex = null;
+    touchTargetIndex = null;
+    draggedStepIndex = null;
+    dragOverStepIndex = null;
+    isDragging = false;
+  }
+
+  function cancelReorder() {
+    showReorderConfirmModal = false;
+    pendingReorder = null;
+  }
+
+  async function confirmReorder() {
+    if (!pendingReorder) return;
+    const { movedStep, toIndex, newSteps } = pendingReorder;
+    submittingReorder = true;
+    try {
+      await reorderManufacturingSteps(newSteps.map(s => ({
+        id: s.id,
+        sequenceOrder: s.sequenceOrder
+      })));
+      steps = newSteps;
+      showSuccessToast(`Reordered '${movedStep.name}' to sequence #${toIndex + 1}!`);
+      showReorderConfirmModal = false;
+      pendingReorder = null;
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to save new step sequence.';
+      showReorderConfirmModal = false;
+      pendingReorder = null;
+    } finally {
+      submittingReorder = false;
+    }
+  }
+
   // Icon mapper for steps
   /** @type {Record<string, string>} */
   const stepIconMap = {
@@ -304,10 +519,16 @@
           <span class="material-symbols-outlined text-primary text-[20px] sm:text-[22px]">view_timeline</span>
           Manufacturing Sequence & WIP
         </h2>
+        <p class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px] text-primary/80">drag_indicator</span>
+          Drag rows to change the production pipeline order.
+        </p>
       </div>
-      <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant w-fit">
-        {steps.length} steps configured
-      </span>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant w-fit">
+          {steps.length} steps configured
+        </span>
+      </div>
     </div>
 
     {#if loading}
@@ -318,34 +539,52 @@
     {:else if steps.length > 0}
       <!-- Mobile View: Card Stack Column (below md) -->
       <div class="block md:hidden space-y-2">
-        {#each steps as step}
+        {#each steps as step, index (step.id)}
           <div
+            data-step-index={index}
+            draggable="true"
+            ondragstart={(e) => handleDragStart(index, e)}
+            ondragover={handleDragOver}
+            ondragenter={(e) => handleDragEnter(index, e)}
+            ondrop={(e) => handleDrop(index, e)}
+            ondragend={handleDragEnd}
             role="button"
             tabindex="0"
-            onclick={() => window.location.href = `/lots?step=${step.id}`}
-            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/lots?step=${step.id}`)}
-            class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
-            title="Click to view lots at '{step.name}' in Lots Directory"
+            onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/lots?step=${step.id}`)}
+            class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary' : ''} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10 shadow-md' : ''}"
+            title="Drag to reorder sequence, or click to view lots at '{step.name}'"
           >
-            <!-- Card Line 1: Seq # | Icon | Code & Name | Terminating Badge | Edit -->
+            <!-- Card Line 1: Drag handle | Seq # | Icon | Code & Name | Terminating Badge | Edit -->
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2 min-w-0">
-                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs shrink-0">
+                <div
+                  class="text-on-surface-variant/40 hover:text-primary cursor-grab active:cursor-grabbing p-1.5 shrink-0 rounded flex items-center justify-center touch-none select-none bg-surface-container-low/50 active:bg-primary/20"
+                  ontouchstart={(e) => handleTouchStart(index, e)}
+                  ontouchmove={handleTouchMove}
+                  ontouchend={handleTouchEnd}
+                  ontouchcancel={handleTouchCancel}
+                  onclick={(e) => e.stopPropagation()}
+                  title="Touch & drag to reorder"
+                >
+                  <span class="material-symbols-outlined text-[20px] pointer-events-none select-none">drag_indicator</span>
+                </div>
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs shrink-0 select-none">
                   {step.sequenceOrder}
                 </span>
-                <span class="material-symbols-outlined text-[18px] text-primary/80 shrink-0">
+                <span class="material-symbols-outlined text-[18px] text-primary/80 shrink-0 pointer-events-none select-none">
                   {stepIconMap[step.code] || 'work'}
                 </span>
                 <div class="min-w-0">
-                  <span class="font-bold text-sm text-on-surface truncate">{step.name}</span>
-                  <span class="font-mono text-xs text-primary font-bold ml-1">({step.code})</span>
+                  <span class="font-bold text-sm text-on-surface truncate select-none">{step.name}</span>
+                  <span class="font-mono text-xs text-primary font-bold ml-1 select-none">({step.code})</span>
                 </div>
               </div>
 
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div class="flex items-center gap-1 shrink-0">
                 {#if step.isTerminating}
-                  <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300">
-                    <span class="material-symbols-outlined text-[12px] text-amber-600">flag</span>
+                  <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 select-none">
+                    <span class="material-symbols-outlined text-[12px] text-amber-600 pointer-events-none">flag</span>
                     Terminating
                   </span>
                 {/if}
@@ -354,13 +593,13 @@
                   title="Edit Step"
                   class="p-1 rounded-md border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                 >
-                  <span class="material-symbols-outlined text-[15px]">edit</span>
+                  <span class="material-symbols-outlined text-[14px] pointer-events-none">edit</span>
                 </button>
               </div>
             </div>
 
             <!-- Card Line 2: WIP Quantity & Lot Count -->
-            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
+            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50 select-none">
               <span class="text-on-surface-variant font-mono">
                 {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'active lot' : 'active lots'}
               </span>
@@ -372,86 +611,107 @@
         {/each}
       </div>
 
-      <!-- Desktop View: Table (md and up) -->
-      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
-        <table class="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-              <th class="px-4 py-3 text-center w-14">Seq</th>
-              <th class="px-4 py-3">Code</th>
-              <th class="px-4 py-3">Step Name</th>
-              <th class="px-4 py-3 text-right">Total Qty</th>
-              <th class="px-4 py-3 text-center">Terminating Step?</th>
-              <th class="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-outline-variant/50 text-on-surface">
-            {#each steps as step}
-              <tr
-                onclick={() => window.location.href = `/lots?step=${step.id}`}
-                class="hover:bg-surface-container-low/60 transition-colors cursor-pointer group"
-                title="Click to view lots at '{step.name}' in Lots Directory"
+      <!-- Desktop View: Grid Table (md and up) -->
+      <div class="hidden md:block w-full overflow-hidden rounded-xl border border-outline-variant bg-surface">
+        <!-- Table Header -->
+        <div class="grid grid-cols-[40px_60px_110px_1fr_130px_140px_80px] items-center px-4 py-3 bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+          <div class="text-center"></div>
+          <div class="text-center">Seq</div>
+          <div>Code</div>
+          <div>Step Name</div>
+          <div class="text-right">Total Qty</div>
+          <div class="text-center">Terminating?</div>
+          <div class="text-right">Actions</div>
+        </div>
+
+        <!-- Table Rows -->
+        <div class="divide-y divide-outline-variant/50 text-on-surface">
+          {#each steps as step, index (step.id)}
+            <div
+              data-step-index={index}
+              draggable="true"
+              ondragstart={(e) => handleDragStart(index, e)}
+              ondragover={handleDragOver}
+              ondragenter={(e) => handleDragEnter(index, e)}
+              ondrop={(e) => handleDrop(index, e)}
+              ondragend={handleDragEnd}
+              role="button"
+              tabindex="0"
+              onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/lots?step=${step.id}`)}
+              class="grid grid-cols-[40px_60px_110px_1fr_130px_140px_80px] items-center px-4 py-3.5 transition-all cursor-pointer group select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary scale-[0.99]' : 'hover:bg-surface-container-low/60'} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}"
+              title="Drag to reorder sequence, or click to view lots at '{step.name}'"
+            >
+              <!-- Drag Handle -->
+              <div
+                class="flex items-center justify-center text-on-surface-variant/40 hover:text-primary transition-colors cursor-grab active:cursor-grabbing p-1 rounded touch-none select-none"
+                ontouchstart={(e) => handleTouchStart(index, e)}
+                ontouchmove={handleTouchMove}
+                ontouchend={handleTouchEnd}
+                ontouchcancel={handleTouchCancel}
+                onclick={(e) => e.stopPropagation()}
+                title="Drag to reorder step sequence"
               >
-                <!-- Sequence Order Badge -->
-                <td class="px-4 py-3.5 text-center">
-                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs group-hover:scale-110 transition-transform">
-                    {step.sequenceOrder}
+                <span class="material-symbols-outlined text-[20px] pointer-events-none select-none">drag_indicator</span>
+              </div>
+
+              <!-- Sequence Order Badge -->
+              <div class="text-center">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs group-hover:scale-110 transition-transform select-none">
+                  {step.sequenceOrder}
+                </span>
+              </div>
+
+              <!-- Code -->
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="material-symbols-outlined text-[20px] text-primary/80 group-hover:text-primary transition-colors pointer-events-none select-none shrink-0">
+                  {stepIconMap[step.code] || 'work'}
+                </span>
+                <span class="font-mono font-bold text-sm text-primary tracking-wide group-hover:underline truncate select-none">
+                  {step.code}
+                </span>
+              </div>
+
+              <!-- Name -->
+              <div class="font-bold text-on-surface group-hover:text-primary transition-colors truncate select-none">
+                {step.name}
+              </div>
+
+              <!-- Total Quantity -->
+              <div class="text-right whitespace-nowrap select-none">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary font-bold text-base font-mono tracking-wide">
+                  {(step.totalQuantity || 0).toLocaleString()} Pcs
+                </span>
+                <div class="text-[11px] text-on-surface-variant font-mono mt-0.5">
+                  {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
+                </div>
+              </div>
+
+              <!-- Terminating Indicator -->
+              <div class="text-center select-none">
+                {#if step.isTerminating}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                    <span class="material-symbols-outlined text-[15px] text-amber-600 pointer-events-none">flag</span>
+                    Terminating
                   </span>
-                </td>
+                {:else}
+                  <span class="text-xs text-on-surface-variant/60 font-mono">—</span>
+                {/if}
+              </div>
 
-                <!-- Code -->
-                <td class="px-4 py-3.5">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[20px] text-primary/80 group-hover:text-primary transition-colors">
-                      {stepIconMap[step.code] || 'work'}
-                    </span>
-                    <span class="font-mono font-bold text-sm text-primary tracking-wide group-hover:underline">
-                      {step.code}
-                    </span>
-                  </div>
-                </td>
-
-                <!-- Name -->
-                <td class="px-4 py-3.5 font-bold text-on-surface group-hover:text-primary transition-colors">
-                  {step.name}
-                </td>
-
-                <!-- Total Quantity -->
-                <td class="px-4 py-3.5 text-right whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary font-bold text-base font-mono tracking-wide">
-                    {(step.totalQuantity || 0).toLocaleString()} Pcs
-                  </span>
-                  <div class="text-[11px] text-on-surface-variant font-mono mt-1">
-                    {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
-                  </div>
-                </td>
-
-                <!-- Terminating Indicator -->
-                <td class="px-4 py-3.5 text-center">
-                  {#if step.isTerminating}
-                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                      <span class="material-symbols-outlined text-[15px] text-amber-600">flag</span>
-                      Terminating
-                    </span>
-                  {:else}
-                    <span class="text-xs text-on-surface-variant/60 font-mono">—</span>
-                  {/if}
-                </td>
-
-                <!-- Actions -->
-                <td class="px-4 py-3.5 text-right">
-                  <button
-                    onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
-                    class="px-3 py-1.5 rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-bold text-xs flex items-center gap-1 ml-auto transition-colors cursor-pointer"
-                  >
-                    <span class="material-symbols-outlined text-[16px]">edit</span>
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+              <!-- Actions -->
+              <div class="text-right whitespace-nowrap">
+                <button
+                  onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
+                  class="px-3 py-1.5 rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-bold text-xs flex items-center gap-1 ml-auto transition-colors cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[15px] pointer-events-none">edit</span>
+                  Edit
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     {:else}
       <div class="p-12 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
@@ -674,3 +934,72 @@
     </div>
   </div>
 {/if}
+
+<!-- Reorder Confirmation Modal -->
+{#if showReorderConfirmModal && pendingReorder}
+  <div class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface dark:bg-surface-dim w-full max-w-md rounded-2xl border border-outline-variant shadow-xl p-6 space-y-5 animate-scale-up">
+      <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+        <h3 class="font-bold text-lg text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">swap_vert</span>
+          Confirm Step Sequence Change
+        </h3>
+        <button onclick={cancelReorder} class="text-on-surface-variant hover:text-on-surface">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-sm text-on-surface">
+        <p class="leading-relaxed">
+          Do you really want to move step <strong class="text-primary font-bold">{pendingReorder.movedStep.name} ({pendingReorder.movedStep.code})</strong>
+          from sequence position <span class="font-mono font-bold px-1.5 py-0.5 rounded bg-surface-container-low border border-outline-variant">#{pendingReorder.fromIndex + 1}</span>
+          to <span class="font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">#{pendingReorder.toIndex + 1}</span>?
+        </p>
+
+        <!-- Preview of new sequence -->
+        <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant space-y-1.5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant font-mono mb-1">
+            New Sequence Order Preview
+          </div>
+          <div class="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {#each pendingReorder.newSteps as s}
+              <div class="flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg {s.id === pendingReorder.movedStep.id ? 'bg-primary text-on-primary font-bold shadow-xs' : 'bg-surface border border-outline-variant/60 text-on-surface'}">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="font-mono font-bold text-[11px] w-5 text-center {s.id === pendingReorder.movedStep.id ? 'text-on-primary' : 'text-primary'}">
+                    #{s.sequenceOrder}
+                  </span>
+                  <span class="truncate">{s.name} ({s.code})</span>
+                </div>
+                {#if s.id === pendingReorder.movedStep.id}
+                  <span class="text-[10px] uppercase font-bold tracking-wider opacity-90">Moved</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+        <button
+          type="button"
+          onclick={cancelReorder}
+          class="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-bold text-xs hover:bg-surface-container-low cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onclick={confirmReorder}
+          disabled={submittingReorder}
+          class="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          {#if submittingReorder}
+            <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+          {/if}
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+

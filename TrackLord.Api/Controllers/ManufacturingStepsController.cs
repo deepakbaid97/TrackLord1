@@ -54,4 +54,15 @@ public class ManufacturingStepsController : ControllerBase
         await _mediator.Send(command);
         return Ok(new { success = true });
     }
+
+    /// <summary>
+    /// Reorders manufacturing steps.
+    /// </summary>
+    [HttpPut("reorder")]
+    public async Task<IActionResult> Reorder([FromBody] ReorderManufacturingStepsRequest request)
+    {
+        var command = new ReorderManufacturingStepsCommand(request.Steps);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
 }

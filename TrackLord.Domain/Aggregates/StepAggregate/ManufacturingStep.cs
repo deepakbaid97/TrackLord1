@@ -44,6 +44,12 @@ public class ManufacturingStep : AggregateRoot<Guid>, ITenantScopedEntity
         IsTerminating = isTerminating;
     }
 
+    public void UpdateSequenceOrder(int sequenceOrder)
+    {
+        if (sequenceOrder < 0) throw new DomainException("Sequence order must be non-negative.");
+        SequenceOrder = sequenceOrder;
+    }
+
     public void Deactivate() => IsActive = false;
     public void Activate() => IsActive = true;
 }
