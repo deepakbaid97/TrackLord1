@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { getUsers, createUser, updateUser } from '$lib/api.js';
   import { authStore } from '$lib/stores/authStore.js';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
@@ -203,31 +204,9 @@
 <!-- Main Container -->
 <main class="max-w-[1440px] mx-auto p-3.5 sm:p-6 md:p-8 space-y-4 sm:space-y-6 pt-8 sm:pt-10">
 
-  <!-- Success Notification -->
-  {#if successMessage}
-    <div class="p-3.5 sm:p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fadeIn">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-600">check_circle</span>
-        <span class="font-medium">{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-600 hover:text-emerald-800">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Error Banner -->
-  {#if errorMessage}
-    <div class="p-3.5 sm:p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <!-- Floating Notifications -->
+  <Callout bind:message={errorMessage} type="error" />
+  <Callout bind:message={successMessage} type="success" />
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">

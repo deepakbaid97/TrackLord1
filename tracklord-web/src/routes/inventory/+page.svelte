@@ -8,6 +8,7 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
   import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   import {
@@ -705,30 +706,9 @@
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
-  <!-- Notification Banner -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-500">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-500 hover:text-emerald-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <!-- Floating Notifications -->
+  <Callout bind:message={errorMessage} type="error" />
+  <Callout bind:message={successMessage} type="success" />
 
   <!-- Action Bar & Lot Selector -->
   <section class="bg-surface-container-low p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

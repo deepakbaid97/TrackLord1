@@ -11,6 +11,7 @@
   import Select from '$lib/components/ui/Select.svelte';
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
   import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
@@ -484,17 +485,7 @@
 <!-- Main Content -->
 <main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
 
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <Callout bind:message={errorMessage} type="error" />
 
   <!-- Header Info & KPI Summary -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">

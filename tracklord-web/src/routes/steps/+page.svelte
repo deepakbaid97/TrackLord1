@@ -8,6 +8,7 @@
     getProductionLots,
     getLotJourney
   } from '$lib/api.js';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
@@ -444,31 +445,9 @@
 <!-- Main Content -->
 <main class="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 pt-20 pb-24">
 
-  <!-- Success Toast -->
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fade-in">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-600 hover:text-emerald-800">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Error Alert -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
+  <!-- Floating Notifications -->
+  <Callout bind:message={errorMessage} type="error" />
+  <Callout bind:message={successMessage} type="success" />
 
   <!-- Summary Cards -->
   <section class="grid grid-cols-3 gap-1.5 sm:gap-4">
