@@ -410,44 +410,42 @@
     'INSP': 'search_check',
     'DISP': 'local_shipping'
   };
+
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Manufacturing Steps',
+      subtitle: 'Sequence & Routing',
+      icon: 'alt_route',
+      actions: [
+        {
+          label: 'Add Step',
+          icon: 'add',
+          variant: 'primary',
+          onclick: () => openCreateModal()
+        },
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => fetchSteps()
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- Header -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">alt_route</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">Manufacturing Steps</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => fetchSteps()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-    <button
-      onclick={openCreateModal}
-      class="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 shadow-sm flex items-center gap-1.5 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[18px]">add</span>
-      Add Step
-    </button>
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Content -->
-<main class="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 pt-20 pb-24">
-
-  <!-- Floating Notifications -->
-  <Callout bind:message={errorMessage} type="error" />
-  <Callout bind:message={successMessage} type="success" />
+<main class="max-w-[1200px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4 pb-24">
 
   <!-- Summary Cards -->
   <section class="grid grid-cols-3 gap-1.5 sm:gap-4">

@@ -15,8 +15,10 @@
   } = $props();
 
   let isOpen = $state(false);
+  let openDirection = $state(/** @type {'down' | 'up'} */ ('down'));
   let searchQuery = $state('');
   let searchInputEl = $state(/** @type {HTMLInputElement | null} */ (null));
+  let buttonEl = $state(/** @type {HTMLButtonElement | null} */ (null));
 
   let selectedOption = $derived(
     options.find((opt) => String(opt.value) === String(value))
@@ -32,10 +34,29 @@
 
   function toggle() {
     if (disabled) return;
+    if (!isOpen && buttonEl) {
+      const rect = buttonEl.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // If space below is less than 240px and space above is greater, open upwards
+      if (spaceBelow < 240 && spaceAbove > spaceBelow) {
+        openDirection = 'up';
+      } else {
+        openDirection = 'down';
+      }
+    }
+
     isOpen = !isOpen;
     if (isOpen) {
       searchQuery = '';
-      setTimeout(() => searchInputEl?.focus(), 50);
+      setTimeout(() => {
+        searchInputEl?.focus();
+        if (buttonEl) {
+          buttonEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
     }
   }
 
@@ -82,6 +103,7 @@
   <div class="relative flex items-center w-full">
     <button
       {id}
+      bind:this={buttonEl}
       type="button"
       {disabled}
       onclick={toggle}
@@ -95,15 +117,17 @@
         {selectedOption ? selectedOption.label : placeholder}
       </span>
 
-      <span class="material-symbols-outlined absolute right-3 text-on-surface-variant text-[20px] pointer-events-none transition-transform duration-200 {isOpen ? 'rotate-180' : ''}">
-        unfold_more
+      <span class="material-symbols-outlined absolute right-3 text-on-surface-variant text-[20px] pointer-events-none transition-transform duration-200 {isOpen ? (openDirection === 'up' ? '' : 'rotate-180') : ''}">
+        {openDirection === 'up' && isOpen ? 'expand_less' : 'unfold_more'}
       </span>
     </button>
 
     {#if isOpen}
-      <div class="absolute top-full left-0 right-0 mt-1 bg-surface border border-outline-variant rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+      <div 
+        class="absolute {openDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} left-0 right-0 bg-surface dark:bg-slate-900 border border-outline-variant/80 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in {openDirection === 'up' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-150"
+      >
         {#if searchable}
-          <div class="p-2 border-b border-outline-variant/60 bg-surface">
+          <div class="p-2 border-b border-outline-variant/60 bg-surface dark:bg-slate-900">
             <div class="relative flex items-center">
               <span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[18px] pointer-events-none">search</span>
               <input
@@ -111,23 +135,23 @@
                 type="text"
                 bind:value={searchQuery}
                 placeholder={searchPlaceholder}
-                class="w-full bg-surface-container-low border border-outline-variant rounded-md pl-8 pr-3 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/60 outline-none focus:ring-2 focus:ring-primary/20"
+                class="w-full bg-surface-container-low dark:bg-slate-800 border border-outline-variant/70 rounded-md pl-8 pr-3 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/60 outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
           </div>
         {/if}
 
-        <div class="max-h-56 overflow-y-auto py-1">
+        <div class="max-h-48 sm:max-h-56 overflow-y-auto py-1 divide-y divide-outline-variant/20">
           {#each filteredOptions as opt}
             {@const isSelected = String(opt.value) === String(value)}
             <button
               type="button"
               onclick={() => selectOption(opt.value)}
-              class="w-full px-3 py-2 text-sm flex items-center justify-between text-left transition-colors {isSelected ? 'bg-primary/10 font-semibold text-primary' : 'text-on-surface hover:bg-surface-container-low'}"
+              class="w-full px-3 py-2 text-xs sm:text-sm flex items-center justify-between text-left transition-colors cursor-pointer {isSelected ? 'bg-primary/10 font-semibold text-primary' : 'text-on-surface hover:bg-surface-container-low dark:hover:bg-slate-800'}"
             >
               <span class="truncate">{opt.label}</span>
               {#if isSelected}
-                <span class="material-symbols-outlined text-[18px] text-primary">check</span>
+                <span class="material-symbols-outlined text-[18px] text-primary shrink-0 ml-2">check</span>
               {/if}
             </button>
           {:else}
@@ -140,3 +164,4 @@
     {/if}
   </div>
 </div>
+

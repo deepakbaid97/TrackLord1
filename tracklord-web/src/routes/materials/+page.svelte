@@ -340,62 +340,47 @@
       isImporting = false;
     }
   }
+
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Raw Materials',
+      subtitle: 'Stock & Consumption',
+      icon: 'texture',
+      actions: [
+        {
+          label: 'Register Material',
+          icon: 'add',
+          variant: 'primary',
+          onclick: () => { isCreateMaterialModalOpen = true; }
+        },
+        {
+          label: 'Import Lots',
+          icon: 'file_upload',
+          variant: 'outline',
+          onclick: () => { openImportModal(); }
+        },
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => { fetchMaterials(); }
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- Top App Header -->
-<header class="fixed top-0 w-full z-40 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">texture</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">Raw Materials Stock & History</div>
-    </div>
-  </div>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => fetchMaterials()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
-
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
-
-  <!-- Floating Notifications -->
-  <Callout bind:message={errorMessage} type="error" />
-  <Callout bind:message={successMessage} type="success" />
-
-  <!-- Page Title & Primary Action -->
-  <section class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-2xl border border-outline-variant shadow-sm">
-    <div>
-      <h1 class="text-lg sm:text-2xl font-bold text-primary flex items-center gap-1.5 sm:gap-2">
-        <span>Raw Materials Ledger</span>
-      </h1>
-    </div>
-
-    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-      <button
-        onclick={openImportModal}
-        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-emerald-700 dark:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-emerald-800 transition-colors shadow-xs cursor-pointer"
-      >
-        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">file_upload</span>
-        <span>Import</span>
-      </button>
-      <button
-        onclick={() => isCreateMaterialModalOpen = true}
-        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
-      >
-        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">add</span>
-        <span>Register</span>
-      </button>
-    </div>
-  </section>
+<main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
   <!-- Summary Cards -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">

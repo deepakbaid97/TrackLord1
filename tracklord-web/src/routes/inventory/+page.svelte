@@ -667,6 +667,31 @@
       errorMessage = err.message || 'Failed to delete production lot.';
     }
   }
+  let isMobileActionSheetOpen = $state(false);
+  let isLotPickerModalOpen = $state(false);
+  let lotSearchFilter = $state('');
+
+  let filteredLots = $derived(
+    productionLots.filter(l => 
+      (l.lotNumber || '').toLowerCase().includes(lotSearchFilter.toLowerCase()) ||
+      (l.status || '').toLowerCase().includes(lotSearchFilter.toLowerCase()) ||
+      (l.clientName || '').toLowerCase().includes(lotSearchFilter.toLowerCase())
+    )
+  );
+
+  let selectedLotObj = $derived(productionLots.find(l => l.id === selectedLotId));
+
+  let totalLotWip = $derived.by(() => {
+    if (!currentLotJourney || !currentLotJourney.activeBalances) return 0;
+    return currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + (Number(b.quantity) || 0), 0);
+  });
+
+  let currentActiveStepName = $derived.by(() => {
+    if (!currentLotJourney || !currentLotJourney.activeBalances) return 'None';
+    const active = currentLotJourney.activeBalances.find((/** @type {any} */ b) => Number(b.quantity) > 0);
+    return active ? active.stepName : 'Completed';
+  });
+
   let isMoreActionsOpen = $state(false);
 
   /** @param {MouseEvent} e */
@@ -676,168 +701,112 @@
       isMoreActionsOpen = false;
     }
   }
+
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Lot Inventory',
+      subtitle: selectedLotObj ? `${selectedLotObj.lotNumber} • ${selectedLotObj.clientName || 'Live WIP'}` : 'Live Production WIP',
+      icon: 'inventory_2',
+      actions: [
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => { refreshAllData(); }
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
 <svelte:window onclick={handleDocumentClick} />
 
-<!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">factory</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">Production Lot Inventory</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => refreshAllData()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh Data
-    </button>
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
+<main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
-  <!-- Floating Notifications -->
-  <Callout bind:message={errorMessage} type="error" />
-  <Callout bind:message={successMessage} type="success" />
-
-  <!-- Action Bar & Lot Selector -->
-  <section class="bg-surface-container-low p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto min-w-[280px]">
-      <Select
-        label="Select Lot:"
-        value={selectedLotId}
-        onchange={(val) => handleLotChange(val)}
-        options={productionLots.map(lot => ({
-          label: `${lot.lotNumber} (${lot.initialQuantity} Pcs - ${lot.status})`,
-          value: lot.id
-        }))}
-        placeholder={productionLots.length === 0 ? "No lots available" : "Select a lot..."}
-        searchPlaceholder="Search lot number or status..."
-      />
-    </div>
-
-    <!-- Quick Action Buttons -->
-    <div class="w-full md:w-auto">
-      <!-- Desktop View (hidden on mobile, visible on md and up) -->
-      <div class="hidden md:flex flex-wrap gap-2">
-        <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
-          New Production Lot
-        </Button>
-        <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
-          Move Quantity
-        </Button>
-        <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
-          Register Material
-        </Button>
-        <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
-          Log Consumption
-        </Button>
-        <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
-          Report Rejection
-        </Button>
-      </div>
-
-      <!-- Mobile View (visible on mobile, hidden on md and up) -->
-      <div class="flex md:hidden items-center gap-2 w-full">
-        <div class="flex-1">
-          <Button variant="primary" icon="add" class="w-full justify-center" onclick={() => isCreateLotModalOpen = true}>
-            New Lot
-          </Button>
-        </div>
-
-        <div id="more-actions-container" class="relative">
-          <Button
-            variant="outline"
-            icon="more_vert"
-            onclick={() => isMoreActionsOpen = !isMoreActionsOpen}
-          >
-            More Actions
-            <span class="material-symbols-outlined text-[16px] transition-transform duration-200 {isMoreActionsOpen ? 'rotate-180' : ''}">expand_more</span>
-          </Button>
-
-          {#if isMoreActionsOpen}
-            <div class="absolute right-0 top-full mt-2 w-56 bg-surface dark:bg-surface-container-high rounded-xl border border-outline-variant shadow-xl z-50 py-1 divide-y divide-outline-variant/40 animate-in fade-in zoom-in-95 duration-100">
-              <div class="py-1">
-                <button
-                  disabled={!selectedLotId}
-                  onclick={() => { isMoreActionsOpen = false; openMoveModal(); }}
-                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[18px] text-primary">move_item</span>
-                  Move Quantity
-                </button>
-
-                <button
-                  onclick={() => { isMoreActionsOpen = false; isCreateMaterialModalOpen = true; }}
-                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[18px] text-tertiary">inventory</span>
-                  Register Material
-                </button>
-
-                <button
-                  disabled={!selectedLotId}
-                  onclick={() => { isMoreActionsOpen = false; isConsumeMaterialModalOpen = true; }}
-                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[18px] text-emerald-600">local_mall</span>
-                  Log Consumption
-                </button>
-
-                <button
-                  disabled={!selectedLotId}
-                  onclick={() => { isMoreActionsOpen = false; isRejectModalOpen = true; }}
-                  class="w-full px-4 py-2.5 text-left text-sm font-medium text-on-surface hover:bg-surface-container-low flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[18px] text-amber-600">report_problem</span>
-                  Report Rejection
-                </button>
-              </div>
-
-              {#if selectedLotId}
-                <div class="py-1">
-                  <button
-                    onclick={() => { isMoreActionsOpen = false; handleDeleteLot(); }}
-                    class="w-full px-4 py-2.5 text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <span class="material-symbols-outlined text-[18px]">delete</span>
-                    Delete Lot
-                  </button>
-                </div>
-              {/if}
+  <!-- Compact Top Bar: Lot Switcher Pill & Desktop Actions -->
+  <section class="bg-surface p-2.5 sm:p-4 rounded-2xl border border-outline-variant/70 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+    <!-- Left: Sleek Lot Switcher Pill -->
+    <div class="flex items-center gap-2 flex-1 max-w-full">
+      <button
+        type="button"
+        onclick={() => { lotSearchFilter = ''; isLotPickerModalOpen = true; }}
+        class="flex-1 sm:flex-none flex items-center justify-between sm:justify-start gap-2.5 px-3.5 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/80 transition-all text-left group cursor-pointer shadow-xs active:scale-[0.99]"
+      >
+        <div class="flex items-center gap-2 truncate">
+          <span class="material-symbols-outlined text-primary text-[20px] shrink-0">inventory_2</span>
+          {#if selectedLotObj}
+            <div class="truncate">
+              <span class="font-bold text-sm text-on-surface tracking-tight font-mono">{selectedLotObj.lotNumber}</span>
+              <span class="text-xs text-on-surface-variant ml-1.5 font-mono">({selectedLotObj.initialQuantity} Pcs)</span>
             </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary shrink-0">
+              {selectedLotObj.status}
+            </span>
+          {:else}
+            <span class="text-sm font-medium text-on-surface-variant">Select Production Lot...</span>
           {/if}
         </div>
-      </div>
+        <span class="material-symbols-outlined text-on-surface-variant text-[18px] group-hover:text-primary transition-colors shrink-0">unfold_more</span>
+      </button>
+
+      <button
+        onclick={() => refreshAllData()}
+        title="Refresh Live Data"
+        class="p-2 rounded-xl border border-outline-variant/80 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
+      >
+        <span class="material-symbols-outlined text-[18px]">refresh</span>
+      </button>
+    </div>
+
+    <!-- Right: Desktop Toolbar (hidden on mobile) -->
+    <div class="hidden md:flex items-center gap-2">
+      <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
+        New Lot
+      </Button>
+      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={openMoveModal}>
+        Move Qty
+      </Button>
+      <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
+        Material
+      </Button>
+      <Button variant="outline" icon="local_mall" disabled={!selectedLotId} onclick={() => isConsumeMaterialModalOpen = true}>
+        Consume
+      </Button>
+      <Button variant="outline" icon="report_problem" disabled={!selectedLotId} onclick={() => isRejectModalOpen = true}>
+        Rejection
+      </Button>
     </div>
   </section>
 
-  <!-- View Mode Tabs -->
-  <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-    <div class="flex gap-2">
+  <!-- View Mode Tabs (Compact iOS-Style Segmented Control) -->
+  <div class="flex items-center justify-between">
+    <div class="inline-flex p-1 bg-surface-container-low dark:bg-slate-800 rounded-xl border border-outline-variant/60 shadow-xs">
       <button
+        type="button"
         onclick={() => activeTab = 'lots'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'lots' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        class="px-3.5 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 cursor-pointer {activeTab === 'lots' ? 'bg-primary text-white shadow-md shadow-primary/20 scale-[1.01]' : 'text-on-surface-variant hover:text-on-surface'}"
       >
-        <span class="material-symbols-outlined text-[18px]">reorder</span>
-        Lot Tracking & Journey
+        <span class="material-symbols-outlined text-[16px]">alt_route</span>
+        Journey & WIP
       </button>
       <button
+        type="button"
         onclick={() => activeTab = 'ledger'}
-        class="px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 {activeTab === 'ledger' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}"
+        class="px-3.5 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 cursor-pointer {activeTab === 'ledger' ? 'bg-primary text-white shadow-md shadow-primary/20 scale-[1.01]' : 'text-on-surface-variant hover:text-on-surface'}"
       >
-        <span class="material-symbols-outlined text-[18px]">history</span>
-        Movements Ledger ({movementsLedgerRows.length})
+        <span class="material-symbols-outlined text-[16px]">history</span>
+        Ledger ({movementsLedgerRows.length})
       </button>
     </div>
   </div>
@@ -845,86 +814,142 @@
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
       <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-      <span>Fetching live data from backend API...</span>
+      <span class="text-sm font-medium">Fetching live manufacturing data...</span>
     </div>
   {:else if activeTab === 'lots'}
     <!-- LOT TRACKING VIEW -->
     {#if currentLotJourney}
-      <!-- Header Info -->
-      <section class="bg-surface p-4 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-2xl sm:text-3xl text-primary font-bold">{currentLotJourney.lotNumber}</h1>
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-container text-on-primary-container">
-            {currentLotJourney.status}
-          </span>
+      <!-- Compact Lot Summary Card -->
+      <section class="bg-surface p-3.5 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-xl sm:text-2xl text-primary font-bold tracking-tight font-mono">{currentLotJourney.lotNumber}</h1>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+              {currentLotJourney.status}
+            </span>
+            {#if currentLotJourney.clientName}
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface flex items-center gap-1 border border-outline-variant/50">
+                <span class="material-symbols-outlined text-[13px] text-primary">badge</span>
+                {currentLotJourney.clientName}
+              </span>
+            {/if}
+          </div>
+
           <button
             onclick={handleDeleteLot}
             title="Delete Production Lot"
-            class="px-2.5 py-1 text-xs bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+            class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
           >
-            <span class="material-symbols-outlined text-[15px]">delete</span>
-            Delete Lot
+            <span class="material-symbols-outlined text-[14px]">delete</span>
+            <span class="hidden sm:inline">Delete Lot</span>
           </button>
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-on-surface-variant font-mono">
-          <div>
-            Total WIP: <span class="text-lg font-bold text-primary ml-1">{currentLotJourney.activeBalances ? currentLotJourney.activeBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0) : 0} Pcs</span>
+        <!-- 3-Metric Clean Strip -->
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/50 font-mono text-center">
+          <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
+            <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Total WIP</div>
+            <div class="text-base sm:text-lg font-bold text-primary mt-0.5">{totalLotWip} <span class="text-xs font-normal">Pcs</span></div>
           </div>
-          {#if currentLotJourney.clientName}
-            <div class="flex items-center gap-1">
-              Client: <span class="font-semibold text-primary ml-1">{currentLotJourney.clientName}</span>
-            </div>
-          {/if}
-          <div>
-            Created: <span class="font-semibold text-on-surface ml-1">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</span>
+          <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
+            <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Current Stage</div>
+            <div class="text-xs sm:text-sm font-bold text-on-surface truncate mt-1">{currentActiveStepName}</div>
+          </div>
+          <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
+            <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Created</div>
+            <div class="text-xs sm:text-sm font-semibold text-on-surface mt-1">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</div>
           </div>
         </div>
       </section>
 
       <!-- Grid Content -->
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
         <!-- Journey Timeline -->
-        <section class="md:col-span-4 bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-          <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-4">Journey Timeline</h2>
-          <Timeline steps={timelineSteps} />
+        <section class="md:col-span-4 bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-outline-variant/60 pb-2">
+            <h2 class="font-bold text-sm sm:text-base text-on-surface flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-primary text-[18px]">route</span>
+              Journey Timeline
+            </h2>
+          </div>
+          <Timeline 
+            steps={timelineSteps} 
+            onMoveStep={(stepId) => {
+              updateMoveQuantityFromStep(stepId);
+              isMoveModalOpen = true;
+            }}
+          />
         </section>
 
-        <div class="md:col-span-8 space-y-6">
-          <!-- Current Inventory Distribution -->
-          <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
-            <h2 class="font-headline-md text-headline-md border-b border-outline-variant pb-2 mb-3 sm:mb-4">WIP Distribution Across Steps</h2>
-            <div class="space-y-2.5 sm:space-y-4">
+        <div class="md:col-span-8 space-y-4 sm:space-y-6">
+          <!-- WIP Distribution Across Steps (Commented out: Journey Timeline already displays step balances)
+          <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
+            <div class="flex justify-between items-center border-b border-outline-variant/60 pb-2">
+              <h2 class="font-bold text-sm sm:text-base text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[18px]">bar_chart</span>
+                WIP Distribution
+              </h2>
+              <span class="text-xs font-mono font-bold text-primary">{totalLotWip} Pcs Total</span>
+            </div>
+
+            {#if totalLotWip > 0}
+              <div class="h-2.5 w-full rounded-full bg-surface-container overflow-hidden flex shadow-inner">
+                {#each manufacturingSteps as step}
+                  {@const bal = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
+                  {@const qty = bal ? bal.quantity : 0}
+                  {@const pct = (qty / totalLotWip) * 100}
+                  {#if pct > 0}
+                    <div
+                      class="h-full bg-primary transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                      style="width: {pct}%"
+                      title="{step.name}: {qty} Pcs ({Math.round(pct)}%)"
+                    ></div>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+
+            <div class="space-y-2 pt-1">
               {#each manufacturingSteps as step}
                 {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
                 {@const qty = balanceObj ? balanceObj.quantity : 0}
-                {@const totalActive = activeWipBalances.reduce((/** @type {number} */ a, /** @type {any} */ b) => a + b.quantity, 0)}
-                <div>
-                  <div class="flex justify-between font-stat-label text-xs sm:text-sm mb-1">
-                    <span class="font-bold text-on-surface">{step.name} ({step.code})</span>
-                    <span class="font-mono text-primary font-bold">{qty} Pcs</span>
+                {@const hasWip = qty > 0}
+                <div class="flex items-center justify-between p-2 rounded-xl transition-colors {hasWip ? 'bg-primary/5 border border-primary/20' : 'hover:bg-surface-container-low opacity-60'}">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full {hasWip ? 'bg-primary animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}"></span>
+                    <span class="text-xs sm:text-sm font-semibold {hasWip ? 'text-primary' : 'text-on-surface'}">{step.name}</span>
+                    <span class="text-[11px] font-mono text-on-surface-variant">({step.code})</span>
                   </div>
-                  <div class="w-full bg-surface-variant rounded-full h-1.5 sm:h-2.5 overflow-hidden">
-                    <div
-                      class="bg-primary h-1.5 sm:h-2.5 rounded-full transition-all duration-500"
-                      style="width: {totalActive > 0 ? (qty / totalActive) * 100 : 0}%"
-                    ></div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs sm:text-sm font-bold {hasWip ? 'text-primary' : 'text-on-surface-variant'}">{qty} Pcs</span>
+                    {#if hasWip}
+                      <button
+                        type="button"
+                        onclick={() => { updateMoveQuantityFromStep(step.id); isMoveModalOpen = true; }}
+                        class="px-2 py-0.5 bg-primary text-white rounded text-[11px] font-bold hover:bg-blue-700 transition-all cursor-pointer"
+                      >
+                        Move
+                      </button>
+                    {/if}
                   </div>
                 </div>
               {/each}
             </div>
           </section>
+          -->
 
           <!-- Raw Material Traceability -->
-          <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant pb-2 mb-4 gap-2">
-              <div class="flex items-center gap-3">
-                <h2 class="font-headline-md text-headline-md">Raw Material Traceability</h2>
+          <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
+            <div class="flex justify-between items-center border-b border-outline-variant/60 pb-2">
+              <div class="flex items-center gap-2">
+                <h2 class="font-bold text-sm sm:text-base text-on-surface flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-tertiary text-[18px]">texture</span>
+                  Raw Materials Logged
+                </h2>
                 {#if currentMaterialTraceability}
                   {@const totalCost = currentMaterialTraceability.totalMaterialCost ?? (currentMaterialTraceability.consumptions ? currentMaterialTraceability.consumptions.reduce((/** @type {number} */ a, /** @type {any} */ c) => a + (c.totalPrice ?? (c.quantityConsumed * (c.unitRate || 0))), 0) : 0)}
-                  <span class="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center gap-1 font-mono">
-                    <span class="material-symbols-outlined text-[15px]">payments</span>
-                    Total Price: ₹{Number(totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold rounded-full font-mono">
+                    ₹{Number(totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 {/if}
               </div>
@@ -932,22 +957,22 @@
                 onclick={() => isConsumeMaterialModalOpen = true}
                 class="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
               >
-                <span class="material-symbols-outlined text-[16px]">add</span>
+                <span class="material-symbols-outlined text-[15px]">add</span>
                 Log Material
               </button>
             </div>
 
             {#if currentMaterialTraceability && currentMaterialTraceability.consumptions && currentMaterialTraceability.consumptions.length > 0}
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {#each currentMaterialTraceability.consumptions as mat}
-                  <div class="bg-surface-container-low p-4 rounded-lg border border-outline-variant flex flex-col justify-between relative group">
-                    <div class="flex justify-between items-start mb-2">
-                      <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-tertiary">texture</span>
+                  <div class="bg-surface-container-low p-3 rounded-xl border border-outline-variant/60 flex flex-col justify-between relative group">
+                    <div class="flex justify-between items-start mb-1.5">
+                      <div class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-tertiary text-[18px]">texture</span>
                         <div>
-                          <div class="font-bold text-sm text-on-surface">{mat.materialLotNumber}</div>
+                          <div class="font-bold text-xs text-on-surface font-mono">{mat.materialLotNumber}</div>
                           {#if mat.materialName}
-                            <div class="text-[11px] font-medium text-on-surface-variant">{mat.materialName}</div>
+                            <div class="text-[10px] text-on-surface-variant truncate max-w-[120px]">{mat.materialName}</div>
                           {/if}
                         </div>
                       </div>
@@ -956,58 +981,111 @@
                         title="Edit Material Consumption"
                         class="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors cursor-pointer"
                       >
-                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                        <span class="material-symbols-outlined text-[15px]">edit</span>
                       </button>
                     </div>
-                    <div class="text-2xl font-bold text-primary">{mat.quantityConsumed} {mat.unit}</div>
-                    
+
+                    <div class="text-xl font-bold text-primary font-mono">{mat.quantityConsumed} {mat.unit}</div>
+
                     {#if mat.unitRate !== undefined && mat.unitRate !== null}
                       {@const itemTotal = mat.totalPrice ?? (mat.quantityConsumed * mat.unitRate)}
-                      <div class="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-300 mt-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 rounded border border-emerald-200/50 dark:border-emerald-800/50">
-                        <span>@ ₹{Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{mat.unit}</span>
-                        <span class="font-bold text-emerald-800 dark:text-emerald-200">Total: ₹{Number(itemTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <div class="text-[11px] font-mono font-semibold text-emerald-700 dark:text-emerald-300 mt-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/50">
+                        <span>@ ₹{Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        <span class="font-bold">₹{Number(itemTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                       </div>
                     {/if}
 
-                    <div class="text-xs text-on-surface-variant mt-2 font-mono flex justify-between items-end">
-                      <div>
-                        Step: {mat.stepName}<br/>
-                        Date: {new Date(mat.consumptionDate).toLocaleDateString()}
-                      </div>
-                      {#if mat.remarks}
-                        <div class="text-[11px] italic text-on-surface-variant max-w-[120px] truncate" title={mat.remarks}>
-                          "{mat.remarks}"
-                        </div>
-                      {/if}
+                    <div class="text-[10px] text-on-surface-variant mt-2 font-mono flex justify-between items-end border-t border-outline-variant/30 pt-1">
+                      <span>Step: {mat.stepName}</span>
+                      <span>{new Date(mat.consumptionDate).toLocaleDateString()}</span>
                     </div>
                   </div>
                 {/each}
               </div>
             {:else}
-              <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-lg border border-dashed border-outline-variant text-sm">
-                No raw material consumptions logged for this production lot yet.
+              <div class="p-4 text-center text-on-surface-variant bg-surface-container-low rounded-xl border border-dashed border-outline-variant text-xs">
+                No raw materials logged for this production lot yet.
               </div>
             {/if}
           </section>
-          </div>
+        </div>
       </div>
     {:else}
-      <div class="p-12 text-center text-on-surface-variant bg-surface rounded-xl border border-outline-variant">
-        No lot selected or no production lots found. Click "New Production Lot" above to create one.
+      <div class="p-12 text-center text-on-surface-variant bg-surface rounded-2xl border border-outline-variant">
+        No lot selected. Click "New Lot" or select one from the picker above.
       </div>
     {/if}
   {:else if activeTab === 'ledger'}
-    <!-- Ledger Table -->
-    <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
-      <div class="flex justify-between items-center border-b border-outline-variant pb-2">
-        <h2 class="font-headline-md text-headline-md">Inventory Movement Ledger</h2>
-        <span class="text-xs text-on-surface-variant font-mono">Total Transactions: {movementsLedgerRows.length}</span>
+    <!-- Movements Ledger View -->
+    <section class="bg-surface p-4 sm:p-6 rounded-2xl border border-outline-variant/70 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b border-outline-variant/60 pb-2">
+        <h2 class="font-bold text-base text-on-surface flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary text-[20px]">history</span>
+          Movement History
+        </h2>
+        <span class="text-xs text-on-surface-variant font-mono">{movementsLedgerRows.length} Total</span>
       </div>
 
-      <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+      <!-- Mobile Card List View (< md) -->
+      <div class="block md:hidden space-y-2.5">
+        {#if movementsLedgerRows.length === 0}
+          <div class="p-6 text-center text-xs text-on-surface-variant bg-surface-container-low rounded-xl">
+            No movements recorded for this production lot.
+          </div>
+        {:else}
+          {#each movementsLedgerRows as m}
+            <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 shadow-xs space-y-2 {m.isReversed ? 'line-through opacity-50 bg-red-50/20' : ''}">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary">
+                    {m.type}
+                  </span>
+                  {#if m.referenceNumber !== '-'}
+                    <span class="text-[11px] font-mono text-on-surface-variant font-semibold">#{m.referenceNumber}</span>
+                  {/if}
+                </div>
+                <span class="text-[10px] font-mono text-on-surface-variant">{m.date}</span>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center gap-1.5 text-xs font-semibold text-on-surface">
+                  <span>{m.from}</span>
+                  <span class="material-symbols-outlined text-[14px] text-primary">arrow_forward</span>
+                  <span>{m.to}</span>
+                </div>
+                <span class="text-sm font-bold text-primary font-mono">{m.qty}</span>
+              </div>
+
+              {#if m.clientName !== '-'}
+                <div class="text-[11px] text-on-surface-variant flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[12px] text-primary">badge</span>
+                  <span>Client: <strong class="text-on-surface">{m.clientName}</strong></span>
+                </div>
+              {/if}
+
+              <div class="flex items-center justify-between pt-1 border-t border-outline-variant/30 text-[10px] text-on-surface-variant">
+                <span>By: {m.user}</span>
+                {#if !m.isReversed && m.type !== 'InitialProduction'}
+                  <button
+                    onclick={() => openReverseModal(m)}
+                    class="px-2 py-0.5 text-[11px] bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300 rounded font-semibold transition-colors cursor-pointer"
+                  >
+                    Reverse
+                  </button>
+                {:else if m.isReversed}
+                  <span class="text-[10px] text-red-500 font-bold">REVERSED</span>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        {/if}
+      </div>
+
+      <!-- Desktop Table View (>= md) -->
+      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant/60 bg-surface shadow-xs">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
-            <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+            <tr class="bg-surface-container-low border-b border-outline-variant/60 text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Movement Date</th>
               <th class="px-4 py-3">Type</th>
               <th class="px-4 py-3">Ref No</th>
@@ -1064,6 +1142,175 @@
     </section>
   {/if}
 </main>
+
+<!-- Mobile Floating Action Button (FAB) -->
+<div class="fixed bottom-20 right-4 z-40 md:hidden">
+  <button
+    type="button"
+    onclick={() => isMobileActionSheetOpen = true}
+    class="flex items-center gap-1.5 px-4 py-3 bg-gradient-to-r from-primary to-blue-600 text-white rounded-full shadow-[0_4px_24px_rgba(0,74,198,0.45)] hover:shadow-primary/60 transition-all duration-200 active:scale-95 cursor-pointer font-bold text-sm tracking-wide border border-white/25"
+  >
+    <span class="material-symbols-outlined text-[20px]">bolt</span>
+    <span>Actions</span>
+  </button>
+</div>
+
+<!-- Mobile Bottom Action Sheet Drawer -->
+<Modal bind:isOpen={isMobileActionSheetOpen} title="Lot & Inventory Actions">
+  <div class="space-y-2 py-1">
+    <button
+      disabled={!selectedLotId}
+      onclick={() => { isMobileActionSheetOpen = false; openMoveModal(); }}
+      class="w-full px-4 py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-between shadow-md shadow-primary/25 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] transition-transform"
+    >
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px]">send</span>
+        <span>Move Lot Quantity</span>
+      </div>
+      <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+    </button>
+
+    <button
+      disabled={!selectedLotId}
+      onclick={() => { isMobileActionSheetOpen = false; isConsumeMaterialModalOpen = true; }}
+      class="w-full px-4 py-3 rounded-xl bg-surface-container-low hover:bg-surface-container font-semibold text-sm text-on-surface flex items-center justify-between border border-outline-variant/60 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] transition-transform"
+    >
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px] text-emerald-600">local_mall</span>
+        <span>Log Material Consumption</span>
+      </div>
+      <span class="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
+    </button>
+
+    <button
+      disabled={!selectedLotId}
+      onclick={() => { isMobileActionSheetOpen = false; isRejectModalOpen = true; }}
+      class="w-full px-4 py-3 rounded-xl bg-surface-container-low hover:bg-surface-container font-semibold text-sm text-on-surface flex items-center justify-between border border-outline-variant/60 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] transition-transform"
+    >
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px] text-amber-600">report_problem</span>
+        <span>Report Item Rejection</span>
+      </div>
+      <span class="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
+    </button>
+
+    <button
+      onclick={() => { isMobileActionSheetOpen = false; isCreateLotModalOpen = true; }}
+      class="w-full px-4 py-3 rounded-xl bg-surface-container-low hover:bg-surface-container font-semibold text-sm text-on-surface flex items-center justify-between border border-outline-variant/60 cursor-pointer active:scale-[0.98] transition-transform"
+    >
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px] text-primary">add_circle</span>
+        <span>Create New Production Lot</span>
+      </div>
+      <span class="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
+    </button>
+
+    <button
+      onclick={() => { isMobileActionSheetOpen = false; isCreateMaterialModalOpen = true; }}
+      class="w-full px-4 py-3 rounded-xl bg-surface-container-low hover:bg-surface-container font-semibold text-sm text-on-surface flex items-center justify-between border border-outline-variant/60 cursor-pointer active:scale-[0.98] transition-transform"
+    >
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px] text-tertiary">inventory</span>
+        <span>Register Raw Material</span>
+      </div>
+      <span class="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
+    </button>
+
+    {#if selectedLotId}
+      <div class="pt-2 border-t border-outline-variant/60">
+        <button
+          onclick={() => { isMobileActionSheetOpen = false; handleDeleteLot(); }}
+          class="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 font-semibold text-sm flex items-center justify-between border border-red-200 dark:border-red-800/60 cursor-pointer active:scale-[0.98] transition-transform"
+        >
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-[22px]">delete</span>
+            <span>Delete Current Lot</span>
+          </div>
+          <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+        </button>
+      </div>
+    {/if}
+  </div>
+</Modal>
+
+<!-- Lot Quick Picker Modal -->
+<Modal bind:isOpen={isLotPickerModalOpen} title="Select Production Lot">
+  <div class="space-y-3">
+    <!-- Search Filter Input -->
+    <div class="relative">
+      <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
+      <input
+        type="text"
+        bind:value={lotSearchFilter}
+        placeholder="Search by lot number, status, or client..."
+        class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/80 rounded-xl text-sm text-on-surface focus:outline-none focus:border-primary"
+      />
+      {#if lotSearchFilter}
+        <button
+          type="button"
+          onclick={() => lotSearchFilter = ''}
+          class="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant text-[16px] hover:text-on-surface"
+        >
+          close
+        </button>
+      {/if}
+    </div>
+
+    <!-- Lot List -->
+    <div class="max-h-[55vh] overflow-y-auto space-y-2 divide-y divide-outline-variant/30">
+      {#if filteredLots.length === 0}
+        <div class="p-8 text-center text-on-surface-variant text-sm">
+          No matching lots found.
+        </div>
+      {:else}
+        {#each filteredLots as lot}
+          {@const isSelected = lot.id === selectedLotId}
+          <button
+            type="button"
+            onclick={() => { handleLotChange(lot.id); isLotPickerModalOpen = false; }}
+            class="w-full p-3 rounded-xl flex items-center justify-between transition-colors text-left cursor-pointer {isSelected ? 'bg-primary/10 border-2 border-primary' : 'hover:bg-surface-container-low border border-transparent'}"
+          >
+            <div class="space-y-0.5 truncate">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-on-surface font-mono">{lot.lotNumber}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
+                  {lot.status}
+                </span>
+              </div>
+              <div class="text-xs text-on-surface-variant font-mono flex items-center gap-2">
+                <span>{lot.initialQuantity} Pcs</span>
+                {#if lot.clientName}
+                  <span>•</span>
+                  <span class="truncate">{lot.clientName}</span>
+                {/if}
+              </div>
+            </div>
+
+            {#if isSelected}
+              <span class="material-symbols-outlined text-primary text-[20px] shrink-0 ml-2">check_circle</span>
+            {/if}
+          </button>
+        {/each}
+      {/if}
+    </div>
+
+    <div class="pt-2 border-t border-outline-variant/60 flex justify-between items-center">
+      <Button
+        variant="primary"
+        icon="add"
+        onclick={() => { isLotPickerModalOpen = false; isCreateLotModalOpen = true; }}
+      >
+        Create New Lot
+      </Button>
+      <Button
+        variant="outline"
+        onclick={() => isLotPickerModalOpen = false}
+      >
+        Close
+      </Button>
+    </div>
+  </div>
+</Modal>
 
 <!-- Modal 1: Create Production Lot -->
 <Modal bind:isOpen={isCreateLotModalOpen} title="Create New Production Lot">

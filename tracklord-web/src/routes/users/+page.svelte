@@ -164,49 +164,36 @@
       minute: '2-digit'
     });
   }
+
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'User Management',
+      subtitle: 'Access & Operators',
+      icon: 'manage_accounts',
+      actions: [
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => refreshUsers()
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- Top Header Navigation -->
-<header class="fixed top-0 w-full z-40 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-14 sm:h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-2.5 min-w-0">
-    <div class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 bg-primary/10 rounded-full text-primary shrink-0">
-      <span class="material-symbols-outlined text-[20px] sm:text-[24px]">manage_accounts</span>
-    </div>
-    <div class="min-w-0">
-      <div class="font-bold text-base sm:text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-[10px] sm:text-xs text-on-surface-variant truncate">User & Access Management</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-    <button
-      onclick={() => refreshUsers()}
-      class="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer transition-colors"
-      title="Refresh User Directory"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      <span class="hidden sm:inline">Refresh</span>
-    </button>
-
-    {#if isAuthenticated && currentUser}
-      <button
-        onclick={handleLogout}
-        class="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/50 dark:hover:bg-red-900/60 dark:text-red-300 font-semibold text-xs border border-red-200 dark:border-red-800 flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
-        title="Sign Out"
-      >
-        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">logout</span>
-        <span class="hidden sm:inline">Logout</span>
-      </button>
-    {/if}
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Container -->
-<main class="max-w-[1440px] mx-auto p-3.5 sm:p-6 md:p-8 space-y-4 sm:space-y-6 pt-8 sm:pt-10">
-
-  <!-- Floating Notifications -->
-  <Callout bind:message={errorMessage} type="error" />
-  <Callout bind:message={successMessage} type="success" />
+<main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">

@@ -163,37 +163,41 @@
       c.clientType.toLowerCase().includes(clientSearchQuery.toLowerCase())
     )
   );
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Clients Directory',
+      subtitle: 'Buyers & Partners',
+      icon: 'groups',
+      actions: [
+        {
+          label: 'Add Client',
+          icon: 'person_add',
+          variant: 'primary',
+          onclick: () => { isCreateClientModalOpen = true; }
+        },
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => { refreshClients(); }
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">groups</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">Client Directory</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => refreshClients()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
-
-  <!-- Floating Notifications -->
-  <Callout bind:message={errorMessage} type="error" />
-  <Callout bind:message={successMessage} type="success" />
+<main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
@@ -201,23 +205,6 @@
       <span>Loading clients...</span>
     </div>
   {:else}
-    <!-- Header & Add Button -->
-    <div class="flex flex-row justify-between items-center gap-2 bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
-      <div>
-        <h2 class="text-base sm:text-2xl text-primary font-bold flex items-center gap-1.5 sm:gap-2">
-          <span class="material-symbols-outlined text-[22px] sm:text-[28px]">groups</span>
-          <span>Client Directory</span>
-        </h2>
-      </div>
-      <button
-        onclick={() => isCreateClientModalOpen = true}
-        class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-xs cursor-pointer shrink-0"
-      >
-        <span class="material-symbols-outlined text-[16px] sm:text-[18px]">person_add</span>
-        <span>Add Client</span>
-      </button>
-    </div>
-
     <!-- Client Statistics Summary -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
       <div class="bg-surface p-2.5 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-3 min-w-0">
