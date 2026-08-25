@@ -21,22 +21,21 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
-  <!-- Backdrop (z-[60] to guarantee sitting cleanly above floating bottom nav) -->
-  <div
-    class="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
-    role="button"
-    tabindex="0"
-    onclick={close}
-    onkeydown={(e) => e.key === 'Enter' && close()}
-  >
+  <!-- Modal Container -->
+  <div class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <!-- Backdrop Overlay -->
+    <div
+      class="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-sm"
+      aria-hidden="true"
+      onclick={close}
+    ></div>
+
     <!-- Content Box -->
     <div
-      class="bg-surface dark:bg-slate-900 rounded-2xl border border-outline-variant/80 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[90dvh] flex flex-col"
+      class="bg-surface dark:bg-slate-900 rounded-2xl border border-outline-variant/80 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[90dvh] flex flex-col relative z-10"
       role="dialog"
       aria-modal="true"
       tabindex="-1"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
     >
       <!-- Modal Header -->
       <div class="flex items-center justify-between px-5 py-3.5 border-b border-outline-variant/60 bg-surface-container-low dark:bg-slate-800 shrink-0">

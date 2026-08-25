@@ -68,7 +68,7 @@
 
       const res = await createProductionLot(payload);
       isOpen = false;
-      const lotNum = form.lotNumber;
+      const lotNum = payload.lotNumber;
       form.lotNumber = '';
       form.clientId = '';
       form.remarks = '';

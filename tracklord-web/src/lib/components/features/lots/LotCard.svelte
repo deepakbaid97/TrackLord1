@@ -17,6 +17,7 @@
 <div
   role="button"
   tabindex="0"
+  aria-label="View lot {lot.lotNumber} details"
   onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
   onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/inventory?lot=${lot.id}`)}
   class="bg-surface p-3 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
