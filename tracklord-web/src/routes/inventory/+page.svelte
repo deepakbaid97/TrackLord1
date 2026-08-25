@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import Button from '$lib/components/ui/Button.svelte';
-  import Timeline from '$lib/components/ui/Timeline.svelte';
+  // import Timeline from '$lib/components/ui/Timeline.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
@@ -376,7 +376,9 @@
 
       return {
         id: step.id,
+        code: step.code,
         name: step.name,
+        quantity: qty,
         status: status,
         subtitle: subtitle,
         clientName: stepClientName,
@@ -862,10 +864,10 @@
         </div>
       </section>
 
-      <!-- Grid Content -->
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-        <!-- Journey Timeline -->
-        <section class="md:col-span-4 bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
+      <!-- Lot Content Sections -->
+      <div class="space-y-4 sm:space-y-6">
+        <!-- Journey Timeline (Commented out)
+        <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
           <div class="flex items-center justify-between border-b border-outline-variant/60 pb-2">
             <h2 class="font-bold text-sm sm:text-base text-on-surface flex items-center gap-1.5">
               <span class="material-symbols-outlined text-primary text-[18px]">route</span>
@@ -880,9 +882,9 @@
             }}
           />
         </section>
+        -->
 
-        <div class="md:col-span-8 space-y-4 sm:space-y-6">
-          <!-- WIP Distribution Across Steps (Commented out: Journey Timeline already displays step balances)
+        <!-- WIP Distribution Across Steps -->
           <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
             <div class="flex justify-between items-center border-b border-outline-variant/60 pb-2">
               <h2 class="font-bold text-sm sm:text-base text-on-surface flex items-center gap-1.5">
@@ -894,34 +896,36 @@
 
             {#if totalLotWip > 0}
               <div class="h-2.5 w-full rounded-full bg-surface-container overflow-hidden flex shadow-inner">
-                {#each manufacturingSteps as step}
-                  {@const bal = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
-                  {@const qty = bal ? bal.quantity : 0}
-                  {@const pct = (qty / totalLotWip) * 100}
+                {#each timelineSteps as step}
+                  {@const pct = (step.quantity / totalLotWip) * 100}
                   {#if pct > 0}
                     <div
                       class="h-full bg-primary transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                       style="width: {pct}%"
-                      title="{step.name}: {qty} Pcs ({Math.round(pct)}%)"
+                      title="{step.name}: {step.quantity} Pcs ({Math.round(pct)}%)"
                     ></div>
                   {/if}
                 {/each}
               </div>
             {/if}
 
-            <div class="space-y-2 pt-1">
-              {#each manufacturingSteps as step}
-                {@const balanceObj = activeWipBalances.find((/** @type {any} */ b) => b.stepId === step.id)}
-                {@const qty = balanceObj ? balanceObj.quantity : 0}
-                {@const hasWip = qty > 0}
+            <div class="space-y-1.5 pt-1">
+              {#each timelineSteps as step}
+                {@const hasWip = step.quantity > 0}
                 <div class="flex items-center justify-between p-2 rounded-xl transition-colors {hasWip ? 'bg-primary/5 border border-primary/20' : 'hover:bg-surface-container-low opacity-60'}">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full {hasWip ? 'bg-primary animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}"></span>
-                    <span class="text-xs sm:text-sm font-semibold {hasWip ? 'text-primary' : 'text-on-surface'}">{step.name}</span>
-                    <span class="text-[11px] font-mono text-on-surface-variant">({step.code})</span>
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <span class="w-2 h-2 rounded-full shrink-0 {hasWip ? 'bg-primary animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}"></span>
+                    <span class="text-xs sm:text-sm font-semibold {hasWip ? 'text-primary' : 'text-on-surface'} truncate">{step.name}</span>
+                    <span class="text-[11px] font-mono text-on-surface-variant shrink-0">({step.code})</span>
+                    {#if $tenantConfigStore.clientMode !== 'none' && step.clientName}
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-900 dark:text-amber-300 border border-amber-500/25 shrink-0 max-w-[130px] sm:max-w-[200px]">
+                        <span class="material-symbols-outlined text-[12px] text-amber-600 dark:text-amber-400">badge</span>
+                        <span class="truncate">{step.clientName}</span>
+                      </span>
+                    {/if}
                   </div>
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs sm:text-sm font-bold {hasWip ? 'text-primary' : 'text-on-surface-variant'}">{qty} Pcs</span>
+                  <div class="flex items-center gap-2 shrink-0 pl-2">
+                    <span class="font-mono text-xs sm:text-sm font-bold {hasWip ? 'text-primary' : 'text-on-surface-variant'}">{step.quantity} Pcs</span>
                     {#if hasWip}
                       <button
                         type="button"
@@ -936,7 +940,6 @@
               {/each}
             </div>
           </section>
-          -->
 
           <!-- Raw Material Traceability -->
           <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
@@ -1009,7 +1012,6 @@
             {/if}
           </section>
         </div>
-      </div>
     {:else}
       <div class="p-12 text-center text-on-surface-variant bg-surface rounded-2xl border border-outline-variant">
         No lot selected. Click "New Lot" or select one from the picker above.
