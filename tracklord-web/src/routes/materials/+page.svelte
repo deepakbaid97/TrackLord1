@@ -382,63 +382,65 @@
 
 <main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
-  <!-- Summary Cards -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-4">
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
-      <div class="p-2 sm:p-3 bg-primary/10 text-primary rounded-lg sm:rounded-xl shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">inventory</span>
+  <!-- Unified 4-Metric KPI Strip (All 4 cards in a single line on mobile & desktop) -->
+  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden">
+    <div class="grid grid-cols-4 divide-x divide-outline-variant/40 p-1.5 sm:p-3 text-center">
+      <!-- 1. Total Lots -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-primary hidden min-[380px]:inline">inventory</span>
+          <span>Lots</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1">
+          {totalLotsCount}
+        </div>
       </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Total Material Lots</div>
-        <div class="text-base sm:text-2xl font-bold text-on-surface truncate">{totalLotsCount}</div>
-      </div>
-    </div>
 
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
-      <div class="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg sm:rounded-xl shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">workspaces</span>
-      </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Available Stock</div>
-        <div class="text-base sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono truncate">
+      <!-- 2. Available Stock -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-emerald-600 hidden min-[380px]:inline">workspaces</span>
+          <span>Stock</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1 truncate max-w-full">
           {totalAvailableQty.toLocaleString()}
         </div>
       </div>
-    </div>
 
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
-      <div class="p-2 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg sm:rounded-xl shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">payments</span>
-      </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Valuation</div>
-        <div class="text-base sm:text-2xl font-bold text-on-surface font-mono truncate">
+      <!-- 3. Valuation -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-tertiary hidden min-[380px]:inline">payments</span>
+          <span>Valuation</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1 truncate max-w-full">
           ₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
         </div>
       </div>
-    </div>
 
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-row items-center gap-2 sm:gap-4 min-w-0">
-      <div class="p-2 sm:p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg sm:rounded-xl shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">warning</span>
-      </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs font-mono uppercase text-on-surface-variant font-bold tracking-wider truncate">Depleted Lots</div>
-        <div class="text-base sm:text-2xl font-bold text-amber-600 dark:text-amber-400 truncate">{depletedCount}</div>
+      <!-- 4. Depleted Lots -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-amber-600 hidden min-[380px]:inline">warning</span>
+          <span>Depleted</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5 sm:mt-1">
+          {depletedCount}
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Search & Filtering Bar -->
-  <section class="bg-surface p-3 sm:p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 md:gap-4">
+  <section class="bg-surface p-3.5 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 md:gap-4">
     <!-- Search Box -->
     <div class="relative flex-1 max-w-md">
-      <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+      <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
       <input
         type="text"
         bind:value={searchQuery}
         placeholder="Search material lot number or item name..."
-        class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+        class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/70 rounded-xl text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20 transition-all"
       />
       {#if searchQuery}
         <button
@@ -452,22 +454,25 @@
 
     <!-- Status Filters -->
     <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
-      <span class="text-xs font-semibold text-on-surface-variant mr-1 shrink-0">Filter:</span>
+      <span class="text-xs font-semibold text-on-surface-variant mr-1 shrink-0 font-mono">Filter:</span>
       <button
+        type="button"
         onclick={() => filterStatus = 'all'}
-        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'all' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'all' ? 'bg-primary text-on-primary shadow-xs' : 'bg-surface-container-low border border-outline-variant/70 text-on-surface-variant hover:bg-surface-container'}"
       >
         All Materials ({totalLotsCount})
       </button>
       <button
+        type="button"
         onclick={() => filterStatus = 'available'}
-        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'available' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'available' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-surface-container-low border border-outline-variant/70 text-on-surface-variant hover:bg-surface-container'}"
       >
         In Stock ({totalLotsCount - depletedCount})
       </button>
       <button
+        type="button"
         onclick={() => filterStatus = 'depleted'}
-        class="px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'depleted' ? 'bg-amber-600 text-white shadow-sm' : 'bg-surface-container-low border border-outline-variant text-on-surface-variant hover:bg-surface-container'}"
+        class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer {filterStatus === 'depleted' ? 'bg-amber-600 text-white shadow-xs' : 'bg-surface-container-low border border-outline-variant/70 text-on-surface-variant hover:bg-surface-container'}"
       >
         Depleted ({depletedCount})
       </button>
@@ -478,7 +483,7 @@
   {#if loading}
     <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
       <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-      <span>Fetching materials inventory...</span>
+      <span class="text-xs sm:text-sm font-medium">Fetching materials inventory...</span>
     </div>
   {:else if filteredMaterials.length > 0}
     <!-- Mobile View: Card Stack Column (below md) -->
@@ -493,42 +498,61 @@
           tabindex="0"
           onclick={() => viewMaterialHistory(mat.id)}
           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && viewMaterialHistory(mat.id)}
-          class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
-          title="View {mat.lotNumber} consumption history"
+          class="bg-surface p-3 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
+          title="View material {mat.lotNumber} details and consumption history"
         >
-          <!-- Card Line 1: Icon | Lot # & Material Name | Edit -->
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="p-1 bg-primary/10 text-primary rounded-md shrink-0">
-                <span class="material-symbols-outlined text-[16px]">texture</span>
+          <!-- Card Line 1: Lot #, Material Name, Stock Quantity & Edit Button -->
+          <div class="flex items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0 font-mono">
+                <span class="material-symbols-outlined text-[15px]">tag</span>
+                <span>{mat.lotNumber}</span>
               </div>
-              <div class="min-w-0">
-                <span class="font-bold text-sm text-primary font-mono">{mat.lotNumber}</span>
-                {#if mat.materialName}
-                  <span class="text-xs text-on-surface font-medium truncate ml-1">• {mat.materialName}</span>
-                {/if}
-              </div>
+              {#if mat.materialName}
+                <span class="text-on-surface-variant text-[11px] truncate">• {mat.materialName}</span>
+              {/if}
             </div>
-            <button
-              onclick={(e) => { e.stopPropagation(); openEditModal(mat); }}
-              title="Edit Material Lot"
-              class="p-1 text-on-surface-variant hover:text-primary rounded-md border border-outline-variant transition-colors cursor-pointer shrink-0"
-            >
-              <span class="material-symbols-outlined text-[15px]">edit</span>
-            </button>
-          </div>
 
-          <!-- Card Line 2: Remaining Stock & Stock Valuation -->
-          <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50">
-            <div class="flex items-center gap-1.5">
-              <span class="text-on-surface-variant font-mono">Stock:</span>
-              <span class="font-bold font-mono {remaining <= 0 ? 'text-red-500' : usagePercent < 25 ? 'text-amber-600' : 'text-emerald-600'}">
+            <div class="flex items-center gap-1.5 shrink-0 font-mono">
+              <span class="font-bold text-xs {remaining <= 0 ? 'text-red-500' : usagePercent < 25 ? 'text-amber-600' : 'text-emerald-600 dark:text-emerald-400'}">
                 {Number(remaining).toLocaleString()} {mat.unit}
               </span>
+              <button
+                type="button"
+                onclick={(e) => { e.stopPropagation(); openEditModal(mat); }}
+                title="Edit Material Lot"
+                class="p-1 text-on-surface-variant hover:text-primary rounded-md border border-outline-variant/70 transition-colors cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[13px]">edit</span>
+              </button>
             </div>
-            <div class="font-mono text-on-surface-variant">
-              Value: <span class="font-bold text-emerald-700 dark:text-emerald-400">₹{Number(stockValuation).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-            </div>
+          </div>
+
+          <!-- Card Line 2: Detailed Badges / Pills (Valuation, Rate, Status) -->
+          <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50 text-[10px] font-mono">
+            <!-- Valuation Pill -->
+            <span class="px-2 py-0.5 rounded font-bold bg-primary-container text-on-primary-container flex items-center gap-1">
+              <span class="material-symbols-outlined text-[11px]">payments</span>
+              Valuation: ₹{Number(stockValuation).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+
+            <!-- Rate Pill -->
+            {#if mat.unitRate}
+              <span class="px-2 py-0.5 rounded bg-surface-container-low text-on-surface-variant border border-outline-variant/60">
+                Rate: ₹{Number(mat.unitRate).toLocaleString('en-IN')}/{mat.unit}
+              </span>
+            {/if}
+
+            <!-- Initial / Status Pill -->
+            {#if remaining <= 0}
+              <span class="px-1.5 py-0.5 rounded font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300">
+                Depleted
+              </span>
+            {:else}
+              <span class="px-1.5 py-0.5 rounded bg-surface-container-low text-on-surface-variant border border-outline-variant/60">
+                Initial: {Number(initial).toLocaleString()} {mat.unit}
+              </span>
+            {/if}
           </div>
         </div>
       {/each}
