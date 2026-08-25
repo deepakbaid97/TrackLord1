@@ -1,23 +1,25 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import {
     getProductionLots,
     getManufacturingSteps,
     getClients,
-    getLotJourney,
-    importProductionLots,
-    createProductionLot
+    getLotJourney
   } from '$lib/api.js';
-  import * as XLSX from 'xlsx';
   import Select from '$lib/components/ui/Select.svelte';
-  import Input from '$lib/components/ui/Input.svelte';
-  import Button from '$lib/components/ui/Button.svelte';
-  import Modal from '$lib/components/ui/Modal.svelte';
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
   import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
   import Callout from '$lib/components/ui/Callout.svelte';
+  import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
+  import KpiStrip from '$lib/components/ui/KpiStrip.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import LotCard from '$lib/components/features/lots/LotCard.svelte';
+  import CreateLotModal from '$lib/components/features/lots/CreateLotModal.svelte';
+  import ImportLotsModal from '$lib/components/features/lots/ImportLotsModal.svelte';
+  import { STEP_ICON_MAP } from '$lib/services/lotService.js';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
-  import { headerStore } from '$lib/stores/headerStore.js';
+  import { usePageHeader } from '$lib/utils/usePageHeader.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -32,27 +34,18 @@
   /** @type {Array<any>} */
   let enrichedLots = $state([]);
 
-  // Create Lot Modal state
+  // Modals state
   let isCreateLotModalOpen = $state(false);
-  let createLotForm = $state({
-    lotNumber: '',
-    initialQuantity: 100,
-    unit: 1, // Pieces
-    initialStepId: '',
-    createdBy: 'Operator',
-    remarks: '',
-    clientId: ''
-  });
+  let isImportModalOpen = $state(false);
 
   // Filter States
   let searchQuery = $state('');
   let selectedStepId = $state('ALL');
   let selectedClientId = $state('ALL');
-  let selectedDateRange = $state('ALL'); // ALL, TODAY, 7DAYS, 30DAYS, CUSTOM
+  let selectedDateRange = $state('ALL');
   let customStartDate = $state('');
   let customEndDate = $state('');
-  let isFilterExpanded = $state(false); // Collapsed by default on mobile
-
+  let isFilterExpanded = $state(false);
 
   let activeFilterCount = $derived(
     (searchQuery.trim() ? 1 : 0) +
@@ -70,33 +63,37 @@
     customEndDate = '';
   }
 
-  // Import Modal state
-  let isImportModalOpen = $state(false);
-  let importFile = $state(/** @type {File|null} */ (null));
-  let importPreviewData = $state(/** @type {Array<any>} */ ([]));
-  let hasStepColumn = $state(false);
-  let selectedGlobalStepId = $state('');
-  let selectedGlobalStepName = $state('');
-  let isParsing = $state(false);
-  let isImporting = $state(false);
-  let importErrorMessage = $state('');
-  let importSuccessResult = $state(/** @type {any} */ (null));
-
-  // Step Icon mapping
-  /** @type {Record<string, string>} */
-  const stepIconMap = {
-    'CUT': 'content_cut',
-    'STITCH': 'webhook',
-    'WASH': 'local_laundry_service',
-    'FIN': 'iron',
-    'PACK': 'inventory_2',
-    'IMPORT': 'file_upload'
-  };
-
-  import { page } from '$app/stores';
+  usePageHeader(() => ({
+    title: 'Production Lots',
+    subtitle: 'Directory & Batches',
+    icon: 'reorder',
+    actions: [
+      {
+        label: 'Actions',
+        icon: 'bolt',
+        variant: 'primary',
+        dropdownItems: [
+          {
+            label: 'New Production Lot',
+            icon: 'add_circle',
+            onclick: () => { isCreateLotModalOpen = true; }
+          },
+          {
+            label: 'Import Lots (Excel/CSV)',
+            icon: 'file_upload',
+            onclick: () => { isImportModalOpen = true; }
+          },
+          {
+            label: 'Refresh Lots Data',
+            icon: 'refresh',
+            onclick: () => { refreshData(); }
+          }
+        ]
+      }
+    ]
+  }));
 
   onMount(async () => {
-    // Read URL query parameters for pre-selected step or client filters
     const urlParams = $page.url.searchParams;
     const stepParam = urlParams.get('step');
     const clientParam = urlParams.get('client');
@@ -111,7 +108,6 @@
     loading = true;
     errorMessage = '';
     try {
-      // 1. Fetch base steps & clients
       const [stepsData, clientsData, lotsData] = await Promise.all([
         getManufacturingSteps(),
         getClients(),
@@ -122,8 +118,7 @@
       clients = clientsData || [];
       rawLots = lotsData || [];
 
-      // 2. Fetch journeys for each lot to gather active steps, quantities, and client associations
-      const clientTrackingMode = $tenantConfigStore.clientMode; // 'lot' | 'step' | 'none'
+      const clientTrackingMode = $tenantConfigStore.clientMode;
 
       const enriched = await Promise.all(
         rawLots.map(async (lot) => {
@@ -142,160 +137,111 @@
           let clientNamesList = [];
 
           if (journey) {
-            // Extract active step balances
             if (journey.activeBalances) {
               activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
 
-              // Exclude terminating step quantities and inactive step quantities from total active WIP calculation
               const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
                 const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
-                return !stepObj?.isTerminating && (stepObj?.isActive !== false);
+                return !stepObj?.isTerminating && stepObj?.isActive !== false;
               });
 
-              totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
+              totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ sum, /** @type {any} */ b) => sum + b.quantity, 0);
             }
-          }
 
-          // Lot is completely in terminating stage if it has 0 items in non-terminating active steps
-          const allInTerminatingStage = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => {
-            const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
-            return stepObj?.isTerminating;
-          });
+            const initialClientId = lot.clientId || journey.clientId;
+            const initialClientName = lot.clientName || journey.clientName;
 
-          const lotClientId = lot.clientId || journey?.clientId;
-          const lotClientName = lot.clientName || journey?.clientName;
-
-          if (clientTrackingMode === 'lot') {
-            // ── Strategy A: Per Production Lot ──
-            // The entire lot belongs to lot.clientId across all steps
-            if (lotClientId) {
-              activeLotClientsSet.add(lotClientId);
-            }
-            if (lotClientName) {
-              clientNamesList.push(lotClientName);
-            }
-          } else {
-            // ── Strategy B: Per Step Movement / Subcontracting ──
-            // Extract clients specifically associated with steps that currently hold active WIP quantity
-            const activeStepIds = new Set(activeSteps.map((/** @type {any} */ s) => s.stepId));
-
-            if (journey && journey.movementHistory) {
-              journey.movementHistory.forEach((/** @type {any} */ m) => {
-                if (!m.isReversed && m.toStepName && activeStepIds.size > 0) {
-                  // Find if this movement moved items into one of the currently active WIP steps
-                  const isMoveToActiveStep = activeSteps.some((/** @type {any} */ s) => s.stepName === m.toStepName);
-                  if (isMoveToActiveStep) {
-                    if (m.clientId) activeLotClientsSet.add(m.clientId);
-                    if (m.clientName) clientNamesList.push(m.clientName);
+            if (clientTrackingMode === 'lot') {
+              if (initialClientId) activeLotClientsSet.add(initialClientId);
+              if (initialClientName) clientNamesList.push(initialClientName);
+            } else {
+              if (journey.movementHistory) {
+                const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+                journey.movementHistory.forEach((/** @type {any} */ m) => {
+                  if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
+                    activeLotClientsSet.add(m.clientId);
+                    if (m.clientName && !clientNamesList.includes(m.clientName)) {
+                      clientNamesList.push(m.clientName);
+                    }
                   }
-                }
-              });
-            }
+                });
+              }
 
-            // Fallback: If no step movements have a client, but the lot had an initial client assigned
-            if (activeLotClientsSet.size === 0 && lotClientId) {
-              activeLotClientsSet.add(lotClientId);
-              if (lotClientName) clientNamesList.push(lotClientName);
+              if (activeLotClientsSet.size === 0) {
+                if (initialClientId) activeLotClientsSet.add(initialClientId);
+                if (initialClientName) clientNamesList.push(initialClientName);
+              }
             }
           }
-
-          const activeClientIdsArray = Array.from(activeLotClientsSet);
-          const uniqueClientNames = Array.from(new Set(clientNamesList));
 
           return {
-            id: lot.id,
-            lotNumber: lot.lotNumber,
-            itemName: 'Garment Item Lot', // Item default / display name
-            initialQuantity: lot.initialQuantity,
-            status: lot.status,
-            createdAtUtc: lot.createdAtUtc,
-            createdDate: new Date(lot.createdAtUtc),
+            ...lot,
             activeSteps,
-            totalWipQty: journey ? totalWipQty : lot.initialQuantity,
-            allInTerminatingStage,
-            clientId: lotClientId,
-            clientName: lotClientName,
-            clientIds: activeClientIdsArray,
-            clientNamesDisplay: uniqueClientNames.length > 0 ? uniqueClientNames.join(', ') : 'Direct Factory'
+            totalWipQty,
+            clientIds: Array.from(activeLotClientsSet),
+            clientNamesDisplay: clientNamesList.length > 0 ? clientNamesList.join(', ') : 'Unassigned',
+            createdDate: new Date(lot.createdAtUtc || lot.creationDate || Date.now())
           };
         })
       );
 
       enrichedLots = enriched;
     } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to load production lots data.';
+      errorMessage = err.message || 'Failed to connect to backend server';
     } finally {
       loading = false;
     }
   }
 
-  // Filter Logic
-  let filteredLots = $derived.by(() => {
-    return enrichedLots.filter((lot) => {
-      // Search Query Filter
+  let filteredLots = $derived(
+    enrichedLots.filter(lot => {
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesNumber = lot.lotNumber.toLowerCase().includes(query);
-        const matchesClient = lot.clientNamesDisplay.toLowerCase().includes(query);
-        const matchesItem = lot.itemName.toLowerCase().includes(query);
-        if (!matchesNumber && !matchesClient && !matchesItem) return false;
+        const q = searchQuery.toLowerCase();
+        const matchLot = lot.lotNumber?.toLowerCase().includes(q);
+        const matchItem = lot.itemName?.toLowerCase().includes(q);
+        const matchClient = lot.clientNamesDisplay?.toLowerCase().includes(q);
+        if (!matchLot && !matchItem && !matchClient) return false;
       }
 
-      // Step Filter & Terminating Stage Exclusion
-      if (selectedStepId === 'ALL') {
-        // By default, hide lots where all items are in terminating stage
-        if (lot.allInTerminatingStage) return false;
-      } else {
-        // When a specific step is explicitly selected (including terminating steps):
-        const hasStep = lot.activeSteps.some((/** @type {any} */ s) => s.stepId === selectedStepId);
+      if (selectedStepId !== 'ALL') {
+        const hasStep = lot.activeSteps?.some((/** @type {any} */ s) => s.stepId === selectedStepId);
         if (!hasStep) return false;
       }
 
-      // Client Filter
       if (selectedClientId !== 'ALL') {
-        if (selectedClientId === 'NONE') {
-          if (lot.clientIds.length > 0) return false;
-        } else {
-          if (!lot.clientIds.includes(selectedClientId)) return false;
-        }
+        const hasClient = lot.clientIds?.includes(selectedClientId);
+        if (!hasClient) return false;
       }
 
-      // Date Range Filter
       if (selectedDateRange !== 'ALL') {
-        const lotDate = new Date(lot.createdAtUtc);
+        const lotTime = lot.createdDate.getTime();
         const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
         if (selectedDateRange === 'TODAY') {
-          const isToday =
-            lotDate.getDate() === now.getDate() &&
-            lotDate.getMonth() === now.getMonth() &&
-            lotDate.getFullYear() === now.getFullYear();
-          if (!isToday) return false;
+          if (lotTime < startOfDay) return false;
         } else if (selectedDateRange === '7DAYS') {
-          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          if (lotDate < sevenDaysAgo) return false;
+          const sevenDaysAgo = startOfDay - 7 * 24 * 60 * 60 * 1000;
+          if (lotTime < sevenDaysAgo) return false;
         } else if (selectedDateRange === '30DAYS') {
-          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          if (lotDate < thirtyDaysAgo) return false;
+          const thirtyDaysAgo = startOfDay - 30 * 24 * 60 * 60 * 1000;
+          if (lotTime < thirtyDaysAgo) return false;
         } else if (selectedDateRange === 'CUSTOM') {
           if (customStartDate) {
-            const start = new Date(customStartDate);
-            start.setHours(0, 0, 0, 0);
-            if (lotDate < start) return false;
+            const start = new Date(customStartDate).getTime();
+            if (lotTime < start) return false;
           }
           if (customEndDate) {
-            const end = new Date(customEndDate);
-            end.setHours(23, 59, 59, 999);
-            if (lotDate > end) return false;
+            const end = new Date(customEndDate).getTime() + 24 * 60 * 60 * 1000 - 1;
+            if (lotTime > end) return false;
           }
         }
       }
 
       return true;
-    });
-  });
+    })
+  );
 
-  // Summary Metrics
   let totalWipSum = $derived(
     filteredLots.reduce((acc, l) => {
       if (selectedStepId !== 'ALL') {
@@ -307,298 +253,26 @@
       return acc + l.totalWipQty;
     }, 0)
   );
+
   let totalInitialSum = $derived(filteredLots.reduce((acc, l) => acc + l.initialQuantity, 0));
 
-  function openImportModal() {
-    isImportModalOpen = true;
-    importFile = null;
-    importPreviewData = [];
-    hasStepColumn = false;
-    selectedGlobalStepId = '';
-    selectedGlobalStepName = '';
-    importErrorMessage = '';
-    importSuccessResult = null;
-  }
-
-  function closeImportModal() {
-    isImportModalOpen = false;
-    importFile = null;
-    importPreviewData = [];
-    hasStepColumn = false;
-    selectedGlobalStepId = '';
-    selectedGlobalStepName = '';
-    importErrorMessage = '';
-    importSuccessResult = null;
-  }
-
-  async function handleFileSelect(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    importFile = file;
-    isParsing = true;
-    importErrorMessage = '';
-    importPreviewData = [];
-    importSuccessResult = null;
-    hasStepColumn = false;
-    selectedGlobalStepId = '';
-    selectedGlobalStepName = '';
-
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      if (!firstSheetName) {
-        throw new Error('No worksheets found in file.');
-      }
-
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-      if (!jsonRows || jsonRows.length === 0) {
-        throw new Error('Selected file contains no data rows.');
-      }
-
-      // Column Header Matching
-      const sampleRow = jsonRows[0];
-      const keys = Object.keys(sampleRow);
-
-      const findKey = (candidates) => {
-        return keys.find(k => {
-          const lower = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return candidates.some(c => lower.includes(c));
-        });
-      };
-
-      const clientKey = findKey(['client', 'customer', 'buyer', 'name']);
-      const qtyKey = findKey(['quantity', 'qty', 'count', 'pcs', 'amount']);
-      const lotKey = findKey(['lot', 'batch', 'number', 'code']);
-      const stepKey = findKey(['step', 'steps', 'stage', 'process', 'manufacturingstep']);
-
-      const defaultClientKey = clientKey || keys[0];
-      const defaultQtyKey = qtyKey || keys[1];
-      const defaultLotKey = lotKey || keys[2];
-
-      hasStepColumn = Boolean(stepKey);
-
-      if (!hasStepColumn) {
-        // Default global step to 'IMPORT' or first available step
-        const defaultStep = steps.find(s => s.code.toUpperCase() === 'IMPORT') || steps[0];
-        selectedGlobalStepId = defaultStep ? defaultStep.id : '';
-        selectedGlobalStepName = defaultStep ? defaultStep.name : 'Import';
-      }
-
-      const parsed = jsonRows.map((row, idx) => {
-        const clientName = String(row[defaultClientKey] ?? '').trim();
-        const rawQty = row[defaultQtyKey] ?? 0;
-        const lotNumber = String(row[defaultLotKey] ?? '').trim();
-        const quantity = parseFloat(rawQty) || 0;
-
-        let rowStepId = '';
-        let rowStepName = '';
-
-        if (hasStepColumn && stepKey) {
-          const rawStep = String(row[stepKey] ?? '').trim();
-          if (rawStep) {
-            const matchedStep = steps.find(s =>
-              s.name.toLowerCase() === rawStep.toLowerCase() ||
-              s.code.toLowerCase() === rawStep.toLowerCase()
-            );
-            if (matchedStep) {
-              rowStepId = matchedStep.id;
-              rowStepName = matchedStep.name;
-            } else {
-              rowStepName = rawStep;
-            }
-          }
-        }
-
-        return {
-          rowNum: idx + 1,
-          clientName: clientName || 'General Client',
-          quantity,
-          lotNumber,
-          stepId: rowStepId,
-          stepName: rowStepName,
-          isValid: Boolean(lotNumber && quantity > 0)
-        };
-      }).filter(r => r.lotNumber || r.quantity > 0);
-
-      importPreviewData = parsed;
-      if (parsed.length === 0) {
-        importErrorMessage = 'Could not extract valid records. Ensure columns: Client Name, Quantity, Lot Number.';
-      }
-    } catch (err) {
-      importErrorMessage = 'Failed to parse file: ' + (err?.message || err);
-    } finally {
-      isParsing = false;
-    }
-  }
-
-  async function handleImportSubmit() {
-    const validItems = importPreviewData.filter(r => r.isValid);
-    if (validItems.length === 0) {
-      importErrorMessage = 'No valid rows found to import.';
-      return;
-    }
-
-    isImporting = true;
-    importErrorMessage = '';
-    importSuccessResult = null;
-
-    try {
-      const payload = {
-        items: validItems.map(item => ({
-          clientName: item.clientName,
-          quantity: item.quantity,
-          lotNumber: item.lotNumber,
-          stepId: item.stepId || (!hasStepColumn ? selectedGlobalStepId : null),
-          stepName: item.stepName || (!hasStepColumn ? selectedGlobalStepName : null)
-        })),
-        createdBy: 'File Import Tool'
-      };
-
-      const result = await importProductionLots(payload);
-      importSuccessResult = result;
-
-      // Refresh lots list
-      await refreshData();
-    } catch (err) {
-      importErrorMessage = err?.message || 'Import failed.';
-    } finally {
-      isImporting = false;
-    }
-  }
-
-  async function handleCreateLotSubmit(e) {
-    if (e) e.preventDefault();
-    errorMessage = '';
-    try {
-      const selectedClient = clients.find((/** @type {any} */ c) => c.id === createLotForm.clientId);
-      const payload = {
-        lotNumber: createLotForm.lotNumber.trim(),
-        itemId: '00000000-0000-0000-0000-000000000001',
-        initialQuantity: Number(createLotForm.initialQuantity),
-        unit: Number(createLotForm.unit),
-        initialStepId: createLotForm.initialStepId || (steps[0] ? steps[0].id : ''),
-        createdBy: createLotForm.createdBy,
-        remarks: createLotForm.remarks,
-        clientId: createLotForm.clientId || null,
-        clientName: selectedClient ? selectedClient.name : null
-      };
-
-      const res = await createProductionLot(payload);
-      successMessage = `Production Lot '${createLotForm.lotNumber}' created successfully!`;
-      isCreateLotModalOpen = false;
-      createLotForm.lotNumber = '';
-      createLotForm.clientId = '';
-
-      await refreshData();
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to create production lot.';
-    }
-  }
-
-  // Register dynamic page header with actions dropdown
-  $effect(() => {
-    headerStore.setHeader({
-      title: 'Production Lots',
-      subtitle: 'Directory & Batches',
-      icon: 'reorder',
-      actions: [
-        {
-          label: 'Actions',
-          icon: 'bolt',
-          variant: 'primary',
-          dropdownItems: [
-            {
-              label: 'New Production Lot',
-              icon: 'add_circle',
-              onclick: () => {
-                if (steps.length > 0 && !createLotForm.initialStepId) {
-                  createLotForm.initialStepId = steps[0].id;
-                }
-                isCreateLotModalOpen = true;
-              }
-            },
-            {
-              label: 'Import Lots (Excel/CSV)',
-              icon: 'file_upload',
-              onclick: () => { openImportModal(); }
-            },
-            {
-              label: 'Refresh Lots Data',
-              icon: 'refresh',
-              onclick: () => { refreshData(); }
-            }
-          ]
-        }
-      ]
-    });
-  });
-
-  onDestroy(() => {
-    headerStore.reset();
-  });
+  let kpiItems = $derived([
+    { label: 'Lots', value: filteredLots.length, icon: 'inventory_2', color: 'text-primary' },
+    { label: 'WIP Qty', value: `${totalWipSum.toLocaleString()} Pcs`, icon: 'stacks', color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Created', value: `${totalInitialSum.toLocaleString()} Pcs`, icon: 'output', color: 'text-emerald-700 dark:text-emerald-400' },
+    { label: 'Clients', value: new Set(filteredLots.flatMap(l => l.clientIds)).size, icon: 'groups', color: 'text-amber-800 dark:text-amber-300' }
+  ]);
 </script>
 
 <Callout bind:message={errorMessage} type="error" />
 <Callout bind:message={successMessage} type="success" />
 
-<!-- Main Content -->
 <main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
-
-  <!-- Unified 4-Metric KPI Strip (All 4 cards in a single line on mobile & desktop) -->
-  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden">
-    <div class="grid grid-cols-4 divide-x divide-outline-variant/40 p-1.5 sm:p-3 text-center">
-      <!-- 1. Total Lots -->
-      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-primary hidden min-[380px]:inline">inventory_2</span>
-          <span>Lots</span>
-        </div>
-        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1">
-          {filteredLots.length}
-        </div>
-      </div>
-
-      <!-- 2. Active WIP -->
-      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-blue-600 hidden min-[380px]:inline">stacks</span>
-          <span>WIP Qty</span>
-        </div>
-        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-primary font-mono mt-0.5 sm:mt-1 truncate max-w-full">
-          {totalWipSum.toLocaleString()} <span class="text-[9px] sm:text-xs font-normal">Pcs</span>
-        </div>
-      </div>
-
-      <!-- 3. Initial Created -->
-      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-emerald-600 hidden min-[380px]:inline">output</span>
-          <span>Created</span>
-        </div>
-        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1 truncate max-w-full">
-          {totalInitialSum.toLocaleString()} <span class="text-[9px] sm:text-xs font-normal">Pcs</span>
-        </div>
-      </div>
-
-      <!-- 4. Clients -->
-      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-amber-600 hidden min-[380px]:inline">groups</span>
-          <span>Clients</span>
-        </div>
-        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-amber-800 dark:text-amber-300 font-mono mt-0.5 sm:mt-1">
-          {new Set(filteredLots.flatMap(l => l.clientIds)).size}
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- Unified 4-Metric KPI Strip -->
+  <KpiStrip items={kpiItems} />
 
   <!-- Filter Toolbar -->
   <section class="bg-surface p-3.5 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3.5">
-    <!-- Filter Header (Entire header clickable on mobile) -->
     <div
       role="button"
       tabindex="0"
@@ -628,17 +302,15 @@
             <span>Reset</span>
           </button>
         {/if}
-        <!-- Chevron indicator on mobile -->
         <span class="md:hidden material-symbols-outlined text-[20px] text-on-surface-variant transition-transform duration-200 {isFilterExpanded ? 'rotate-180' : ''}">
           expand_more
         </span>
       </div>
     </div>
 
-    <!-- Filter Body: Collapsed by default on mobile, always visible on md+ -->
+    <!-- Filter Body -->
     <div class="{isFilterExpanded ? 'block' : 'hidden md:block'} space-y-3.5 pt-1 md:pt-0">
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <!-- Search Input -->
         <div class="relative w-full max-w-md">
           <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
           <input
@@ -747,68 +419,19 @@
     </div>
 
     {#if loading}
-      <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
-        <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-        <span class="text-xs sm:text-sm font-medium">Loading production lots...</span>
-      </div>
+      <LoadingSpinner message="Loading production lots..." />
     {:else}
-      <!-- Mobile View: Card Stack Column (below md) -->
+      <!-- Mobile View: Card Stack Column -->
       <div class="block md:hidden space-y-2">
+        {#each filteredLots as lot (lot.id)}
+          <LotCard {lot} {steps} {selectedStepId} />
+        {/each}
         {#if filteredLots.length === 0}
-          <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-xl border border-dashed border-outline-variant text-xs">
-            <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40 mb-1 block">filter_alt_off</span>
-            No production lots match your filter criteria.
-          </div>
-        {:else}
-          {#each filteredLots as lot}
-            <div
-              role="button"
-              tabindex="0"
-              onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
-              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/inventory?lot=${lot.id}`)}
-              class="bg-surface p-3 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
-              title="View lot {lot.lotNumber} details"
-            >
-              <!-- Card Line 1: Lot #, Client, Quantity & Date -->
-              <div class="flex items-center justify-between gap-2 text-xs">
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0 font-mono">
-                    <span class="material-symbols-outlined text-[15px]">tag</span>
-                    <span>{lot.lotNumber}</span>
-                  </div>
-                  <span class="text-on-surface-variant text-[11px] truncate">• {lot.clientNamesDisplay}</span>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0 font-mono">
-                  <span class="font-bold text-xs text-primary">
-                    {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
-                  </span>
-                  <span class="text-[10px] text-on-surface-variant">• {lot.createdDate.toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              <!-- Card Line 2: Active Steps Pill List -->
-              {#if lot.activeSteps && lot.activeSteps.length > 0}
-                <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50">
-                  {#each lot.activeSteps as step}
-                    {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
-                      <span class="material-symbols-outlined text-[11px]">{stepIconMap[step.stepCode] || 'work'}</span>
-                      {step.stepName}: {step.quantity} Pcs
-                      {#if stepObj?.isTerminating}
-                        <span class="text-[8px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
-                      {:else if stepObj?.isActive === false}
-                        <span class="text-[8px] uppercase tracking-wider font-extrabold text-zinc-500 ml-0.5">(Inactive)</span>
-                      {/if}
-                    </span>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/each}
+          <EmptyState icon="filter_alt_off" title="No matching lots" message="Try adjusting your filter criteria." />
         {/if}
       </div>
 
-      <!-- Desktop View: Table (md and up) -->
+      <!-- Desktop View: Table -->
       <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant/60 bg-surface">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
@@ -822,365 +445,90 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+            {#each filteredLots as lot (lot.id)}
+              <tr
+                onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
+                class="hover:bg-surface-container-low/60 transition-colors cursor-pointer group"
+                title="View lot {lot.lotNumber} details"
+              >
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <div class="font-bold text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px]">tag</span>
+                    {lot.lotNumber}
+                  </div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
+                  {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-1.5 items-center">
+                    {#each lot.activeSteps as step}
+                      {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
+                      <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">{STEP_ICON_MAP[step.stepCode] || 'work'}</span>
+                        {step.stepName}: {step.quantity} Pcs
+                        {#if stepObj?.isTerminating}
+                          <span class="text-[9px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
+                        {:else if stepObj?.isActive === false}
+                          <span class="text-[9px] uppercase tracking-wider font-extrabold text-zinc-500 ml-0.5">(Inactive)</span>
+                        {/if}
+                      </span>
+                    {/each}
+                    {#if lot.activeSteps.length === 0}
+                      <span class="text-xs text-on-surface-variant italic">No active step</span>
+                    {/if}
+                  </div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-xs text-on-surface-variant font-mono">
+                  {lot.createdDate.toLocaleDateString()}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-right">
+                  <a
+                    href="/inventory?lot={lot.id}"
+                    class="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold transition-colors inline-flex items-center gap-1"
+                  >
+                    <span class="material-symbols-outlined text-[14px]">visibility</span>
+                    View WIP
+                  </a>
+                </td>
+              </tr>
+            {/each}
             {#if filteredLots.length === 0}
               <tr>
                 <td colspan="6" class="px-4 py-12 text-center text-on-surface-variant">
-                  <span class="material-symbols-outlined text-[36px] text-on-surface-variant/40 mb-2 block">filter_alt_off</span>
-                  No production lots match your filter criteria. Try adjusting the search query or filters above.
+                  <EmptyState icon="filter_alt_off" title="No matching production lots found" message="Try adjusting the search query or filters above." />
                 </td>
               </tr>
-            {:else}
-              {#each filteredLots as lot}
-                <tr
-                  onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
-                  class="hover:bg-surface-container-low/60 transition-colors cursor-pointer group"
-                  title="View lot {lot.lotNumber} details"
-                >
-                  <td class="px-4 py-3 whitespace-nowrap">
-                    <div class="font-bold text-primary flex items-center gap-1.5">
-                      <span class="material-symbols-outlined text-[16px]">tag</span>
-                      {lot.lotNumber}
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
-                  <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
-                    {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
-                  </td>
-                  <td class="px-4 py-3">
-                    <div class="flex flex-wrap gap-1.5 items-center">
-                      {#each lot.activeSteps as step}
-                        {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
-                          <span class="material-symbols-outlined text-[12px]">{stepIconMap[step.stepCode] || 'work'}</span>
-                          {step.stepName}: {step.quantity} Pcs
-                          {#if stepObj?.isTerminating}
-                            <span class="text-[9px] uppercase tracking-wider font-extrabold text-amber-700 dark:text-amber-400 ml-0.5">(Terminated)</span>
-                          {:else if stepObj?.isActive === false}
-                            <span class="text-[9px] uppercase tracking-wider font-extrabold text-zinc-500 ml-0.5">(Inactive)</span>
-                          {/if}
-                        </span>
-                      {/each}
-                      {#if lot.activeSteps.length === 0}
-                        <span class="text-xs text-on-surface-variant italic">No active step</span>
-                      {/if}
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 whitespace-nowrap text-xs text-on-surface-variant font-mono">
-                    {lot.createdDate.toLocaleDateString()}
-                  </td>
-                  <td class="px-4 py-3 whitespace-nowrap text-right">
-                    <a
-                      href="/inventory"
-                      class="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold transition-colors inline-flex items-center gap-1"
-                    >
-                      <span class="material-symbols-outlined text-[14px]">visibility</span>
-                      View WIP
-                    </a>
-                  </td>
-                </tr>
-              {/each}
             {/if}
           </tbody>
         </table>
       </div>
     {/if}
   </section>
-
 </main>
 
-<!-- Import Modal -->
-{#if isImportModalOpen}
-  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-    <div class="bg-surface dark:bg-surface-dim w-full max-w-3xl rounded-2xl border border-outline-variant shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      
-      <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low/50">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-            <span class="material-symbols-outlined text-[24px]">file_upload</span>
-          </div>
-          <div>
-            <h3 class="font-bold text-lg text-on-surface">Import Production Lots</h3>
-            <p class="text-xs text-on-surface-variant">Upload an Excel (.xlsx, .xls) or CSV (.csv) file to import lots</p>
-          </div>
-        </div>
-        <button
-          onclick={closeImportModal}
-          class="w-8 h-8 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-[18px]">close</span>
-        </button>
-      </div>
+<CreateLotModal
+  bind:isOpen={isCreateLotModalOpen}
+  {steps}
+  {clients}
+  onSuccess={(lot) => {
+    successMessage = `Production Lot '${lot.lotNumber}' created successfully!`;
+    refreshData();
+  }}
+  onError={(err) => {
+    errorMessage = err.message || 'Failed to create production lot.';
+  }}
+/>
 
-      <!-- Modal Body -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-1">
-        
-        {#if importErrorMessage}
-          <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
-            <span class="material-symbols-outlined text-red-500">error</span>
-            <span>{importErrorMessage}</span>
-          </div>
-        {/if}
-
-        {#if importSuccessResult}
-          <div class="p-5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-900 dark:text-emerald-200 space-y-3">
-            <div class="flex items-center gap-2 font-bold text-base text-emerald-800 dark:text-emerald-300">
-              <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400">check_circle</span>
-              Successfully Imported {importSuccessResult.totalImported} Lots!
-            </div>
-            <p class="text-xs text-emerald-700 dark:text-emerald-300/80">
-              All imported lots have been assigned to the manufacturing step <span class="font-mono font-bold px-1.5 py-0.5 bg-emerald-200/60 dark:bg-emerald-900/60 rounded">IMPORT</span> with their associated clients.
-            </p>
-
-            <div class="mt-3 max-h-40 overflow-y-auto border border-emerald-200/60 dark:border-emerald-800/60 rounded-lg p-2 bg-white/50 dark:bg-black/20 text-xs font-mono space-y-1">
-              {#each importSuccessResult.importedLots as lot}
-                <div class="flex justify-between items-center px-2 py-1 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 rounded">
-                  <span class="font-bold">{lot.finalLotNumber} {#if lot.originalLotNumber !== lot.finalLotNumber}<span class="text-amber-600 text-[11px] font-sans">(auto-incremented from {lot.originalLotNumber})</span>{/if}</span>
-                  <span class="text-on-surface-variant font-sans">{lot.clientName}</span>
-                  <span class="font-bold text-primary">{lot.quantity} Pcs</span>
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <!-- File Upload Zone -->
-        <div class="border-2 border-dashed border-outline-variant hover:border-primary rounded-2xl p-6 text-center bg-surface-container-lowest transition-colors relative group">
-          <input
-            type="file"
-            accept=".xlsx, .xls, .csv"
-            onchange={handleFileSelect}
-            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-          <div class="flex flex-col items-center gap-2">
-            <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-              <span class="material-symbols-outlined text-[28px]">upload_file</span>
-            </div>
-            <div>
-              <span class="font-bold text-sm text-primary underline">Click to select file</span>
-              <span class="text-xs text-on-surface-variant"> or drag and drop</span>
-            </div>
-            <div class="flex gap-2 mt-1">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLSX</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.XLS</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-container-high text-on-surface-variant">.CSV</span>
-            </div>
-            {#if importFile}
-              <div class="mt-2 text-xs font-mono font-bold text-emerald-600 flex items-center gap-1">
-                <span class="material-symbols-outlined text-[16px]">description</span>
-                Selected: {importFile.name}
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Format Rules Guide -->
-        <div class="p-4 bg-surface-container-low rounded-xl text-xs space-y-2 border border-outline-variant/60">
-          <div class="font-bold text-on-surface flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-[16px] text-primary">info</span>
-            Expected File Structure
-          </div>
-          <p class="text-on-surface-variant">
-            File headers: <strong class="text-on-surface">Client Name</strong>, <strong class="text-on-surface">Quantity</strong>, <strong class="text-on-surface">Lot Number</strong>, and optional <strong class="text-on-surface">Steps</strong>.
-          </p>
-          <div class="grid grid-cols-4 gap-2 font-mono text-[11px] text-center pt-1">
-            <div class="p-2 bg-surface rounded border border-outline-variant">Client Name</div>
-            <div class="p-2 bg-surface rounded border border-outline-variant">Quantity</div>
-            <div class="p-2 bg-surface rounded border border-outline-variant">Lot Number</div>
-            <div class="p-2 bg-surface rounded border border-outline-variant text-primary font-bold">Steps (Opt)</div>
-          </div>
-        </div>
-
-        <!-- Parsed Data Preview Table & Step Prompt -->
-        {#if isParsing}
-          <div class="p-8 text-center text-on-surface-variant flex flex-col items-center gap-2 font-mono text-sm">
-            <span class="material-symbols-outlined animate-spin text-primary text-[28px]">sync</span>
-            Parsing spreadsheet data...
-          </div>
-        {:else if importPreviewData.length > 0}
-          <div class="space-y-3">
-            <!-- Step Prompt Banner when Steps column is absent -->
-            {#if !hasStepColumn}
-              <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div class="flex items-center gap-2 text-amber-900 dark:text-amber-200">
-                  <span class="material-symbols-outlined text-amber-600 dark:text-amber-400">info</span>
-                  <div>
-                    <div class="font-bold">No 'Steps' column detected in file</div>
-                    <div class="text-on-surface-variant text-[11px]">Select the target step under which all import lines should be added:</div>
-                  </div>
-                </div>
-                <div class="min-w-[220px]">
-                  <select
-                    value={selectedGlobalStepId}
-                    onchange={(e) => {
-                      selectedGlobalStepId = e.target.value;
-                      const found = steps.find(s => s.id === e.target.value);
-                      selectedGlobalStepName = found ? found.name : 'Import';
-                    }}
-                    class="w-full px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface font-bold text-xs focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    {#each steps as step}
-                      <option value={step.id}>{step.name} ({step.code})</option>
-                    {/each}
-                    <option value="">Default (IMPORT step)</option>
-                  </select>
-                </div>
-              </div>
-            {/if}
-
-            <div class="flex items-center justify-between">
-              <h4 class="font-bold text-sm text-on-surface flex items-center gap-2">
-                Preview Data
-                <span class="px-2 py-0.5 bg-primary/10 text-primary font-mono text-xs rounded-full">
-                  {importPreviewData.filter(r => r.isValid).length} ready to import
-                </span>
-              </h4>
-              {#if hasStepColumn}
-                <span class="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <span class="material-symbols-outlined text-[14px]">check_circle</span>
-                  Steps column detected in file
-                </span>
-              {/if}
-            </div>
-
-            <div class="border border-outline-variant rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-surface-container-low font-mono font-bold uppercase text-[11px] border-b border-outline-variant sticky top-0">
-                  <tr>
-                    <th class="p-3 w-12 text-center">#</th>
-                    <th class="p-3">Lot Number</th>
-                    <th class="p-3">Client Name</th>
-                    <th class="p-3 text-right">Quantity</th>
-                    <th class="p-3 text-center">Initial Step</th>
-                    <th class="p-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-outline-variant/40">
-                  {#each importPreviewData as row}
-                    <tr class="hover:bg-surface-container-low/50">
-                      <td class="p-3 text-center text-on-surface-variant font-mono">{row.rowNum}</td>
-                      <td class="p-3 font-mono font-bold text-primary">{row.lotNumber || '—'}</td>
-                      <td class="p-3 font-bold text-on-surface">{row.clientName}</td>
-                      <td class="p-3 text-right font-mono font-bold">{row.quantity.toLocaleString()} Pcs</td>
-                      <td class="p-3 text-center">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary border border-primary/20">
-                          {row.stepName || (!hasStepColumn ? (selectedGlobalStepName || 'IMPORT') : 'IMPORT')}
-                        </span>
-                      </td>
-                      <td class="p-3 text-center">
-                        {#if row.isValid}
-                          <span class="text-emerald-600 font-bold flex items-center justify-center gap-0.5">
-                            <span class="material-symbols-outlined text-[14px]">check</span> Valid
-                          </span>
-                        {:else}
-                          <span class="text-red-500 font-bold flex items-center justify-center gap-0.5">
-                            <span class="material-symbols-outlined text-[14px]">warning</span> Missing Qty/Lot
-                          </span>
-                        {/if}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        {/if}
-
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="px-6 py-4 border-t border-outline-variant bg-surface-container-low/50 flex items-center justify-end gap-3">
-        <button
-          onclick={closeImportModal}
-          class="px-4 py-2 rounded-xl border border-outline-variant hover:bg-surface-container text-on-surface-variant text-xs font-bold transition-colors cursor-pointer"
-        >
-          Cancel
-        </button>
-        <button
-          onclick={handleImportSubmit}
-          disabled={isImporting || isParsing || importPreviewData.filter(r => r.isValid).length === 0}
-          class="px-5 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer"
-        >
-          {#if isImporting}
-            <span class="material-symbols-outlined animate-spin text-[16px]">sync</span>
-            Importing Lots...
-          {:else}
-            <span class="material-symbols-outlined text-[16px]">upload_file</span>
-            Import {importPreviewData.filter(r => r.isValid).length} Lots
-          {/if}
-        </button>
-      </div>
-
-    </div>
-  </div>
-{/if}
-
-<!-- Create Production Lot Modal -->
-<Modal bind:isOpen={isCreateLotModalOpen} title="Create New Production Lot">
-  <form onsubmit={handleCreateLotSubmit} class="space-y-4">
-    <Input
-      label="Production Lot Number"
-      bind:value={createLotForm.lotNumber}
-      placeholder="e.g. LOT-2026-002"
-      icon="tag"
-      required={true}
-    />
-
-    <Input
-      label="Initial Quantity (Pcs)"
-      type="number"
-      bind:value={createLotForm.initialQuantity}
-      placeholder="e.g. 100"
-      icon="numbers"
-      required={true}
-    />
-
-    <Select
-      label="Initial Manufacturing Step"
-      bind:value={createLotForm.initialStepId}
-      options={steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
-      icon="factory"
-      required={true}
-    />
-
-    <ClientModeGate mode="lot">
-      <div class="space-y-1">
-        <label for="create-lot-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
-        <Select
-          id="create-lot-client-select"
-          bind:value={createLotForm.clientId}
-          options={[
-            { label: 'None (Direct / Internal Factory)', value: '' },
-            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
-          ]}
-          placeholder="Select Client (Optional)..."
-          icon="badge"
-        />
-      </div>
-    </ClientModeGate>
-
-    <Input
-      label="Created By"
-      bind:value={createLotForm.createdBy}
-      placeholder="e.g. Production Manager"
-      icon="person"
-    />
-
-    <Input
-      label="Remarks / Notes"
-      bind:value={createLotForm.remarks}
-      placeholder="Optional notes..."
-      icon="notes"
-    />
-
-    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
-      <Button variant="outline" onclick={() => isCreateLotModalOpen = false}>
-        Cancel
-      </Button>
-      <Button variant="primary" type="submit" icon="send">
-        Create Lot
-      </Button>
-    </div>
-  </form>
-</Modal>
-
+<ImportLotsModal
+  bind:isOpen={isImportModalOpen}
+  {steps}
+  onSuccess={() => {
+    successMessage = 'Lots imported successfully!';
+    refreshData();
+  }}
+  onError={(err) => {
+    errorMessage = err.message || 'Import failed.';
+  }}
+/>

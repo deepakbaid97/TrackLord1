@@ -4,7 +4,10 @@
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
   import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
   import Callout from '$lib/components/ui/Callout.svelte';
-  import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+  import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import { STEP_ICON_MAP, STEP_COLOR_MAP } from '$lib/services/lotService.js';
+  import { usePageHeader } from '$lib/utils/usePageHeader.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -18,6 +21,20 @@
   let totalMaterialAvailable = $state(0);
   /** @type {any[]} */
   let materialLots = $state([]);
+
+  usePageHeader(() => ({
+    title: 'Dashboard',
+    subtitle: 'Analytics & Floor Overview',
+    icon: 'dashboard',
+    actions: [
+      {
+        label: 'Refresh',
+        icon: 'refresh',
+        variant: 'outline',
+        onclick: () => refreshDashboard()
+      }
+    ]
+  }));
 
   onMount(async () => {
     await refreshDashboard();
@@ -34,14 +51,12 @@
       loading = false;
     }
 
-    // Fetch material lots and compute total available quantity
     materialLoading = true;
     materialError = '';
     try {
       const fetchedLots = await getMaterialLots();
-      materialLots = fetchedLots;
-      // Sum remaining quantity across all material lots
-      totalMaterialAvailable = fetchedLots.reduce((sum, lot) => {
+      materialLots = fetchedLots || [];
+      totalMaterialAvailable = (fetchedLots || []).reduce((sum, lot) => {
         const qty = lot.remainingQuantity ?? lot.initialQuantity ?? 0;
         return sum + Number(qty);
       }, 0);
@@ -52,73 +67,21 @@
     }
   }
 
-  // Computed: max WIP across steps for bar scaling
   let maxStepWip = $derived(
     overview?.stepSummaries?.length > 0
       ? Math.max(...overview.stepSummaries.map((/** @type {any} */ s) => s.totalWipQuantity), 1)
       : 1
   );
-
-  // Step icon mapping
-  /** @type {Record<string, string>} */
-  const stepIconMap = {
-    'CUT': 'content_cut',
-    'STITCH': 'webhook',
-    'WASH': 'local_laundry_service',
-    'FIN': 'iron',
-    'PACK': 'inventory_2'
-  };
-
-  /** @type {Record<string, string>} */
-  const stepColorMap = {
-    'CUT': 'bg-blue-500',
-    'STITCH': 'bg-violet-500',
-    'WASH': 'bg-cyan-500',
-    'FIN': 'bg-amber-500',
-    'PACK': 'bg-emerald-500'
-  };
-
-  import { onDestroy } from 'svelte';
-  import { headerStore } from '$lib/stores/headerStore.js';
-
-  $effect(() => {
-    headerStore.setHeader({
-      title: 'Dashboard',
-      subtitle: 'Analytics & Floor Overview',
-      icon: 'dashboard',
-      actions: [
-        {
-          label: 'Refresh',
-          icon: 'refresh',
-          variant: 'outline',
-          onclick: () => refreshDashboard()
-        }
-      ]
-    });
-  });
-
-  onDestroy(() => {
-    headerStore.reset();
-  });
 </script>
 
 <Callout bind:message={errorMessage} type="error" />
 
-<!-- Main Content -->
 <main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
-
   {#if loading}
-    <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
-      <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-      <span>Loading dashboard metrics...</span>
-    </div>
+    <LoadingSpinner message="Loading dashboard metrics..." />
   {:else if overview}
-
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET 1: KPI Summary Cards                                -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- KPI Summary Cards -->
     <section class="grid grid-cols-2 gap-2.5 sm:gap-4">
-      <!-- Active Lots -->
       <a
         href="/lots"
         class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-all cursor-pointer hover:border-primary/50 min-w-0"
@@ -133,7 +96,6 @@
         </div>
       </a>
 
-      <!-- Total WIP Quantity -->
       <div class="bg-surface p-3.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex items-center gap-2.5 sm:gap-4 group hover:shadow-md transition-shadow min-w-0">
         <div class="p-2 sm:p-3 bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-blue-500/15 transition-colors shrink-0">
           <span class="material-symbols-outlined text-[22px] sm:text-[28px]">stacks</span>
@@ -148,10 +110,7 @@
 
     <!-- Two Column Grid for Step WIP + Client Distribution -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!-- WIDGET 2: WIP by Manufacturing Step                       -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- WIP by Manufacturing Step -->
       <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
         <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-5">
           <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -167,7 +126,7 @@
           <div class="space-y-2 sm:space-y-4">
             {#each overview.stepSummaries as step}
               {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
-              {@const barColor = stepColorMap[step.stepCode] || 'bg-primary'}
+              {@const barColor = STEP_COLOR_MAP[step.stepCode] || 'bg-primary'}
               <a
                 href="/lots?step={step.stepId}"
                 class="group block p-1.5 sm:p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
@@ -175,7 +134,7 @@
               >
                 <div class="flex items-center justify-between mb-1 sm:mb-1.5">
                   <div class="flex items-center gap-1.5 sm:gap-2">
-                    <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{stepIconMap[step.stepCode] || 'work'}</span>
+                    <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-on-surface-variant group-hover:text-primary transition-colors">{STEP_ICON_MAP[step.stepCode] || 'work'}</span>
                     <span class="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors">{step.stepName}</span>
                     <span class="text-[9px] sm:text-[10px] font-mono text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">{step.stepCode}</span>
                     {#if step.isActive === false}
@@ -197,15 +156,11 @@
             {/each}
           </div>
         {:else}
-          <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-            No manufacturing steps configured.
-          </div>
+          <EmptyState icon="alt_route" title="No manufacturing steps configured" message="Steps will appear here once created." />
         {/if}
       </section>
 
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!-- WIDGET 3: Client Distribution (Declaratively Gated)        -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- Client Distribution -->
       <FeatureGate feature="pages.clients">
         <ClientModeGate mode="any">
           <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
@@ -260,19 +215,14 @@
                 </table>
               </div>
             {:else}
-              <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-                <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">groups</span>
-                No client activity recorded yet. Movements or lots with assigned clients will appear here.
-              </div>
+              <EmptyState icon="groups" title="No client activity recorded yet" message="Movements or lots with assigned clients will appear here." />
             {/if}
           </section>
         </ClientModeGate>
       </FeatureGate>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET: Material Availability                              -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Material Availability -->
     <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
       <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
         <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -341,16 +291,11 @@
           </table>
         </div>
       {:else}
-        <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-          <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">inventory_2</span>
-          No material lots found. Create a new material lot from the Inventory page.
-        </div>
+        <EmptyState icon="inventory_2" title="No material lots found" message="Create a new material lot from the Inventory page." />
       {/if}
     </section>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- WIDGET 4: Active Production Lots Table                     -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Active Production Lots Table -->
     <section class="bg-surface p-6 rounded-xl border border-outline-variant shadow-sm">
       <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-5">
         <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
@@ -408,12 +353,8 @@
           </table>
         </div>
       {:else}
-        <div class="p-8 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-          <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-2 block">inventory_2</span>
-          No active production lots found. Create a new lot from the Inventory page.
-        </div>
+        <EmptyState icon="inventory_2" title="No active production lots found" message="Create a new lot from the Inventory page." />
       {/if}
     </section>
-
   {/if}
 </main>

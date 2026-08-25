@@ -1,13 +1,15 @@
 <script>
   import { onMount } from 'svelte';
-  import Button from '$lib/components/ui/Button.svelte';
-  import Input from '$lib/components/ui/Input.svelte';
-  import Select from '$lib/components/ui/Select.svelte';
-  import Modal from '$lib/components/ui/Modal.svelte';
   import Callout from '$lib/components/ui/Callout.svelte';
+  import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
+  import SearchBox from '$lib/components/ui/SearchBox.svelte';
+  import KpiStrip from '$lib/components/ui/KpiStrip.svelte';
+  import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import ClientCard from '$lib/components/features/clients/ClientCard.svelte';
+  import CreateClientModal from '$lib/components/features/clients/CreateClientModal.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
-
-  import { getClients, createClient, getProductionLots, getLotJourney, getManufacturingSteps } from '$lib/api.js';
+  import { usePageHeader } from '$lib/utils/usePageHeader.js';
+  import { getClients, getProductionLots, getLotJourney, getManufacturingSteps } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -16,13 +18,27 @@
 
   /** @type {Array<any>} */
   let clients = $state([]);
-
   let isCreateClientModalOpen = $state(false);
-  let createClientForm = $state({
-    name: '',
-    phoneNumber: '',
-    clientType: 'Buyer'
-  });
+
+  usePageHeader(() => ({
+    title: 'Clients Directory',
+    subtitle: 'Buyers & Partners',
+    icon: 'groups',
+    actions: [
+      {
+        label: 'Add Client',
+        icon: 'person_add',
+        variant: 'primary',
+        onclick: () => { isCreateClientModalOpen = true; }
+      },
+      {
+        label: 'Refresh',
+        icon: 'refresh',
+        variant: 'outline',
+        onclick: () => { refreshClients(); }
+      }
+    ]
+  }));
 
   onMount(async () => {
     await refreshClients();
@@ -41,17 +57,14 @@
       const baseClients = clientData || [];
       const lots = rawLots || [];
       const steps = rawSteps || [];
-      const clientTrackingMode = $tenantConfigStore.clientMode; // 'lot' | 'step' | 'none'
+      const clientTrackingMode = $tenantConfigStore.clientMode;
 
-      // Map client stats: active lots count and active WIP quantity
-      // Key: clientId, Value: { activeLotIds: Set, totalWip: number }
       /** @type {Map<string, { activeLotIds: Set<string>, totalWip: number }>} */
       const clientStats = new Map();
       baseClients.forEach((/** @type {any} */ c) => {
         clientStats.set(c.id, { activeLotIds: new Set(), totalWip: 0 });
       });
 
-      // Fetch journey for each lot to trace active WIP step balances and associated clients
       await Promise.all(
         lots.map(async (/** @type {any} */ lot) => {
           try {
@@ -64,18 +77,14 @@
 
             if (activeSteps.length === 0) return;
 
-            // Non-terminating active WIP sum for this lot
             const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
               const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
               return !stepObj?.isTerminating;
             });
             const lotActiveWip = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
-
             const lotClientId = lot.clientId || journey.clientId;
 
             if (clientTrackingMode === 'lot') {
-              // ── Strategy A: Per Production Lot ──
-              // In lot mode, the lot's active WIP belongs directly to the lot's client
               if (lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
                 const stats = clientStats.get(lotClientId);
                 if (stats) {
@@ -84,7 +93,6 @@
                 }
               }
             } else {
-              // ── Strategy B: Per Step Movement / Subcontracting ──
               if (journey.movementHistory) {
                 const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
                 let foundMovementClient = false;
@@ -103,7 +111,6 @@
                   }
                 });
 
-                // Fallback: If no movements had clients, but the lot had an initial client
                 if (!foundMovementClient && lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
                   const stats = clientStats.get(lotClientId);
                   if (stats) {
@@ -134,27 +141,6 @@
     }
   }
 
-  /** @param {SubmitEvent} e */
-  async function handleCreateClientSubmit(e) {
-    e.preventDefault();
-    errorMessage = '';
-    try {
-      const payload = {
-        name: createClientForm.name.trim(),
-        phoneNumber: createClientForm.phoneNumber ? createClientForm.phoneNumber.trim() : '',
-        clientType: createClientForm.clientType
-      };
-
-      await createClient(payload);
-      successMessage = `Client '${createClientForm.name}' created successfully!`;
-      isCreateClientModalOpen = false;
-      createClientForm = { name: '', phoneNumber: '', clientType: 'Buyer' };
-      await refreshClients();
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to create client';
-    }
-  }
-
   let filteredClients = $derived(
     clients.filter(c =>
       !clientSearchQuery ||
@@ -163,116 +149,28 @@
       c.clientType.toLowerCase().includes(clientSearchQuery.toLowerCase())
     )
   );
-  import { onDestroy } from 'svelte';
-  import { headerStore } from '$lib/stores/headerStore.js';
 
-  $effect(() => {
-    headerStore.setHeader({
-      title: 'Clients Directory',
-      subtitle: 'Buyers & Partners',
-      icon: 'groups',
-      actions: [
-        {
-          label: 'Add Client',
-          icon: 'person_add',
-          variant: 'primary',
-          onclick: () => { isCreateClientModalOpen = true; }
-        },
-        {
-          label: 'Refresh',
-          icon: 'refresh',
-          variant: 'outline',
-          onclick: () => { refreshClients(); }
-        }
-      ]
-    });
-  });
-
-  onDestroy(() => {
-    headerStore.reset();
-  });
+  let kpiItems = $derived([
+    { label: 'Clients', value: clients.length, icon: 'group', color: 'text-primary' },
+    { label: 'Buyers', value: clients.filter(c => c.clientType === 'Buyer').length, icon: 'shopping_bag', color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Wholesale', value: clients.filter(c => c.clientType === 'Wholesaler').length, icon: 'storefront', color: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Job Workers', value: clients.filter(c => c.clientType === 'Job Worker').length, icon: 'precision_manufacturing', color: 'text-amber-600 dark:text-amber-300' }
+  ]);
 </script>
 
 <Callout bind:message={errorMessage} type="error" />
 <Callout bind:message={successMessage} type="success" />
 
-<!-- Main Content -->
 <main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
-
   {#if loading}
-    <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
-      <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-      <span class="text-xs sm:text-sm font-medium">Loading clients...</span>
-    </div>
+    <LoadingSpinner message="Loading clients..." />
   {:else}
-    <!-- Unified 4-Metric KPI Strip (All 4 cards in a single line on mobile & desktop) -->
-    <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden">
-      <div class="grid grid-cols-4 divide-x divide-outline-variant/40 p-1.5 sm:p-3 text-center">
-        <!-- 1. Total Clients -->
-        <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-          <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-            <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-primary hidden min-[380px]:inline">group</span>
-            <span>Clients</span>
-          </div>
-          <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1">
-            {clients.length}
-          </div>
-        </div>
-
-        <!-- 2. Buyers -->
-        <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-          <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-            <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-blue-600 hidden min-[380px]:inline">shopping_bag</span>
-            <span>Buyers</span>
-          </div>
-          <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-blue-700 dark:text-blue-400 font-mono mt-0.5 sm:mt-1">
-            {clients.filter(c => c.clientType === 'Buyer').length}
-          </div>
-        </div>
-
-        <!-- 3. Wholesalers -->
-        <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-          <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-            <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-emerald-600 hidden min-[380px]:inline">storefront</span>
-            <span>Wholesale</span>
-          </div>
-          <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1">
-            {clients.filter(c => c.clientType === 'Wholesaler').length}
-          </div>
-        </div>
-
-        <!-- 4. Job Workers -->
-        <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
-          <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
-            <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-amber-600 hidden min-[380px]:inline">precision_manufacturing</span>
-            <span>Job Workers</span>
-          </div>
-          <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-amber-800 dark:text-amber-300 font-mono mt-0.5 sm:mt-1">
-            {clients.filter(c => c.clientType === 'Job Worker').length}
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- Unified 4-Metric KPI Strip -->
+    <KpiStrip items={kpiItems} />
 
     <!-- Search Bar -->
-    <section class="bg-surface p-3.5 sm:p-4 rounded-2xl border border-outline-variant/70 shadow-sm flex items-center gap-4">
-      <div class="relative flex-1">
-        <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
-        <input
-          type="text"
-          bind:value={clientSearchQuery}
-          placeholder="Search clients by name, phone, or client type..."
-          class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/70 rounded-xl text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-        />
-        {#if clientSearchQuery}
-          <button
-            onclick={() => clientSearchQuery = ''}
-            class="absolute right-3 top-2.5 text-on-surface-variant hover:text-on-surface"
-          >
-            <span class="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        {/if}
-      </div>
+    <section class="bg-surface p-3.5 sm:p-4 rounded-2xl border border-outline-variant/70 shadow-sm">
+      <SearchBox bind:value={clientSearchQuery} placeholder="Search clients by name, phone, or client type..." />
     </section>
 
     <!-- Clients List Table & Cards -->
@@ -291,71 +189,11 @@
 
       <!-- Mobile View: Card Stack Column (below md) -->
       <div class="block md:hidden space-y-2">
-        {#each filteredClients as client}
-          <div
-            role="button"
-            tabindex="0"
-            onclick={() => window.location.href = `/lots?client=${client.id}`}
-            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/lots?client=${client.id}`)}
-            class="bg-surface p-3 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
-            title="View lots for {client.name}"
-          >
-            <!-- Card Line 1: Icon & Name | Client Type Badge | WIP Qty -->
-            <div class="flex items-center justify-between gap-2 text-xs">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0 font-mono">
-                  <span class="material-symbols-outlined text-[16px]">badge</span>
-                  <span>{client.name}</span>
-                </div>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0
-                  {client.clientType === 'Buyer' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800' :
-                   client.clientType === 'Wholesaler' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
-                   client.clientType === 'Job Worker' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800' :
-                   'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'}">
-                  {client.clientType}
-                </span>
-              </div>
-
-              <div class="flex items-center gap-1.5 shrink-0 font-mono">
-                <span class="font-bold text-xs text-primary">
-                  {client.totalWipQuantity.toLocaleString()} Pcs
-                </span>
-                <span class="material-symbols-outlined text-[16px] text-on-surface-variant/40 group-hover:text-primary transition-colors pointer-events-none">
-                  chevron_right
-                </span>
-              </div>
-            </div>
-
-            <!-- Card Line 2: Active Lots Count, Phone Number, Registered Date -->
-            <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50 text-[10px] font-mono">
-              <!-- Active Lots Badge -->
-              <span class="px-2 py-0.5 rounded font-bold bg-primary-container text-on-primary-container flex items-center gap-1">
-                <span class="material-symbols-outlined text-[11px]">inventory_2</span>
-                {client.activeLotsCount} {client.activeLotsCount === 1 ? 'Active Lot' : 'Active Lots'}
-              </span>
-
-              <!-- Phone Number Pill -->
-              {#if client.phoneNumber}
-                <span class="px-2 py-0.5 rounded bg-surface-container-low text-on-surface-variant border border-outline-variant/60 flex items-center gap-0.5">
-                  <span class="material-symbols-outlined text-[11px]">call</span>
-                  {client.phoneNumber}
-                </span>
-              {/if}
-
-              <!-- Registered Date Pill -->
-              {#if client.createdAtUtc}
-                <span class="px-1.5 py-0.5 rounded bg-surface-container-low text-on-surface-variant/70 border border-outline-variant/60 ml-auto">
-                  {new Date(client.createdAtUtc).toLocaleDateString()}
-                </span>
-              {/if}
-            </div>
-          </div>
+        {#each filteredClients as client (client.id)}
+          <ClientCard {client} />
         {/each}
         {#if filteredClients.length === 0}
-          <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-xl border border-dashed border-outline-variant text-xs">
-            <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40 mb-1 block">filter_alt_off</span>
-            No clients found matching your search.
-          </div>
+          <EmptyState icon="filter_alt_off" title="No clients found" message="Try adjusting your search criteria." />
         {/if}
       </div>
 
@@ -374,7 +212,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
-            {#each filteredClients as client}
+            {#each filteredClients as client (client.id)}
               <tr
                 onclick={() => window.location.href = `/lots?client=${client.id}`}
                 class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
@@ -403,7 +241,7 @@
                   {client.activeLotsCount}
                 </td>
                 <td class="px-6 py-4 text-right font-mono font-bold text-primary">
-                  {client.totalWipQuantity.toLocaleString()} Pcs
+                  {(client.totalWipQuantity || 0).toLocaleString()} Pcs
                 </td>
                 <td class="px-6 py-4 text-xs text-on-surface-variant font-mono">
                   {new Date(client.createdAtUtc).toLocaleDateString()}
@@ -434,49 +272,13 @@
   {/if}
 </main>
 
-<!-- Create Client Modal -->
-<Modal bind:isOpen={isCreateClientModalOpen} title="Register New Client">
-  <form onsubmit={handleCreateClientSubmit} class="space-y-4">
-    <Input
-      label="Client / Company Name"
-      bind:value={createClientForm.name}
-      placeholder="e.g. Apex Textiles Ltd."
-      icon="badge"
-      required={true}
-    />
-
-    <Input
-      label="Phone Number (Optional)"
-      type="tel"
-      bind:value={createClientForm.phoneNumber}
-      placeholder="e.g. +91 98765 43210"
-      icon="call"
-      required={false}
-    />
-
-    <Select
-      label="Client Type"
-      bind:value={createClientForm.clientType}
-      options={[
-        { label: 'Buyer', value: 'Buyer' },
-        { label: 'Wholesaler', value: 'Wholesaler' },
-        { label: 'Job Worker', value: 'Job Worker' },
-        { label: 'Customer', value: 'Customer' },
-        { label: 'Retailer', value: 'Retailer' },
-        { label: 'Supplier', value: 'Supplier' },
-        { label: 'Self', value: 'Self'}
-      ]}
-      icon="category"
-      required={true}
-    />
-
-    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
-      <Button variant="outline" onclick={() => isCreateClientModalOpen = false}>
-        Cancel
-      </Button>
-      <Button variant="primary" type="submit" icon="save">
-        Save Client
-      </Button>
-    </div>
-  </form>
-</Modal>
+<CreateClientModal
+  bind:isOpen={isCreateClientModalOpen}
+  onSuccess={(newClient) => {
+    successMessage = `Client '${newClient.name}' created successfully!`;
+    refreshClients();
+  }}
+  onError={(err) => {
+    errorMessage = err.message || 'Failed to create client';
+  }}
+/>

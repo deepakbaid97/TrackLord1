@@ -29,7 +29,7 @@
 <button
   {type}
   {disabled}
-  {onclick}
+  onclick={(e) => { if (!disabled && onclick) onclick(e); }}
   class="inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer {variantClasses[variant]} {sizeClasses[size]} {className}"
 >
   {#if icon}

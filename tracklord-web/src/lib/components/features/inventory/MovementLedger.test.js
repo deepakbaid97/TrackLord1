@@ -1,0 +1,56 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/svelte';
+import MovementLedger from './MovementLedger.svelte';
+import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+
+describe('MovementLedger component', () => {
+  beforeEach(() => {
+    tenantConfigStore.resetToDefaults();
+  });
+
+  it('renders empty state when movements list is empty', () => {
+    render(MovementLedger, {
+      props: {
+        movements: []
+      }
+    });
+
+    expect(screen.getByText('No movement history')).toBeInTheDocument();
+  });
+
+  it('renders movement list with records and status badges', () => {
+    const movements = [
+      { id: 'm1', from: 'Cutting', to: 'Stitching', qty: '100 Pcs', date: '2026-02-20', isReversed: false, referenceNumber: 'REF-01', user: 'Op 1' },
+      { id: 'm2', from: 'Stitching', to: 'Washing', qty: '50 Pcs', date: '2026-02-21', isReversed: true, referenceNumber: 'REF-02', user: 'Op 2' }
+    ];
+
+    render(MovementLedger, {
+      props: {
+        movements
+      }
+    });
+
+    expect(screen.getByText('2 records')).toBeInTheDocument();
+    expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Reversed').length).toBeGreaterThan(0);
+  });
+
+  it('triggers onReverseClick callback when Reverse button is clicked', async () => {
+    const handleReverse = vi.fn();
+    const movements = [
+      { id: 'm1', from: 'Cutting', to: 'Stitching', qty: '100 Pcs', date: '2026-02-20', isReversed: false, referenceNumber: 'REF-01', user: 'Op 1' }
+    ];
+
+    render(MovementLedger, {
+      props: {
+        movements,
+        onReverseClick: handleReverse
+      }
+    });
+
+    const reverseButtons = screen.getAllByRole('button', { name: /reverse/i });
+    await fireEvent.click(reverseButtons[0]);
+
+    expect(handleReverse).toHaveBeenCalledWith(movements[0]);
+  });
+});
