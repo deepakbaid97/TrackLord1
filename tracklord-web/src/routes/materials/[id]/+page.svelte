@@ -292,6 +292,7 @@
                   </td>
                 </tr>
               {/each}
+            </tbody>
           </table>
         </div>
       {:else}

@@ -1,3 +1,13 @@
-# allow crawling everything by default
+# Allow all search engine crawlers
 User-agent: *
-Disallow:
+Allow: /
+
+# Block sensitive paths
+Disallow: /api
+Disallow: /dashboard
+Disallow: /customers
+Disallow: /raw-materials
+Disallow: /settings
+
+# Allow public paths (some can be crawled, some not)
+Allow: /
