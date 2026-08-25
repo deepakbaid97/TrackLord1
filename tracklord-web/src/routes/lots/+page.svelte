@@ -1,20 +1,27 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import {
     getProductionLots,
     getManufacturingSteps,
     getClients,
     getLotJourney,
-    importProductionLots
+    importProductionLots,
+    createProductionLot
   } from '$lib/api.js';
   import * as XLSX from 'xlsx';
   import Select from '$lib/components/ui/Select.svelte';
+  import Input from '$lib/components/ui/Input.svelte';
+  import Button from '$lib/components/ui/Button.svelte';
+  import Modal from '$lib/components/ui/Modal.svelte';
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
   import ClientModeGate from '$lib/components/ui/ClientModeGate.svelte';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+  import { headerStore } from '$lib/stores/headerStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
+  let successMessage = $state('');
 
   /** @type {Array<any>} */
   let rawLots = $state([]);
@@ -25,6 +32,18 @@
   /** @type {Array<any>} */
   let enrichedLots = $state([]);
 
+  // Create Lot Modal state
+  let isCreateLotModalOpen = $state(false);
+  let createLotForm = $state({
+    lotNumber: '',
+    initialQuantity: 100,
+    unit: 1, // Pieces
+    initialStepId: '',
+    createdBy: 'Operator',
+    remarks: '',
+    clientId: ''
+  });
+
   // Filter States
   let searchQuery = $state('');
   let selectedStepId = $state('ALL');
@@ -33,6 +52,7 @@
   let customStartDate = $state('');
   let customEndDate = $state('');
   let isFilterExpanded = $state(false); // Collapsed by default on mobile
+
 
   let activeFilterCount = $derived(
     (searchQuery.trim() ? 1 : 0) +
@@ -448,115 +468,146 @@
       isImporting = false;
     }
   }
+
+  async function handleCreateLotSubmit(e) {
+    if (e) e.preventDefault();
+    errorMessage = '';
+    try {
+      const selectedClient = clients.find((/** @type {any} */ c) => c.id === createLotForm.clientId);
+      const payload = {
+        lotNumber: createLotForm.lotNumber.trim(),
+        itemId: '00000000-0000-0000-0000-000000000001',
+        initialQuantity: Number(createLotForm.initialQuantity),
+        unit: Number(createLotForm.unit),
+        initialStepId: createLotForm.initialStepId || (steps[0] ? steps[0].id : ''),
+        createdBy: createLotForm.createdBy,
+        remarks: createLotForm.remarks,
+        clientId: createLotForm.clientId || null,
+        clientName: selectedClient ? selectedClient.name : null
+      };
+
+      const res = await createProductionLot(payload);
+      successMessage = `Production Lot '${createLotForm.lotNumber}' created successfully!`;
+      isCreateLotModalOpen = false;
+      createLotForm.lotNumber = '';
+      createLotForm.clientId = '';
+
+      await refreshData();
+    } catch (/** @type {any} */ err) {
+      errorMessage = err.message || 'Failed to create production lot.';
+    }
+  }
+
+  // Register dynamic page header with actions dropdown
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Production Lots',
+      subtitle: 'Directory & Batches',
+      icon: 'reorder',
+      actions: [
+        {
+          label: 'Actions',
+          icon: 'bolt',
+          variant: 'primary',
+          dropdownItems: [
+            {
+              label: 'New Production Lot',
+              icon: 'add_circle',
+              onclick: () => {
+                if (steps.length > 0 && !createLotForm.initialStepId) {
+                  createLotForm.initialStepId = steps[0].id;
+                }
+                isCreateLotModalOpen = true;
+              }
+            },
+            {
+              label: 'Import Lots (Excel/CSV)',
+              icon: 'file_upload',
+              onclick: () => { openImportModal(); }
+            },
+            {
+              label: 'Refresh Lots Data',
+              icon: 'refresh',
+              onclick: () => { refreshData(); }
+            }
+          ]
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- TopAppBar -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">reorder</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <FeatureGate feature="forms.lots.import">
-      <button
-        onclick={openImportModal}
-        class="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-      >
-        <span class="material-symbols-outlined text-[18px]">file_upload</span>
-        Import Lots
-      </button>
-    </FeatureGate>
-    <button
-      onclick={() => refreshData()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Content -->
-<main class="max-w-[1440px] mx-auto p-4 md:p-8 space-y-6 pt-10">
+<main class="max-w-[1440px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4">
 
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Header Info & KPI Summary -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-primary/10 rounded-lg text-primary">
-        <span class="material-symbols-outlined text-[24px]">inventory_2</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total Lots</div>
-        <div class="text-2xl font-bold text-on-surface">{filteredLots.length}</div>
-      </div>
-    </div>
-
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-blue-500/10 rounded-lg text-blue-600">
-        <span class="material-symbols-outlined text-[24px]">stacks</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Total WIP Qty</div>
-        <div class="text-2xl font-bold text-on-surface">{totalWipSum.toLocaleString()} Pcs</div>
-      </div>
-    </div>
-
-    <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-      <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-600">
-        <span class="material-symbols-outlined text-[24px]">output</span>
-      </div>
-      <div>
-        <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Initial Created Qty</div>
-        <div class="text-2xl font-bold text-on-surface">{totalInitialSum.toLocaleString()} Pcs</div>
-      </div>
-    </div>
-
-    <FeatureGate feature="fields.lots.client">
-      <ClientModeGate mode="any">
-        <div class="bg-surface p-4 rounded-xl border border-outline-variant shadow-sm flex items-center gap-3">
-          <div class="p-3 bg-amber-500/10 rounded-lg text-amber-600">
-            <span class="material-symbols-outlined text-[24px]">groups</span>
-          </div>
-          <div>
-            <div class="text-xs text-on-surface-variant uppercase font-mono font-bold">Clients Filtered</div>
-            <div class="text-2xl font-bold text-on-surface">
-              {new Set(filteredLots.flatMap(l => l.clientIds)).size}
-            </div>
-          </div>
+  <!-- Unified 4-Metric KPI Strip (All 4 cards in a single line on mobile & desktop) -->
+  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden">
+    <div class="grid grid-cols-4 divide-x divide-outline-variant/40 p-1.5 sm:p-3 text-center">
+      <!-- 1. Total Lots -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-primary hidden min-[380px]:inline">inventory_2</span>
+          <span>Lots</span>
         </div>
-      </ClientModeGate>
-    </FeatureGate>
-  </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1">
+          {filteredLots.length}
+        </div>
+      </div>
+
+      <!-- 2. Active WIP -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-blue-600 hidden min-[380px]:inline">stacks</span>
+          <span>WIP Qty</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-primary font-mono mt-0.5 sm:mt-1 truncate max-w-full">
+          {totalWipSum.toLocaleString()} <span class="text-[9px] sm:text-xs font-normal">Pcs</span>
+        </div>
+      </div>
+
+      <!-- 3. Initial Created -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-emerald-600 hidden min-[380px]:inline">output</span>
+          <span>Created</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1 truncate max-w-full">
+          {totalInitialSum.toLocaleString()} <span class="text-[9px] sm:text-xs font-normal">Pcs</span>
+        </div>
+      </div>
+
+      <!-- 4. Clients -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-amber-600 hidden min-[380px]:inline">groups</span>
+          <span>Clients</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-amber-800 dark:text-amber-300 font-mono mt-0.5 sm:mt-1">
+          {new Set(filteredLots.flatMap(l => l.clientIds)).size}
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Filter Toolbar -->
-  <section class="bg-surface p-4 sm:p-5 rounded-xl border border-outline-variant shadow-sm space-y-4">
+  <section class="bg-surface p-3.5 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3.5">
     <!-- Filter Header (Entire header clickable on mobile) -->
     <div
       role="button"
       tabindex="0"
       onclick={() => isFilterExpanded = !isFilterExpanded}
       onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (isFilterExpanded = !isFilterExpanded)}
-      class="flex items-center justify-between gap-3 cursor-pointer md:cursor-default select-none {isFilterExpanded ? 'border-b border-outline-variant pb-3 md:pb-4' : 'md:border-b md:border-outline-variant md:pb-4'}"
+      class="flex items-center justify-between gap-3 cursor-pointer md:cursor-default select-none {isFilterExpanded ? 'border-b border-outline-variant/60 pb-3' : 'md:border-b md:border-outline-variant/60 md:pb-3'}"
     >
-      <div class="flex items-center gap-2 font-bold text-primary text-base">
-        <span class="material-symbols-outlined text-[22px]">filter_alt</span>
+      <div class="flex items-center gap-2 font-bold text-primary text-sm sm:text-base">
+        <span class="material-symbols-outlined text-[20px]">filter_alt</span>
         <span>Filter Production Lots</span>
         {#if activeFilterCount > 0}
           <span class="px-2 py-0.5 rounded-full text-xs bg-primary text-on-primary font-mono font-bold">
@@ -573,7 +624,7 @@
             class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-300 text-xs font-semibold transition-colors cursor-pointer"
             title="Reset all active filters"
           >
-            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span class="material-symbols-outlined text-[15px]">restart_alt</span>
             <span>Reset</span>
           </button>
         {/if}
@@ -585,16 +636,16 @@
     </div>
 
     <!-- Filter Body: Collapsed by default on mobile, always visible on md+ -->
-    <div class="{isFilterExpanded ? 'block' : 'hidden md:block'} space-y-4 pt-1 md:pt-0">
+    <div class="{isFilterExpanded ? 'block' : 'hidden md:block'} space-y-3.5 pt-1 md:pt-0">
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <!-- Search Input -->
         <div class="relative w-full max-w-md">
-          <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+          <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
           <input
             type="text"
             bind:value={searchQuery}
             placeholder="Search by lot number, client, or item..."
-            class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+            class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/70 rounded-xl text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
 
@@ -602,7 +653,7 @@
           <button
             type="button"
             onclick={resetFilters}
-            class="hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-300 text-xs font-semibold transition-colors cursor-pointer shrink-0"
+            class="hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-300 text-xs font-semibold transition-colors cursor-pointer shrink-0"
           >
             <span class="material-symbols-outlined text-[16px]">restart_alt</span>
             <span>Clear Filters ({activeFilterCount})</span>
@@ -610,7 +661,7 @@
         {/if}
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <!-- 1. Step Filter -->
         <Select
           label="Manufacturing Step"
@@ -644,7 +695,7 @@
           <select
             id="filter-daterange"
             bind:value={selectedDateRange}
-            class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+            class="w-full bg-surface-container-low border border-outline-variant/70 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
           >
             <option value="ALL">All Time</option>
             <option value="TODAY">Today</option>
@@ -657,14 +708,14 @@
 
       <!-- Custom Date Range Controls -->
       {#if selectedDateRange === 'CUSTOM'}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-dashed border-outline-variant/60">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-dashed border-outline-variant/60">
           <div class="space-y-1">
             <label for="custom-start" class="text-xs text-on-surface-variant font-mono">Start Date</label>
             <input
               id="custom-start"
               type="date"
               bind:value={customStartDate}
-              class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+              class="w-full bg-surface-container-low border border-outline-variant/70 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <div class="space-y-1">
@@ -673,7 +724,7 @@
               id="custom-end"
               type="date"
               bind:value={customEndDate}
-              class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+              class="w-full bg-surface-container-low border border-outline-variant/70 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
@@ -682,15 +733,15 @@
   </section>
 
   <!-- Production Lots Directory Table -->
-  <section class="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant pb-2.5 sm:pb-3 gap-1 sm:gap-2">
-      <h2 class="text-base sm:text-xl font-bold flex items-center gap-1.5 whitespace-nowrap text-on-surface">
+  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden space-y-3.5 p-3.5 sm:p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant/60 pb-2.5 sm:pb-3 gap-1 sm:gap-2">
+      <h2 class="text-sm sm:text-lg font-bold flex items-center gap-1.5 whitespace-nowrap text-on-surface">
         <span>Lots Directory</span>
         <span class="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-0.5">
           {filteredLots.length}
         </span>
       </h2>
-      <span class="text-[11px] sm:text-xs text-on-surface-variant font-mono">
+      <span class="text-[10px] sm:text-xs text-on-surface-variant font-mono">
         Showing {filteredLots.length} of {enrichedLots.length} total lots
       </span>
     </div>
@@ -698,13 +749,13 @@
     {#if loading}
       <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
         <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-        <span>Loading production lots...</span>
+        <span class="text-xs sm:text-sm font-medium">Loading production lots...</span>
       </div>
     {:else}
       <!-- Mobile View: Card Stack Column (below md) -->
-      <div class="block md:hidden space-y-1.5">
+      <div class="block md:hidden space-y-2">
         {#if filteredLots.length === 0}
-          <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-lg border border-dashed border-outline-variant text-xs">
+          <div class="p-6 text-center text-on-surface-variant bg-surface-container-low rounded-xl border border-dashed border-outline-variant text-xs">
             <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40 mb-1 block">filter_alt_off</span>
             No production lots match your filter criteria.
           </div>
@@ -715,13 +766,13 @@
               tabindex="0"
               onclick={() => window.location.href = `/inventory?lot=${lot.id}`}
               onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (window.location.href = `/inventory?lot=${lot.id}`)}
-              class="bg-surface px-3 py-2 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-1.5 active:scale-[0.99] select-none"
+              class="bg-surface p-3 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none"
               title="View lot {lot.lotNumber} details"
             >
               <!-- Card Line 1: Lot #, Client, Quantity & Date -->
               <div class="flex items-center justify-between gap-2 text-xs">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0">
+                  <div class="font-bold text-sm text-primary flex items-center gap-1 shrink-0 font-mono">
                     <span class="material-symbols-outlined text-[15px]">tag</span>
                     <span>{lot.lotNumber}</span>
                   </div>
@@ -740,7 +791,7 @@
                 <div class="flex flex-wrap gap-1 items-center pt-1 border-t border-dashed border-outline-variant/50">
                   {#each lot.activeSteps as step}
                     {@const stepObj = steps.find(s => s.id === step.stepId || s.code === step.stepCode)}
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono {stepObj?.isTerminating ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300' : stepObj?.isActive === false ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700' : 'bg-primary-container text-on-primary-container'} flex items-center gap-1">
                       <span class="material-symbols-outlined text-[11px]">{stepIconMap[step.stepCode] || 'work'}</span>
                       {step.stepName}: {step.quantity} Pcs
                       {#if stepObj?.isTerminating}
@@ -758,7 +809,7 @@
       </div>
 
       <!-- Desktop View: Table (md and up) -->
-      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+      <div class="hidden md:block w-full overflow-x-auto rounded-xl border border-outline-variant/60 bg-surface">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
@@ -1063,3 +1114,73 @@
     </div>
   </div>
 {/if}
+
+<!-- Create Production Lot Modal -->
+<Modal bind:isOpen={isCreateLotModalOpen} title="Create New Production Lot">
+  <form onsubmit={handleCreateLotSubmit} class="space-y-4">
+    <Input
+      label="Production Lot Number"
+      bind:value={createLotForm.lotNumber}
+      placeholder="e.g. LOT-2026-002"
+      icon="tag"
+      required={true}
+    />
+
+    <Input
+      label="Initial Quantity (Pcs)"
+      type="number"
+      bind:value={createLotForm.initialQuantity}
+      placeholder="e.g. 100"
+      icon="numbers"
+      required={true}
+    />
+
+    <Select
+      label="Initial Manufacturing Step"
+      bind:value={createLotForm.initialStepId}
+      options={steps.map(s => ({ label: `${s.name} (${s.code})`, value: s.id }))}
+      icon="factory"
+      required={true}
+    />
+
+    <ClientModeGate mode="lot">
+      <div class="space-y-1">
+        <label for="create-lot-client-select" class="text-xs font-semibold text-on-surface-variant">Client / Customer (Optional)</label>
+        <Select
+          id="create-lot-client-select"
+          bind:value={createLotForm.clientId}
+          options={[
+            { label: 'None (Direct / Internal Factory)', value: '' },
+            ...clients.map(c => ({ label: `${c.name} (${c.clientType})`, value: c.id }))
+          ]}
+          placeholder="Select Client (Optional)..."
+          icon="badge"
+        />
+      </div>
+    </ClientModeGate>
+
+    <Input
+      label="Created By"
+      bind:value={createLotForm.createdBy}
+      placeholder="e.g. Production Manager"
+      icon="person"
+    />
+
+    <Input
+      label="Remarks / Notes"
+      bind:value={createLotForm.remarks}
+      placeholder="Optional notes..."
+      icon="notes"
+    />
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+      <Button variant="outline" onclick={() => isCreateLotModalOpen = false}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" icon="send">
+        Create Lot
+      </Button>
+    </div>
+  </form>
+</Modal>
+

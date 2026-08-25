@@ -19,12 +19,12 @@
 </script>
 
 <!-- Top App Header -->
-<Header title="TRACKLORD" />
+<Header />
 
 <!-- Main Content Area -->
-<main class="pt-4 pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+<div class="pt-4 pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
   {@render children()}
-</main>
+</div>
 
 <!-- Floating Bottom Navbar -->
 <Navbar />

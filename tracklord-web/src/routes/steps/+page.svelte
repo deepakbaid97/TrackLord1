@@ -8,6 +8,7 @@
     getProductionLots,
     getLotJourney
   } from '$lib/api.js';
+  import Callout from '$lib/components/ui/Callout.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
 
   let loading = $state(true);
@@ -409,136 +410,112 @@
     'INSP': 'search_check',
     'DISP': 'local_shipping'
   };
+
+  import { onDestroy } from 'svelte';
+  import { headerStore } from '$lib/stores/headerStore.js';
+
+  $effect(() => {
+    headerStore.setHeader({
+      title: 'Manufacturing Steps',
+      subtitle: 'Sequence & Routing',
+      icon: 'alt_route',
+      actions: [
+        {
+          label: 'Add Step',
+          icon: 'add',
+          variant: 'primary',
+          onclick: () => openCreateModal()
+        },
+        {
+          label: 'Refresh',
+          icon: 'refresh',
+          variant: 'outline',
+          onclick: () => fetchSteps()
+        }
+      ]
+    });
+  });
+
+  onDestroy(() => {
+    headerStore.reset();
+  });
 </script>
 
-<!-- Header -->
-<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center px-4 md:px-8 h-16 border-b border-outline-variant">
-  <div class="flex items-center gap-3">
-    <div class="flex items-center gap-2 p-2 bg-primary/10 rounded-full">
-      <span class="material-symbols-outlined text-primary text-[24px]">alt_route</span>
-    </div>
-    <div>
-      <div class="font-bold text-lg text-primary leading-none">TRACKLORD</div>
-      <div class="text-xs text-on-surface-variant">Manufacturing Steps</div>
-    </div>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      onclick={() => fetchSteps()}
-      class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-stat-label text-xs hover:bg-surface-container-low flex items-center gap-1 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[16px]">refresh</span>
-      Refresh
-    </button>
-    <button
-      onclick={openCreateModal}
-      class="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 shadow-sm flex items-center gap-1.5 cursor-pointer"
-    >
-      <span class="material-symbols-outlined text-[18px]">add</span>
-      Add Step
-    </button>
-  </div>
-</header>
+<Callout bind:message={errorMessage} type="error" />
+<Callout bind:message={successMessage} type="success" />
 
 <!-- Main Content -->
-<main class="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 pt-20 pb-24">
+<main class="max-w-[1200px] mx-auto px-3 py-2 sm:px-6 sm:py-3 md:px-8 flex flex-col gap-2.5 sm:gap-4 pb-24">
 
-  <!-- Success Toast -->
-  {#if successMessage}
-    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-fade-in">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
-        <span>{successMessage}</span>
-      </div>
-      <button onclick={() => successMessage = ''} class="text-emerald-600 hover:text-emerald-800">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Error Alert -->
-  {#if errorMessage}
-    <div class="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center justify-between shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-red-500">error</span>
-        <span>{errorMessage}</span>
-      </div>
-      <button onclick={() => errorMessage = ''} class="text-red-500 hover:text-red-700">
-        <span class="material-symbols-outlined text-[18px]">close</span>
-      </button>
-    </div>
-  {/if}
-
-  <!-- Summary Cards -->
-  <section class="grid grid-cols-3 gap-1.5 sm:gap-4">
-    <!-- Total Steps -->
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
-      <div class="p-1.5 sm:p-3 bg-primary/10 rounded-lg sm:rounded-xl text-primary shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">alt_route</span>
-      </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Total Steps</div>
-        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate">{steps.length}</div>
-      </div>
-    </div>
-
-    <!-- Active Quantity across steps -->
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
-      <div class="p-1.5 sm:p-3 bg-emerald-500/10 rounded-lg sm:rounded-xl text-emerald-600 shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">stacks</span>
-      </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Active Qty</div>
-        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate font-mono">
-          {steps.filter(s => !s.isTerminating).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} Pcs
+  <!-- Unified 3-Metric KPI Summary Strip -->
+  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden">
+    <div class="grid grid-cols-3 divide-x divide-outline-variant/40 p-1.5 sm:p-3 text-center">
+      <!-- 1. Total Steps -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-primary hidden min-[380px]:inline">alt_route</span>
+          <span>Total Steps</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-on-surface font-mono mt-0.5 sm:mt-1">
+          {steps.length}
         </div>
       </div>
-    </div>
 
-    <!-- Terminating Steps -->
-    <div class="bg-surface p-2.5 sm:p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 min-w-0">
-      <div class="p-1.5 sm:p-3 bg-amber-500/10 rounded-lg sm:rounded-xl text-amber-600 shrink-0">
-        <span class="material-symbols-outlined text-[20px] sm:text-[28px]">flag_circle</span>
+      <!-- 2. Active WIP -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-emerald-600 hidden min-[380px]:inline">stacks</span>
+          <span>Active WIP</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1 truncate max-w-full">
+          {steps.filter(s => !s.isTerminating && s.isActive !== false).reduce((sum, s) => sum + (s.totalQuantity || 0), 0).toLocaleString()} <span class="text-[9px] sm:text-xs font-normal">Pcs</span>
+        </div>
       </div>
-      <div class="min-w-0">
-        <div class="text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider truncate">Terminating</div>
-        <div class="text-base sm:text-3xl font-bold text-on-surface leading-tight truncate">
+
+      <!-- 3. Terminating Steps -->
+      <div class="p-1 sm:p-2 flex flex-col items-center justify-center">
+        <div class="flex items-center gap-1 text-[9px] sm:text-xs text-on-surface-variant uppercase font-mono font-bold tracking-wider">
+          <span class="material-symbols-outlined text-[12px] sm:text-[14px] text-amber-600 hidden min-[380px]:inline">flag_circle</span>
+          <span>Terminating</span>
+        </div>
+        <div class="text-xs min-[360px]:text-sm sm:text-xl md:text-2xl font-bold text-amber-800 dark:text-amber-300 font-mono mt-0.5 sm:mt-1">
           {steps.filter(s => s.isTerminating).length}
         </div>
-        <div class="hidden sm:block text-[10px] text-on-surface-variant font-mono truncate">Excluded from Active WIP</div>
       </div>
     </div>
   </section>
 
-  <!-- Steps Table / Directory -->
-  <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant pb-3 gap-1 sm:gap-2">
+  <!-- Manufacturing Pipeline Section -->
+  <section class="bg-surface rounded-2xl border border-outline-variant/70 shadow-sm overflow-hidden p-3 sm:p-5 space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant/60 pb-2.5 gap-1 sm:gap-2">
       <div>
-        <h2 class="text-base sm:text-xl font-bold flex items-center gap-2 text-on-surface">
-          <span class="material-symbols-outlined text-primary text-[20px] sm:text-[22px]">view_timeline</span>
-          Manufacturing Sequence & WIP
+        <h2 class="text-sm sm:text-base font-bold flex items-center gap-1.5 text-on-surface">
+          <span class="material-symbols-outlined text-primary text-[18px] sm:text-[20px]">view_timeline</span>
+          <span>Manufacturing Sequence</span>
+          <span class="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-1">
+            {steps.length}
+          </span>
         </h2>
-        <p class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-[15px] text-primary/80">drag_indicator</span>
-          Drag rows to change the production pipeline order.
+        <p class="text-[11px] text-on-surface-variant mt-0.5 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[13px] text-primary/80">drag_indicator</span>
+          Drag handle to reorder pipeline sequence. Click step to view lots.
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant w-fit">
-          {steps.length} steps configured
+      <div class="hidden sm:flex items-center gap-2">
+        <span class="text-[11px] text-on-surface-variant font-mono bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/70">
+          {steps.filter(s => (s.totalQuantity || 0) > 0).length} active stages
         </span>
       </div>
     </div>
 
     {#if loading}
-      <div class="p-12 text-center text-on-surface-variant flex flex-col items-center gap-3">
-        <span class="material-symbols-outlined animate-spin text-[36px] text-primary">sync</span>
-        <span>Loading manufacturing steps & lots...</span>
+      <div class="p-10 text-center text-on-surface-variant flex flex-col items-center gap-2.5">
+        <span class="material-symbols-outlined animate-spin text-[32px] text-primary">sync</span>
+        <span class="text-xs sm:text-sm font-medium">Loading manufacturing sequence...</span>
       </div>
     {:else if steps.length > 0}
-      <!-- Mobile View: Card Stack Column (below md) -->
-      <div class="block md:hidden space-y-2">
+      <!-- Mobile View: Compact Pipeline Cards (below md) -->
+      <div class="block md:hidden space-y-1.5">
         {#each steps as step, index (step.id)}
           <div
             data-step-index={index}
@@ -552,80 +529,111 @@
             tabindex="0"
             onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
             onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/lots?step=${step.id}`)}
-            class="bg-surface px-3 py-2.5 rounded-lg border border-outline-variant hover:border-primary/50 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 active:scale-[0.99] select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary' : ''} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10 shadow-md' : ''}"
-            title="Drag to reorder sequence, or click to view lots at '{step.name}'"
+            class="bg-surface px-3 py-2.5 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-2 active:scale-[0.99] select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary' : ''} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10 shadow-md' : ''}"
+            title="Click to view lots at '{step.name}', or drag grip to reorder"
           >
-            <!-- Card Line 1: Drag handle | Seq # | Icon | Code & Name | Terminating Badge | Edit -->
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2 min-w-0">
-                <div
-                  class="text-on-surface-variant/40 hover:text-primary cursor-grab active:cursor-grabbing p-1.5 shrink-0 rounded flex items-center justify-center touch-none select-none bg-surface-container-low/50 active:bg-primary/20"
-                  ontouchstart={(e) => handleTouchStart(index, e)}
-                  ontouchmove={handleTouchMove}
-                  ontouchend={handleTouchEnd}
-                  ontouchcancel={handleTouchCancel}
-                  onclick={(e) => e.stopPropagation()}
-                  title="Touch & drag to reorder"
-                >
-                  <span class="material-symbols-outlined text-[20px] pointer-events-none select-none">drag_indicator</span>
-                </div>
-                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs shrink-0 select-none">
-                  {step.sequenceOrder}
-                </span>
-                <span class="material-symbols-outlined text-[18px] text-primary/80 shrink-0 pointer-events-none select-none">
+            <!-- Left: Drag Grip | Seq # | Icon | Name + Code | Status Flags -->
+            <div class="flex items-center gap-1.5 min-w-0">
+              <!-- Drag Grip -->
+              <div
+                role="button"
+                tabindex="0"
+                class="text-on-surface-variant/40 hover:text-primary active:text-primary cursor-grab active:cursor-grabbing p-1 -ml-1 shrink-0 rounded flex items-center justify-center touch-none select-none active:bg-primary/20"
+                ontouchstart={(e) => handleTouchStart(index, e)}
+                ontouchmove={handleTouchMove}
+                ontouchend={handleTouchEnd}
+                ontouchcancel={handleTouchCancel}
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+                aria-label="Drag to reorder sequence"
+                title="Touch & drag to reorder"
+              >
+                <span class="material-symbols-outlined text-[18px] pointer-events-none select-none">drag_indicator</span>
+              </div>
+
+              <!-- Sequence Number Badge -->
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-primary/10 text-primary font-bold font-mono text-[11px] shrink-0 select-none">
+                #{step.sequenceOrder}
+              </span>
+
+              <!-- Step Icon -->
+              <div class="w-6 h-6 rounded-lg bg-surface-container-low flex items-center justify-center text-primary shrink-0">
+                <span class="material-symbols-outlined text-[15px] pointer-events-none select-none">
                   {stepIconMap[step.code] || 'work'}
                 </span>
-                <div class="min-w-0">
-                  <span class="font-bold text-sm text-on-surface truncate select-none">{step.name}</span>
-                  <span class="font-mono text-xs text-primary font-bold ml-1 select-none">({step.code})</span>
+              </div>
+
+              <!-- Name & Code -->
+              <div class="min-w-0 truncate">
+                <div class="flex items-center gap-1 truncate">
+                  <span class="font-bold text-xs sm:text-sm text-on-surface truncate select-none">{step.name}</span>
+                  <span class="font-mono text-[10px] text-primary/80 font-bold uppercase shrink-0">({step.code})</span>
                 </div>
               </div>
 
-              <div class="flex items-center gap-1 shrink-0">
-                {#if step.isTerminating}
-                  <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 select-none">
-                    <span class="material-symbols-outlined text-[12px] text-amber-600 pointer-events-none">flag</span>
-                    Terminating
-                  </span>
-                {/if}
-                <button
-                  onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
-                  title="Edit Step"
-                  class="p-1 rounded-md border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-[14px] pointer-events-none">edit</span>
-                </button>
-              </div>
+              {#if step.isTerminating}
+                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 select-none shrink-0" title="Terminating Step">
+                  <span class="material-symbols-outlined text-[11px] text-amber-600 pointer-events-none">flag</span>
+                  Final
+                </span>
+              {:else if step.isActive === false}
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-300 select-none shrink-0">
+                  Inactive
+                </span>
+              {/if}
             </div>
 
-            <!-- Card Line 2: WIP Quantity & Lot Count -->
-            <div class="flex items-center justify-between text-xs pt-1.5 border-t border-dashed border-outline-variant/50 select-none">
-              <span class="text-on-surface-variant font-mono">
-                {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'active lot' : 'active lots'}
-              </span>
-              <span class="font-mono font-bold text-sm text-primary">
-                {(step.totalQuantity || 0).toLocaleString()} Pcs
+            <!-- Right: Quantity Pill, Lot Count & Edit Button -->
+            <div class="flex items-center gap-2 shrink-0">
+              <!-- Quantity & Lot Count Badge -->
+              {#if (step.totalQuantity || 0) > 0}
+                <div class="flex flex-col items-end leading-none font-mono">
+                  <span class="text-xs font-bold text-primary">
+                    {(step.totalQuantity || 0).toLocaleString()} Pcs
+                  </span>
+                  <span class="text-[9px] text-on-surface-variant font-medium mt-0.5">
+                    {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
+                  </span>
+                </div>
+              {:else}
+                <span class="text-[11px] text-on-surface-variant/50 font-mono">
+                  0 Pcs
+                </span>
+              {/if}
+
+              <button
+                type="button"
+                onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
+                title="Edit Step"
+                class="p-1 rounded-lg border border-outline-variant/70 hover:border-primary text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:scale-95 shrink-0"
+              >
+                <span class="material-symbols-outlined text-[14px] pointer-events-none">edit</span>
+              </button>
+
+              <span class="material-symbols-outlined text-[16px] text-on-surface-variant/40 group-hover:text-primary transition-colors pointer-events-none">
+                chevron_right
               </span>
             </div>
           </div>
         {/each}
       </div>
 
-      <!-- Desktop View: Grid Table (md and up) -->
-      <div class="hidden md:block w-full overflow-hidden rounded-xl border border-outline-variant bg-surface">
+      <!-- Desktop View: Sleek Pipeline List (md and up) -->
+      <div class="hidden md:block w-full overflow-hidden rounded-xl border border-outline-variant/70 bg-surface">
         <!-- Table Header -->
-        <div class="grid grid-cols-[40px_60px_110px_1fr_130px_140px_80px] items-center px-4 py-3 bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+        <div class="grid grid-cols-[40px_60px_100px_1fr_100px_140px_110px_70px] items-center px-4 py-2.5 bg-surface-container-low border-b border-outline-variant/70 text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
           <div class="text-center"></div>
           <div class="text-center">Seq</div>
           <div>Code</div>
           <div>Step Name</div>
-          <div class="text-right">Total Qty</div>
-          <div class="text-center">Terminating?</div>
-          <div class="text-right">Actions</div>
+          <div class="text-center">Active Lots</div>
+          <div class="text-right">Total WIP Qty</div>
+          <div class="text-center">Type</div>
+          <div class="text-right">Action</div>
         </div>
 
         <!-- Table Rows -->
-        <div class="divide-y divide-outline-variant/50 text-on-surface">
+        <div class="divide-y divide-outline-variant/40 text-on-surface">
           {#each steps as step, index (step.id)}
             <div
               data-step-index={index}
@@ -639,73 +647,94 @@
               tabindex="0"
               onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
               onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/lots?step=${step.id}`)}
-              class="grid grid-cols-[40px_60px_110px_1fr_130px_140px_80px] items-center px-4 py-3.5 transition-all cursor-pointer group select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary scale-[0.99]' : 'hover:bg-surface-container-low/60'} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}"
-              title="Drag to reorder sequence, or click to view lots at '{step.name}'"
+              class="grid grid-cols-[40px_60px_100px_1fr_100px_140px_110px_70px] items-center px-4 py-3 transition-all cursor-pointer group select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary scale-[0.99]' : 'hover:bg-surface-container-low/60'} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}"
+              title="Click to view lots at '{step.name}', or drag grip to reorder"
             >
               <!-- Drag Handle -->
               <div
+                role="button"
+                tabindex="0"
                 class="flex items-center justify-center text-on-surface-variant/40 hover:text-primary transition-colors cursor-grab active:cursor-grabbing p-1 rounded touch-none select-none"
                 ontouchstart={(e) => handleTouchStart(index, e)}
                 ontouchmove={handleTouchMove}
                 ontouchend={handleTouchEnd}
                 ontouchcancel={handleTouchCancel}
                 onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+                aria-label="Drag handle"
                 title="Drag to reorder step sequence"
               >
-                <span class="material-symbols-outlined text-[20px] pointer-events-none select-none">drag_indicator</span>
+                <span class="material-symbols-outlined text-[18px] pointer-events-none select-none">drag_indicator</span>
               </div>
 
               <!-- Sequence Order Badge -->
               <div class="text-center">
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold font-mono text-xs group-hover:scale-110 transition-transform select-none">
-                  {step.sequenceOrder}
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 text-primary font-bold font-mono text-xs group-hover:scale-105 transition-transform select-none">
+                  #{step.sequenceOrder}
                 </span>
               </div>
 
               <!-- Code -->
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="material-symbols-outlined text-[20px] text-primary/80 group-hover:text-primary transition-colors pointer-events-none select-none shrink-0">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="material-symbols-outlined text-[18px] text-primary/80 group-hover:text-primary transition-colors pointer-events-none select-none shrink-0">
                   {stepIconMap[step.code] || 'work'}
                 </span>
-                <span class="font-mono font-bold text-sm text-primary tracking-wide group-hover:underline truncate select-none">
+                <span class="font-mono font-bold text-xs text-primary tracking-wide group-hover:underline truncate select-none">
                   {step.code}
                 </span>
               </div>
 
               <!-- Name -->
-              <div class="font-bold text-on-surface group-hover:text-primary transition-colors truncate select-none">
+              <div class="font-bold text-sm text-on-surface group-hover:text-primary transition-colors truncate select-none pr-3">
                 {step.name}
+              </div>
+
+              <!-- Active Lots Count -->
+              <div class="text-center font-mono text-xs select-none">
+                {#if (step.lotsAtStep?.length || 0) > 0}
+                  <span class="px-2 py-0.5 rounded-full bg-surface-container-low text-on-surface font-semibold border border-outline-variant/60">
+                    {step.lotsAtStep.length} {step.lotsAtStep.length === 1 ? 'lot' : 'lots'}
+                  </span>
+                {:else}
+                  <span class="text-on-surface-variant/40">—</span>
+                {/if}
               </div>
 
               <!-- Total Quantity -->
               <div class="text-right whitespace-nowrap select-none">
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary font-bold text-base font-mono tracking-wide">
-                  {(step.totalQuantity || 0).toLocaleString()} Pcs
-                </span>
-                <div class="text-[11px] text-on-surface-variant font-mono mt-0.5">
-                  {step.lotsAtStep?.length || 0} {step.lotsAtStep?.length === 1 ? 'lot' : 'lots'}
-                </div>
+                {#if (step.totalQuantity || 0) > 0}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary font-bold text-sm font-mono tracking-wide">
+                    {(step.totalQuantity || 0).toLocaleString()} Pcs
+                  </span>
+                {:else}
+                  <span class="text-xs text-on-surface-variant/50 font-mono">0 Pcs</span>
+                {/if}
               </div>
 
               <!-- Terminating Indicator -->
               <div class="text-center select-none">
                 {#if step.isTerminating}
-                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                    <span class="material-symbols-outlined text-[15px] text-amber-600 pointer-events-none">flag</span>
-                    Terminating
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                    <span class="material-symbols-outlined text-[13px] text-amber-600 pointer-events-none">flag</span>
+                    Final Step
+                  </span>
+                {:else if step.isActive === false}
+                  <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-300 dark:border-zinc-700">
+                    Inactive
                   </span>
                 {:else}
-                  <span class="text-xs text-on-surface-variant/60 font-mono">—</span>
+                  <span class="text-xs text-on-surface-variant/50 font-mono">Standard</span>
                 {/if}
               </div>
 
               <!-- Actions -->
               <div class="text-right whitespace-nowrap">
                 <button
+                  type="button"
                   onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
-                  class="px-3 py-1.5 rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-bold text-xs flex items-center gap-1 ml-auto transition-colors cursor-pointer"
+                  class="px-2.5 py-1 rounded-lg border border-outline-variant/70 hover:border-primary text-on-surface-variant hover:text-primary font-bold text-xs flex items-center gap-1 ml-auto transition-colors cursor-pointer active:scale-95"
                 >
-                  <span class="material-symbols-outlined text-[15px] pointer-events-none">edit</span>
+                  <span class="material-symbols-outlined text-[14px] pointer-events-none">edit</span>
                   Edit
                 </button>
               </div>
@@ -714,9 +743,9 @@
         </div>
       </div>
     {:else}
-      <div class="p-12 text-center text-on-surface-variant text-sm bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
-        <span class="material-symbols-outlined text-[36px] text-on-surface-variant/50 mb-2 block">alt_route</span>
-        No manufacturing steps found. Click "Add Step" to configure your first step.
+      <div class="p-10 text-center text-on-surface-variant text-xs sm:text-sm bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
+        <span class="material-symbols-outlined text-[32px] text-on-surface-variant/50 mb-1.5 block">alt_route</span>
+        No manufacturing steps found. Click "Add Step" in the header to configure your first step.
       </div>
     {/if}
   </section>
