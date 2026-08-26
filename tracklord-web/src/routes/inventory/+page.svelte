@@ -448,8 +448,8 @@
         </div>
       </section>
 
-      <!-- Lot Content Sections -->
-      <div class="space-y-4 sm:space-y-6">
+      <!-- Lot Content Sections: Side by Side on Desktop -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start">
         <!-- WIP Distribution Section -->
         <WipDistribution
           {timelineSteps}
