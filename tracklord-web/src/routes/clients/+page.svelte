@@ -9,7 +9,7 @@
   import CreateClientModal from '$lib/components/features/clients/CreateClientModal.svelte';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
   import { usePageHeader } from '$lib/utils/usePageHeader.js';
-  import { getClients, getProductionLots, getLotJourney, getManufacturingSteps } from '$lib/api.js';
+  import { getClients, getProductionLots, getBatchLotJourneys, getManufacturingSteps } from '$lib/api.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -58,6 +58,7 @@
       const lots = rawLots || [];
       const steps = rawSteps || [];
       const clientTrackingMode = $tenantConfigStore.clientMode;
+      const lotIds = lots.map(l => l.id);
 
       /** @type {Map<string, { activeLotIds: Set<string>, totalWip: number }>} */
       const clientStats = new Map();
@@ -65,66 +66,68 @@
         clientStats.set(c.id, { activeLotIds: new Set(), totalWip: 0 });
       });
 
-      await Promise.all(
-        lots.map(async (/** @type {any} */ lot) => {
-          try {
-            const journey = await getLotJourney(lot.id);
-            if (!journey) return;
+      /** @type {Record<string, any>} */
+      let journeysMap = {};
+      try {
+        journeysMap = await getBatchLotJourneys(lotIds) || {};
+      } catch {
+        // Fallback gracefully
+      }
 
-            const activeSteps = journey.activeBalances
-              ? journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0)
-              : [];
+      lots.forEach((/** @type {any} */ lot) => {
+        const journey = (lot.id ? (journeysMap[lot.id] || journeysMap[lot.id.toLowerCase()] || journeysMap[lot.id.toUpperCase()]) : null) || null;
+        if (!journey) return;
 
-            if (activeSteps.length === 0) return;
+        const activeSteps = journey.activeBalances
+          ? journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0)
+          : [];
 
-            const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
-              const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
-              return !stepObj?.isTerminating;
-            });
-            const lotActiveWip = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
-            const lotClientId = lot.clientId || journey.clientId;
+        if (activeSteps.length === 0) return;
 
-            if (clientTrackingMode === 'lot') {
-              if (lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
-                const stats = clientStats.get(lotClientId);
+        const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
+          const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
+          return !stepObj?.isTerminating;
+        });
+        const lotActiveWip = activeNonTerminatingSteps.reduce((/** @type {number} */ acc, /** @type {any} */ b) => acc + b.quantity, 0);
+        const lotClientId = lot.clientId || journey.clientId;
+
+        if (clientTrackingMode === 'lot') {
+          if (lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
+            const stats = clientStats.get(lotClientId);
+            if (stats) {
+              stats.activeLotIds.add(lot.id);
+              stats.totalWip += lotActiveWip;
+            }
+          }
+        } else {
+          if (journey.movementHistory) {
+            const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+            let foundMovementClient = false;
+
+            journey.movementHistory.forEach((/** @type {any} */ m) => {
+              if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
+                const stats = clientStats.get(m.clientId);
                 if (stats) {
                   stats.activeLotIds.add(lot.id);
-                  stats.totalWip += lotActiveWip;
+                  foundMovementClient = true;
+                  const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
+                  if (stepObj) {
+                    stats.totalWip += stepObj.quantity;
+                  }
                 }
               }
-            } else {
-              if (journey.movementHistory) {
-                const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
-                let foundMovementClient = false;
+            });
 
-                journey.movementHistory.forEach((/** @type {any} */ m) => {
-                  if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
-                    const stats = clientStats.get(m.clientId);
-                    if (stats) {
-                      stats.activeLotIds.add(lot.id);
-                      foundMovementClient = true;
-                      const stepObj = activeSteps.find((/** @type {any} */ s) => s.stepName === m.toStepName);
-                      if (stepObj) {
-                        stats.totalWip += stepObj.quantity;
-                      }
-                    }
-                  }
-                });
-
-                if (!foundMovementClient && lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
-                  const stats = clientStats.get(lotClientId);
-                  if (stats) {
-                    stats.activeLotIds.add(lot.id);
-                    stats.totalWip += lotActiveWip;
-                  }
-                }
+            if (!foundMovementClient && lotClientId && lot.status === 'Active' && lotActiveWip > 0) {
+              const stats = clientStats.get(lotClientId);
+              if (stats) {
+                stats.activeLotIds.add(lot.id);
+                stats.totalWip += lotActiveWip;
               }
             }
-          } catch {
-            // Ignore single lot fetch error
           }
-        })
-      );
+        }
+      });
 
       clients = baseClients.map((/** @type {any} */ c) => {
         const stats = clientStats.get(c.id) || { activeLotIds: new Set(), totalWip: 0 };

@@ -3,6 +3,7 @@ import { STEP_ICON_MAP, STEP_COLOR_MAP, enrichLotsWithJourneys } from './lotServ
 import * as api from '../api.js';
 
 vi.mock('../api.js', () => ({
+  getBatchLotJourneys: vi.fn(),
   getLotJourney: vi.fn()
 }));
 
@@ -49,10 +50,12 @@ describe('lotService', () => {
     ];
 
     it('enriches lots with journey data and marks isTerminated=false when active balances are at non-terminating steps', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [
-          { stepId: 'step-1', stepCode: 'CUT', quantity: 50 }
-        ]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-1': {
+          activeBalances: [
+            { stepId: 'step-1', stepCode: 'CUT', quantity: 50 }
+          ]
+        }
       });
 
       const rawLots = [{ id: 'lot-1', lotNumber: 'L-001' }];
@@ -66,10 +69,12 @@ describe('lotService', () => {
     });
 
     it('marks isTerminated=true when all active balances are at terminating steps by stepId', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [
-          { stepId: 'step-3', stepCode: 'PACK', quantity: 100 }
-        ]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-2': {
+          activeBalances: [
+            { stepId: 'step-3', stepCode: 'PACK', quantity: 100 }
+          ]
+        }
       });
 
       const rawLots = [{ id: 'lot-2', lotNumber: 'L-002' }];
@@ -79,10 +84,12 @@ describe('lotService', () => {
     });
 
     it('marks isTerminated=true when matched by stepCode case-insensitively', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [
-          { stepId: 'custom-guid', stepCode: 'pack', quantity: 75 }
-        ]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-3': {
+          activeBalances: [
+            { stepId: 'custom-guid', stepCode: 'pack', quantity: 75 }
+          ]
+        }
       });
 
       const rawLots = [{ id: 'lot-3', lotNumber: 'L-003' }];
@@ -92,11 +99,13 @@ describe('lotService', () => {
     });
 
     it('marks isTerminated=true when active balances exist but all quantities are 0', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [
-          { stepId: 'step-1', stepCode: 'CUT', quantity: 0 },
-          { stepId: 'step-2', stepCode: 'STITCH', quantity: '0' }
-        ]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-4': {
+          activeBalances: [
+            { stepId: 'step-1', stepCode: 'CUT', quantity: 0 },
+            { stepId: 'step-2', stepCode: 'STITCH', quantity: '0' }
+          ]
+        }
       });
 
       const rawLots = [{ id: 'lot-4', lotNumber: 'L-004' }];
@@ -114,8 +123,10 @@ describe('lotService', () => {
     });
 
     it('gracefully handles null or undefined manufacturingSteps', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [{ stepId: 'step-1', stepCode: 'CUT', quantity: 20 }]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-5': {
+          activeBalances: [{ stepId: 'step-1', stepCode: 'CUT', quantity: 20 }]
+        }
       });
 
       const rawLots = [{ id: 'lot-5', lotNumber: 'L-005' }];
@@ -125,15 +136,15 @@ describe('lotService', () => {
       expect(result[0].activeBalances).toHaveLength(1);
     });
 
-    it('isolates errors if getLotJourney rejects for a single lot', async () => {
-      vi.mocked(api.getLotJourney)
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
+    it('handles lot when batch response has missing or empty journey', async () => {
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-ok': {
           activeBalances: [{ stepId: 'step-3', stepCode: 'PACK', quantity: 10 }]
-        });
+        }
+      });
 
       const rawLots = [
-        { id: 'lot-err', lotNumber: 'L-ERR' },
+        { id: 'lot-missing', lotNumber: 'L-MISSING' },
         { id: 'lot-ok', lotNumber: 'L-OK' }
       ];
 
@@ -149,7 +160,9 @@ describe('lotService', () => {
     });
 
     it('handles lot when journey response has no activeBalances field', async () => {
-      vi.mocked(api.getLotJourney).mockResolvedValue({});
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-empty': {}
+      });
 
       const rawLots = [{ id: 'lot-empty', lotNumber: 'L-EMPTY' }];
       const result = await enrichLotsWithJourneys(rawLots, mockSteps);
@@ -163,10 +176,12 @@ describe('lotService', () => {
       const mixedSteps = [
         { id: 'STEP-TERMINAL', code: 'TERM', isTerminating: true }
       ];
-      vi.mocked(api.getLotJourney).mockResolvedValue({
-        activeBalances: [
-          { stepId: 'step-terminal', stepCode: 'TERM', quantity: 15 }
-        ]
+      vi.mocked(api.getBatchLotJourneys).mockResolvedValue({
+        'lot-mixed': {
+          activeBalances: [
+            { stepId: 'step-terminal', stepCode: 'TERM', quantity: 15 }
+          ]
+        }
       });
 
       const rawLots = [{ id: 'lot-mixed', lotNumber: 'L-MIX' }];
@@ -176,3 +191,4 @@ describe('lotService', () => {
     });
   });
 });
+

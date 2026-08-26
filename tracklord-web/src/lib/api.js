@@ -43,10 +43,68 @@ async function handleResponse(response) {
   return await response.json();
 }
 
-// 1. Fetch Manufacturing Steps
+// ─── TTL In-Memory Request Cache ───────────────────────────────────────────────
+// Prevents redundant re-fetches of identical reference data across page navigations.
+// Cache entries are keyed by a string identifier and auto-expire after a configurable TTL.
+
+/** @type {Map<string, { data: any, expiresAt: number, inflight?: Promise<any> }>} */
+const _cache = new Map();
+
+/**
+ * Returns cached data if still valid, otherwise calls fetchFn, caches the result,
+ * and deduplicates concurrent in-flight requests for the same key.
+ * @param {string} key - Cache key
+ * @param {() => Promise<any>} fetchFn - Function that fetches fresh data
+ * @param {number} ttlMs - Time-to-live in milliseconds
+ * @returns {Promise<any>}
+ */
+async function cachedFetch(key, fetchFn, ttlMs) {
+  const entry = _cache.get(key);
+  if (entry) {
+    // Return cached data if not expired
+    if (Date.now() < entry.expiresAt) return entry.data;
+    // Deduplicate concurrent in-flight requests
+    if (entry.inflight) return entry.inflight;
+  }
+
+  const promise = fetchFn().then(data => {
+    _cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+    return data;
+  }).catch(err => {
+    // Don't cache errors — delete the inflight marker so next call retries
+    const current = _cache.get(key);
+    if (current?.inflight === promise) _cache.delete(key);
+    throw err;
+  });
+
+  _cache.set(key, { data: null, expiresAt: 0, inflight: promise });
+  return promise;
+}
+
+/**
+ * Invalidates one or all cache entries.
+ * @param {string} [key] - Specific cache key to invalidate. Omit to clear all.
+ */
+export function invalidateCache(key) {
+  if (key) {
+    _cache.delete(key);
+  } else {
+    _cache.clear();
+  }
+}
+
+// Cache key constants
+const CK_STEPS = 'manufacturing_steps';
+const CK_LOTS = 'production_lots';
+const CK_MATERIALS = 'material_lots';
+const CK_CLIENTS = 'clients';
+
+// 1. Fetch Manufacturing Steps (cached 60s)
 export async function getManufacturingSteps() {
-  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps`);
-  return await handleResponse(response);
+  return cachedFetch(CK_STEPS, async () => {
+    const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps`);
+    return await handleResponse(response);
+  }, 60_000);
 }
 
 // 1b. Create Manufacturing Step
@@ -57,7 +115,9 @@ export async function createManufacturingStep(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_STEPS);
+  return result;
 }
 
 // 1c. Update Manufacturing Step
@@ -71,7 +131,9 @@ export async function updateManufacturingStep(id, data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_STEPS);
+  return result;
 }
 
 // 1d. Reorder Manufacturing Steps
@@ -84,19 +146,25 @@ export async function reorderManufacturingSteps(steps) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ steps })
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_STEPS);
+  return result;
 }
 
-// 2. Fetch all Production Lots
+// 2. Fetch all Production Lots (cached 15s)
 export async function getProductionLots() {
-  const response = await authFetch(`${API_BASE_URL}/ProductionLots`);
-  return await handleResponse(response);
+  return cachedFetch(CK_LOTS, async () => {
+    const response = await authFetch(`${API_BASE_URL}/ProductionLots`);
+    return await handleResponse(response);
+  }, 15_000);
 }
 
-// 3. Fetch all Raw Material Lots
+// 3. Fetch all Raw Material Lots (cached 30s)
 export async function getMaterialLots() {
-  const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots`);
-  return await handleResponse(response);
+  return cachedFetch(CK_MATERIALS, async () => {
+    const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots`);
+    return await handleResponse(response);
+  }, 30_000);
 }
 
 // 3b. Fetch Consumption History for a specific Raw Material Lot
@@ -133,7 +201,10 @@ export async function deleteProductionLot(lotId) {
   const response = await authFetch(`${API_BASE_URL}/ProductionLots/${lotId}`, {
     method: 'DELETE'
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 7. Create New Production Lot
@@ -144,7 +215,9 @@ export async function createProductionLot(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
 }
 
 // 7b. Import Production Lots
@@ -155,7 +228,9 @@ export async function importProductionLots(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
 }
 
 // 8. Move Lot Quantity Between Steps
@@ -166,7 +241,9 @@ export async function moveLot(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
 }
 
 // 9. Create New Raw Material Lot
@@ -177,7 +254,9 @@ export async function createMaterialLot(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 9a. Import Raw Material Lots
@@ -188,7 +267,9 @@ export async function importMaterialLots(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 9b. Update Raw Material Lot
@@ -202,7 +283,9 @@ export async function updateMaterialLot(id, data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 9c. Delete Raw Material Lot
@@ -211,7 +294,9 @@ export async function deleteMaterialLot(id) {
   const response = await authFetch(`${API_BASE_URL}/MaterialConsumptions/lots/${id}`, {
     method: 'DELETE'
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 10. Consume Raw Material for Production Lot
@@ -222,7 +307,9 @@ export async function consumeMaterial(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_MATERIALS);
+  return result;
 }
 
 // 11. Reject Items at Step
@@ -236,7 +323,9 @@ export async function rejectItems(lotId, data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
 }
 
 // 12. Reverse Movement
@@ -250,7 +339,9 @@ export async function reverseMovement(movementId, data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
 }
 
 // 13. Edit Raw Material Consumption
@@ -270,10 +361,12 @@ export async function editMaterialConsumption(consumptionId, data) {
   return await handleResponse(response);
 }
 
-// 14. Fetch All Clients
+// 14. Fetch All Clients (cached 60s)
 export async function getClients() {
-  const response = await authFetch(`${API_BASE_URL}/Clients`);
-  return await handleResponse(response);
+  return cachedFetch(CK_CLIENTS, async () => {
+    const response = await authFetch(`${API_BASE_URL}/Clients`);
+    return await handleResponse(response);
+  }, 60_000);
 }
 
 // 15. Create New Client
@@ -284,7 +377,9 @@ export async function createClient(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  invalidateCache(CK_CLIENTS);
+  return result;
 }
 
 // 16. Fetch Dashboard Overview
@@ -341,4 +436,34 @@ export async function updateTenantSettings(data) {
   return await handleResponse(response);
 }
 
-
+// 22. Batch Fetch Lot Journeys (eliminates N+1 individual journey calls with seamless fallback)
+/** @param {string[]} lotIds */
+export async function getBatchLotJourneys(lotIds) {
+  if (!lotIds || lotIds.length === 0) return {};
+  try {
+    const response = await authFetch(`${API_BASE_URL}/ProductionLots/journeys/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lotIds })
+    });
+    return await handleResponse(response);
+  } catch (err) {
+    console.warn('Batch lot journey fetch failed, falling back to individual fetching:', err);
+    /** @type {Record<string, any>} */
+    const fallbackMap = {};
+    await Promise.all(
+      lotIds.map(async (id) => {
+        try {
+          const journey = await getLotJourney(id);
+          if (journey) {
+            fallbackMap[id] = journey;
+            fallbackMap[id.toLowerCase()] = journey;
+          }
+        } catch {
+          // ignore single failure
+        }
+      })
+    );
+    return fallbackMap;
+  }
+}

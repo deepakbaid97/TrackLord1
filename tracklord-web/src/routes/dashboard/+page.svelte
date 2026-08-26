@@ -42,27 +42,32 @@
 
   async function refreshDashboard() {
     loading = true;
+    materialLoading = true;
     errorMessage = '';
+    materialError = '';
+
     try {
-      overview = await getDashboardOverview();
-    } catch (/** @type {any} */ err) {
-      errorMessage = err.message || 'Failed to load dashboard data';
+      const [overviewData, fetchedLots] = await Promise.all([
+        getDashboardOverview().catch(err => {
+          errorMessage = err.message || 'Failed to load dashboard data';
+          return null;
+        }),
+        getMaterialLots().catch(err => {
+          materialError = err.message || 'Failed to load material data';
+          return [];
+        })
+      ]);
+
+      if (overviewData) overview = overviewData;
+      if (fetchedLots) {
+        materialLots = fetchedLots;
+        totalMaterialAvailable = fetchedLots.reduce((sum, lot) => {
+          const qty = lot.remainingQuantity ?? lot.initialQuantity ?? 0;
+          return sum + Number(qty);
+        }, 0);
+      }
     } finally {
       loading = false;
-    }
-
-    materialLoading = true;
-    materialError = '';
-    try {
-      const fetchedLots = await getMaterialLots();
-      materialLots = fetchedLots || [];
-      totalMaterialAvailable = (fetchedLots || []).reduce((sum, lot) => {
-        const qty = lot.remainingQuantity ?? lot.initialQuantity ?? 0;
-        return sum + Number(qty);
-      }, 0);
-    } catch (/** @type {any} */ err) {
-      materialError = err.message || 'Failed to load material data';
-    } finally {
       materialLoading = false;
     }
   }

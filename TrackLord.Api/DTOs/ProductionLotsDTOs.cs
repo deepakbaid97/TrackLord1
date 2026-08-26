@@ -1,4 +1,4 @@
-﻿namespace TrackLord.Api.DTOs;
+namespace TrackLord.Api.DTOs;
 
 public record RejectItemsRequest(
     Guid StepId,
@@ -8,3 +8,8 @@ public record RejectItemsRequest(
     DateTime RejectionDate,
     Guid? ClientId,
     string? CreatedBy);
+
+public class BatchLotJourneysRequest
+{
+    public List<Guid>? LotIds { get; set; } = new();
+}

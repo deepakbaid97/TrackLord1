@@ -21,7 +21,7 @@
   import MaterialTraceability from '$lib/components/features/inventory/MaterialTraceability.svelte';
 
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
-  import { STEP_ICON_MAP, enrichLotsWithJourneys } from '$lib/services/lotService.js';
+  import { STEP_ICON_MAP } from '$lib/services/lotService.js';
   import { usePageHeader } from '$lib/utils/usePageHeader.js';
 
   import {
@@ -130,14 +130,11 @@
       manufacturingSteps = steps || [];
       materialLots = matLots || [];
       clients = clientData || [];
+      productionLots = rawLots || [];
 
-      const enrichedLots = await enrichLotsWithJourneys(rawLots, manufacturingSteps);
       const urlLotParam = $page.url.searchParams.get('lot');
 
-      // Exclude lots where all quantities are in terminating steps (preserve if requested via URL query param)
-      productionLots = enrichedLots.filter((l) => !l.isTerminated || (urlLotParam && l.id === urlLotParam));
-
-      if (urlLotParam && enrichedLots.some((l) => l.id === urlLotParam)) {
+      if (urlLotParam && productionLots.some((l) => l.id === urlLotParam)) {
         selectedLotId = urlLotParam;
         localStorage.setItem('tracklord_last_lot_id', selectedLotId);
         await loadSelectedLotDetails(selectedLotId);

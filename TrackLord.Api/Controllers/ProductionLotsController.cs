@@ -108,4 +108,18 @@ public class ProductionLotsController : ControllerBase
         var rejectionId = await _mediator.Send(command);
         return Ok(new { rejectionId });
     }
+
+    /// <summary>
+    /// Gets journeys for multiple production lots in a single batch request.
+    /// Eliminates N+1 individual journey calls from the frontend.
+    /// </summary>
+    [HttpPost("journeys/batch")]
+    public async Task<IActionResult> GetBatchJourneys([FromBody] BatchLotJourneysRequest request)
+    {
+        if (request?.LotIds == null || request.LotIds.Count == 0)
+            return Ok(new Dictionary<Guid, object>());
+
+        var journeys = await _mediator.Send(new GetBatchLotJourneysQuery(request.LotIds));
+        return Ok(journeys);
+    }
 }

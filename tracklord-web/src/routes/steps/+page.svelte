@@ -4,7 +4,7 @@
     getManufacturingSteps,
     reorderManufacturingSteps,
     getProductionLots,
-    getLotJourney
+    getBatchLotJourneys
   } from '$lib/api.js';
   import Callout from '$lib/components/ui/Callout.svelte';
   import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
@@ -76,32 +76,43 @@
 
       const stepsList = stepsData || [];
       const lotsList = lotsData || [];
+      const lotIds = lotsList.map(l => l.id);
 
       /** @type {Record<string, Array<{lotId: string, lotNumber: string, quantity: number}>>} */
       const stepLotsMap = {};
-      stepsList.forEach(s => { stepLotsMap[s.id] = []; });
+      stepsList.forEach(s => {
+        if (s.id) {
+          stepLotsMap[s.id] = [];
+          stepLotsMap[s.id.toLowerCase()] = stepLotsMap[s.id];
+        }
+      });
 
-      await Promise.all(
-        lotsList.map(async (lot) => {
-          try {
-            const journey = await getLotJourney(lot.id);
-            if (journey && journey.activeBalances) {
-              journey.activeBalances.forEach((/** @type {any} */ b) => {
-                if (b.quantity > 0) {
-                  if (!stepLotsMap[b.stepId]) stepLotsMap[b.stepId] = [];
-                  stepLotsMap[b.stepId].push({
-                    lotId: lot.id,
-                    lotNumber: lot.lotNumber,
-                    quantity: b.quantity
-                  });
-                }
+      /** @type {Record<string, any>} */
+      let journeysMap = {};
+      try {
+        journeysMap = await getBatchLotJourneys(lotIds) || {};
+      } catch {
+        // Fallback gracefully
+      }
+
+      lotsList.forEach((lot) => {
+        const journey = (lot.id ? (journeysMap[lot.id] || journeysMap[lot.id.toLowerCase()] || journeysMap[lot.id.toUpperCase()]) : null) || null;
+        if (journey && journey.activeBalances) {
+          journey.activeBalances.forEach((/** @type {any} */ b) => {
+            if (b.quantity > 0) {
+              const key = b.stepId || (b.stepId ? b.stepId.toLowerCase() : '');
+              if (!stepLotsMap[key]) {
+                stepLotsMap[key] = [];
+              }
+              stepLotsMap[key].push({
+                lotId: lot.id,
+                lotNumber: lot.lotNumber,
+                quantity: b.quantity
               });
             }
-          } catch {
-            // Ignore single lot failure
-          }
-        })
-      );
+          });
+        }
+      });
 
       steps = stepsList.map(s => {
         const lotsAtThisStep = stepLotsMap[s.id] || [];

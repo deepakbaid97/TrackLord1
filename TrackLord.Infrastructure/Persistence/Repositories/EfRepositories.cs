@@ -31,6 +31,17 @@ public class ProductionLotRepository : IProductionLotRepository
         return await _dbContext.ProductionLots.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ProductionLot>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids as ICollection<Guid> ?? ids.Distinct().ToList();
+        if (idList.Count == 0) return Array.Empty<ProductionLot>();
+
+        return await _dbContext.ProductionLots
+            .AsNoTracking()
+            .Where(p => idList.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ProductionLot?> GetByLotNumberAsync(string lotNumber, CancellationToken cancellationToken = default)
     {
         var targetNumber = ProductionLotNumber.Create(lotNumber.Trim());

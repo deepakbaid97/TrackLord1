@@ -19,6 +19,7 @@ namespace TrackLord.Domain.Repositories;
 public interface IProductionLotRepository
 {
     Task<ProductionLot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductionLot>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
     Task<ProductionLot?> GetByLotNumberAsync(string lotNumber, CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(string lotNumber, CancellationToken cancellationToken = default);
     Task AddAsync(ProductionLot lot, CancellationToken cancellationToken = default);

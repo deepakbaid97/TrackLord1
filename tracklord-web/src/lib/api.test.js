@@ -15,6 +15,7 @@ describe('api.js client library', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    api.invalidateCache();
   });
 
   afterEach(() => {
@@ -169,6 +170,64 @@ describe('api.js client library', () => {
       const [url, options] = vi.mocked(global.fetch).mock.calls[0];
       expect(url).toContain('/Movements/mov-1/reverse');
       expect(options.method).toBe('POST');
+    });
+
+    it('getBatchLotJourneys sends POST with lotIds to /ProductionLots/journeys/batch', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ 'lot-1': { activeBalances: [] } })
+      });
+
+      const res = await api.getBatchLotJourneys(['lot-1', 'lot-2']);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [url, options] = vi.mocked(global.fetch).mock.calls[0];
+      expect(url).toContain('/ProductionLots/journeys/batch');
+      expect(options.method).toBe('POST');
+      expect(JSON.parse(options.body)).toEqual({ lotIds: ['lot-1', 'lot-2'] });
+      expect(res).toEqual({ 'lot-1': { activeBalances: [] } });
+    });
+
+    it('getBatchLotJourneys returns empty object immediately for empty array without network request', async () => {
+      global.fetch = vi.fn();
+      const res = await api.getBatchLotJourneys([]);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(res).toEqual({});
+    });
+
+    it('caches getManufacturingSteps and deduplicates concurrent calls', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 's1', name: 'Step 1' }]
+      });
+
+      const [res1, res2] = await Promise.all([
+        api.getManufacturingSteps(),
+        api.getManufacturingSteps()
+      ]);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(res1).toEqual(res2);
+    });
+
+    it('invalidates steps cache on mutation', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 's1' }]
+      });
+
+      await api.getManufacturingSteps();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // Create step mutates and should invalidate cache
+      await api.createManufacturingStep({ code: 'WASH', name: 'Washing' });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      // Next read should fetch fresh
+      await api.getManufacturingSteps();
+      expect(global.fetch).toHaveBeenCalledTimes(3);
     });
   });
 });
