@@ -5,7 +5,9 @@
   import Navbar from '$lib/components/ui/Navbar.svelte';
   import PhoneAuthModal from '$lib/components/ui/PhoneAuthModal.svelte';
   import TenantSettingsModal from '$lib/components/ui/TenantSettingsModal.svelte';
+  import PwaInstallPrompt from '$lib/components/ui/PwaInstallPrompt.svelte';
   import { authStore } from '$lib/stores/authStore.js';
+  import { pwaStore } from '$lib/stores/pwaStore.js';
 
   let { children } = $props();
 
@@ -15,6 +17,7 @@
 
   onMount(() => {
     authStore.initAuth();
+    pwaStore.initPwa();
   });
 </script>
 
@@ -32,7 +35,11 @@
 <!-- Tenant Settings & Feature Configuration Modal -->
 <TenantSettingsModal />
 
+<!-- PWA Install Prompt & Offline Connectivity Banner -->
+<PwaInstallPrompt />
+
 <!-- Phone Authentication Modal -->
 {#if showModal || (!isAuthenticated && !isLoading)}
   <PhoneAuthModal />
 {/if}
+
