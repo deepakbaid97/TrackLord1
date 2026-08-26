@@ -318,7 +318,7 @@
           <input
             type="text"
             bind:value={searchQuery}
-            placeholder="Search by lot number, client, or item..."
+            placeholder="Search by lot number or client..."
             class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/70 rounded-xl text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -439,7 +439,6 @@
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Lot Number</th>
-              <th class="px-4 py-3">Item / Name</th>
               <th class="px-4 py-3 text-right">Current Quantity</th>
               <th class="px-4 py-3">Active Steps & WIP</th>
               <th class="px-4 py-3">Created Date</th>
@@ -459,7 +458,6 @@
                     {lot.lotNumber}
                   </div>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
                   {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
                 </td>
@@ -498,7 +496,7 @@
             {/each}
             {#if filteredLots.length === 0}
               <tr>
-                <td colspan="6" class="px-4 py-12 text-center text-on-surface-variant">
+                <td colspan="5" class="px-4 py-12 text-center text-on-surface-variant">
                   <EmptyState icon="filter_alt_off" title="No matching production lots found" message="Try adjusting the search query or filters above." />
                 </td>
               </tr>
