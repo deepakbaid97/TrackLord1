@@ -80,6 +80,50 @@ export const CONFIG_SCHEMA = [
     ]
   },
   {
+    categoryId: 'dashboard',
+    categoryName: 'Dashboard Widgets',
+    description: 'Toggle visibility of individual KPI metric cards and analytics sections on the dashboard',
+    icon: 'dashboard',
+    items: [
+      {
+        key: 'dashboard.kpi.activeLots',
+        label: 'Active Lots KPI Card',
+        description: 'Display active production lots counter card on dashboard',
+        default: true
+      },
+      {
+        key: 'dashboard.kpi.totalWip',
+        label: 'Total WIP KPI Card',
+        description: 'Display total in-progress pieces counter card on dashboard',
+        default: true
+      },
+      {
+        key: 'dashboard.sections.wipByStep',
+        label: 'WIP by Step Breakdown',
+        description: 'Display manufacturing step visual progress bars and quantity breakdown',
+        default: true
+      },
+      {
+        key: 'dashboard.sections.clientDistribution',
+        label: 'Client Distribution Table',
+        description: 'Display customer volume breakdown and moved quantities table',
+        default: true
+      },
+      {
+        key: 'dashboard.sections.materialAvailability',
+        label: 'Material Availability Section',
+        description: 'Display raw material inventory stock table and total units available',
+        default: true
+      },
+      {
+        key: 'dashboard.sections.activeLots',
+        label: 'Active Production Lots Table',
+        description: 'Display live active lot progress table with primary step badges',
+        default: true
+      }
+    ]
+  },
+  {
     categoryId: 'forms',
     categoryName: 'Forms & Modals',
     description: 'Show or hide creation, import, and scrap recording actions',
