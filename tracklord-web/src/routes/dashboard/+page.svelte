@@ -57,6 +57,9 @@
   let showActiveLots = $derived(
     $tenantConfigStore ? tenantConfigStore.isFeatureEnabled('dashboard.sections.activeLots') : true
   );
+  let isLotClientMode = $derived(
+    $tenantConfigStore ? $tenantConfigStore.clientMode === 'lot' : false
+  );
 
   let hasAnyDashboardWidget = $derived(
     showActiveLotsKpi ||
@@ -387,7 +390,11 @@
                       <th class="px-3 py-2.5">Lot Number</th>
                       <th class="px-3 py-2.5 text-right">WIP</th>
                       <th class="px-3 py-2.5">Current Step</th>
-                      <th class="px-3 py-2.5 text-right">Created</th>
+                      {#if isLotClientMode}
+                        <th class="px-3 py-2.5 text-right">Client</th>
+                      {:else}
+                        <th class="px-3 py-2.5 text-right">Created</th>
+                      {/if}
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-outline-variant/50 text-on-surface">
@@ -407,9 +414,22 @@
                             {lot.currentStepName}
                           </span>
                         </td>
-                        <td class="px-3 py-2.5 text-right text-xs text-on-surface-variant font-mono">
-                          {new Date(lot.createdAtUtc).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                        </td>
+                        {#if isLotClientMode}
+                          <td class="px-3 py-2.5 text-right">
+                            {#if lot.clientName}
+                              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container text-[10px] sm:text-[11px] font-medium border border-outline-variant/50 max-w-[120px] truncate">
+                                <span class="material-symbols-outlined text-[12px] text-primary shrink-0">badge</span>
+                                <span class="truncate">{lot.clientName}</span>
+                              </span>
+                            {:else}
+                              <span class="text-on-surface-variant/60 font-mono text-[11px]">—</span>
+                            {/if}
+                          </td>
+                        {:else}
+                          <td class="px-3 py-2.5 text-right text-xs text-on-surface-variant font-mono">
+                            {new Date(lot.createdAtUtc).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                          </td>
+                        {/if}
                       </tr>
                     {/each}
                   </tbody>
