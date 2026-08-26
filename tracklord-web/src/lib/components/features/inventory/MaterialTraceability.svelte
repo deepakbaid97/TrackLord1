@@ -38,7 +38,7 @@
   </div>
 
   {#if consumptions.length > 0}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
       {#each consumptions as mat}
         <div class="bg-surface-container-low p-3 rounded-xl border border-outline-variant/60 flex flex-col justify-between relative group">
           <div class="flex justify-between items-start mb-1.5">

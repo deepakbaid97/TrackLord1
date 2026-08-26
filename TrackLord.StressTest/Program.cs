@@ -31,7 +31,7 @@ public class Program
         var services = new ServiceCollection();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");
-        Console.WriteLine(connectionString, "CONNECION STRING");
+        Console.WriteLine($"[CONFIG] Connection String: {connectionString}");
         services.AddDbContext<TrackLordDbContext>(options =>
         {
             if (!string.IsNullOrWhiteSpace(connectionString) && !connectionString.Contains("InMemory", StringComparison.OrdinalIgnoreCase))
@@ -83,13 +83,20 @@ public class Program
             Console.WriteLine("  [1] Bulk Seed 2,000,000 Movements (40,000 Lots x 50 Movements)");
             Console.WriteLine("  [2] Bulk Seed 500,000 Movements (10,000 Lots x 50 Movements)");
             Console.WriteLine("  [3] Bulk Seed 50,000 Movements (1,000 Lots x 50 Movements)");
+            Console.WriteLine("  [0] Clean / Reset Stress Test Data");
             Console.WriteLine("  [4] Run Dashboard Stress Test (20 Parallel Workers)");
             Console.WriteLine("  [5] Run Single Lot Journey Query Test against 2 Million Rows (20 Workers)");
             Console.WriteLine("  [6] Exit");
             Console.Write("\nChoice > ");
 
             var input = Console.ReadLine()?.Trim();
-            if (input == "1")
+            if (input == "0")
+            {
+                using var scope = serviceProvider.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<TrackLordDbContext>();
+                await DbSeeder.CleanStressTestDataAsync(dbContext);
+            }
+            else if (input == "1")
             {
                 using var scope = serviceProvider.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<TrackLordDbContext>();

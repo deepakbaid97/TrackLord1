@@ -162,7 +162,9 @@ public record DashboardActiveLotDto(
     decimal InitialQuantity,
     decimal CurrentWipQuantity,
     string CurrentStepName,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    Guid? ClientId = null,
+    string? ClientName = null);
 
 public record DashboardOverviewDto(
     int TotalActiveLots,

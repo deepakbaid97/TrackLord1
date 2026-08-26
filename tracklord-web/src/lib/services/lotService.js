@@ -1,4 +1,4 @@
-import { getLotJourney } from '../api.js';
+import { getBatchLotJourneys } from '../api.js';
 
 /**
  * Common Manufacturing Step Icon mapping
@@ -27,6 +27,7 @@ export const STEP_COLOR_MAP = {
 
 /**
  * Enriches production lots with their journeys, active balances, and termination status.
+ * Uses the batch journey endpoint — 1 HTTP request instead of N.
  * @param {Array<any>} rawLots 
  * @param {Array<any>} manufacturingSteps 
  * @returns {Promise<Array<any>>}
@@ -44,25 +45,30 @@ export async function enrichLotsWithJourneys(rawLots, manufacturingSteps) {
       .map((s) => (s.code || '').toUpperCase())
   );
 
-  const enriched = await Promise.all(
-    (rawLots || []).map(async (lot) => {
-      try {
-        const journey = await getLotJourney(lot.id);
-        if (journey && journey.activeBalances) {
-          const activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => Number(b.quantity) > 0);
-          const isTerminated = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => {
-            const stepIdLower = (b.stepId || '').toLowerCase();
-            const stepCodeUpper = (b.stepCode || '').toUpperCase();
-            return terminatingStepIds.has(stepIdLower) || terminatingStepCodes.has(stepCodeUpper);
-          });
-          return { ...lot, journey, isTerminated, activeBalances: journey.activeBalances };
-        }
-        return { ...lot, journey: null, isTerminated: false, activeBalances: [] };
-      } catch {
-        return { ...lot, journey: null, isTerminated: false, activeBalances: [] };
-      }
-    })
-  );
+  const lotIds = (rawLots || []).map((lot) => lot.id);
+  
+  /** @type {Record<string, any>} */
+  let journeysMap = {};
+  try {
+    journeysMap = await getBatchLotJourneys(lotIds) || {};
+  } catch {
+    // If batch call fails, return lots without journey data
+  }
+
+  const enriched = (rawLots || []).map((lot) => {
+    const journey = (lot.id ? (journeysMap[lot.id] || journeysMap[lot.id.toLowerCase()] || journeysMap[lot.id.toUpperCase()]) : null) || null;
+    if (journey && journey.activeBalances) {
+      const activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => Number(b.quantity) > 0);
+      const isTerminated = activeSteps.length === 0 || activeSteps.every((/** @type {any} */ b) => {
+        const stepIdLower = (b.stepId || '').toLowerCase();
+        const stepCodeUpper = (b.stepCode || '').toUpperCase();
+        return terminatingStepIds.has(stepIdLower) || terminatingStepCodes.has(stepCodeUpper);
+      });
+      return { ...lot, journey, isTerminated, activeBalances: journey.activeBalances };
+    }
+    return { ...lot, journey: null, isTerminated: false, activeBalances: [] };
+  });
 
   return enriched;
 }
+

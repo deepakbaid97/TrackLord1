@@ -2,10 +2,15 @@
   import { page } from '$app/stores';
   import { authStore } from '../../stores/authStore.js';
   import { headerStore } from '../../stores/headerStore.js';
+  import { pwaStore } from '../../stores/pwaStore.js';
 
   let user = $derived($authStore.user);
   let isAuthenticated = $derived($authStore.isAuthenticated);
   let pathname = $derived($page.url.pathname);
+
+  let isOnline = $derived($pwaStore.isOnline);
+  let isInstalled = $derived($pwaStore.isInstalled);
+  let canInstall = $derived($pwaStore.canInstall);
 
   // Default page metadata based on current route
   const routeDefaults = {
@@ -43,6 +48,10 @@
     authStore.logout();
   }
 
+  function handleInstallClick() {
+    pwaStore.openInstallModal();
+  }
+
   /** @param {MouseEvent} e */
   function handleDocumentClick(e) {
     const target = /** @type {HTMLElement} */ (e.target);
@@ -65,6 +74,12 @@
         <span class="font-bold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white leading-tight truncate">
           {displayTitle}
         </span>
+        {#if !isOnline}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+            <span class="material-symbols-outlined text-[12px]">wifi_off</span>
+            Offline
+          </span>
+        {/if}
       </div>
       {#if displaySubtitle}
         <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 font-mono tracking-wider uppercase truncate">
@@ -76,6 +91,19 @@
 
   <!-- Right: Page-Specific Actions & User Profile -->
   <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+    <!-- PWA Download / Install App Button -->
+    {#if !isInstalled}
+      <button
+        type="button"
+        onclick={handleInstallClick}
+        title="Download / Install TrackLord App"
+        class="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/40 text-primary dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+      >
+        <span class="material-symbols-outlined text-[16px] text-primary dark:text-blue-300">download_for_offline</span>
+        <span>Install App</span>
+      </button>
+    {/if}
+
     <!-- Dynamic Page Actions from Store -->
     {#if actions && actions.length > 0}
       <div class="flex items-center gap-1.5 sm:gap-2">

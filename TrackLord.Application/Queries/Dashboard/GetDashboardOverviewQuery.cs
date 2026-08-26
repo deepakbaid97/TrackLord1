@@ -134,13 +134,21 @@ public class GetDashboardOverviewQueryHandler : IRequestHandler<GetDashboardOver
             {
                 nonTerminatedLotCount++;
 
+                string? lotClientName = lot.ClientName;
+                if (string.IsNullOrWhiteSpace(lotClientName) && lot.ClientId.HasValue && clientsDict.TryGetValue(lot.ClientId.Value, out var clientEntity))
+                {
+                    lotClientName = clientEntity.Name;
+                }
+
                 activeLotSummaries.Add(new DashboardActiveLotDto(
                     lot.Id,
                     lot.LotNumber.Value,
                     lot.InitialQuantity.Value,
                     lotActiveWipQuantity,
                     primaryStepName,
-                    lot.CreatedAtUtc));
+                    lot.CreatedAtUtc,
+                    lot.ClientId,
+                    lotClientName));
             }
         }
 

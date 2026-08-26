@@ -5,7 +5,7 @@
     getProductionLots,
     getManufacturingSteps,
     getClients,
-    getLotJourney
+    getBatchLotJourneys
   } from '$lib/api.js';
   import Select from '$lib/components/ui/Select.svelte';
   import FeatureGate from '$lib/components/ui/FeatureGate.svelte';
@@ -119,71 +119,73 @@
       rawLots = lotsData || [];
 
       const clientTrackingMode = $tenantConfigStore.clientMode;
+      const lotIds = rawLots.map(l => l.id);
 
-      const enriched = await Promise.all(
-        rawLots.map(async (lot) => {
-          let journey = null;
-          try {
-            journey = await getLotJourney(lot.id);
-          } catch {
-            // Ignore single lot journey failure
+      /** @type {Record<string, any>} */
+      let journeysMap = {};
+      try {
+        journeysMap = await getBatchLotJourneys(lotIds) || {};
+      } catch {
+        // Fallback gracefully
+      }
+
+      const enriched = rawLots.map((lot) => {
+        const journey = (lot.id ? (journeysMap[lot.id] || journeysMap[lot.id.toLowerCase()] || journeysMap[lot.id.toUpperCase()]) : null) || null;
+
+        /** @type {Array<any>} */
+        let activeSteps = [];
+        let totalWipQty = 0;
+        let activeLotClientsSet = new Set();
+        /** @type {Array<string>} */
+        let clientNamesList = [];
+
+        if (journey) {
+          if (journey.activeBalances) {
+            activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
+
+            const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
+              const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
+              return !stepObj?.isTerminating && stepObj?.isActive !== false;
+            });
+
+            totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ sum, /** @type {any} */ b) => sum + b.quantity, 0);
           }
 
-          /** @type {Array<any>} */
-          let activeSteps = [];
-          let totalWipQty = 0;
-          let activeLotClientsSet = new Set();
-          /** @type {Array<string>} */
-          let clientNamesList = [];
+          const initialClientId = lot.clientId || journey.clientId;
+          const initialClientName = lot.clientName || journey.clientName;
 
-          if (journey) {
-            if (journey.activeBalances) {
-              activeSteps = journey.activeBalances.filter((/** @type {any} */ b) => b.quantity > 0);
-
-              const activeNonTerminatingSteps = activeSteps.filter((/** @type {any} */ b) => {
-                const stepObj = steps.find((s) => s.id === b.stepId || s.code === b.stepCode);
-                return !stepObj?.isTerminating && stepObj?.isActive !== false;
+          if (clientTrackingMode === 'lot') {
+            if (initialClientId) activeLotClientsSet.add(initialClientId);
+            if (initialClientName) clientNamesList.push(initialClientName);
+          } else {
+            if (journey.movementHistory) {
+              const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
+              journey.movementHistory.forEach((/** @type {any} */ m) => {
+                if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
+                  activeLotClientsSet.add(m.clientId);
+                  if (m.clientName && !clientNamesList.includes(m.clientName)) {
+                    clientNamesList.push(m.clientName);
+                  }
+                }
               });
-
-              totalWipQty = activeNonTerminatingSteps.reduce((/** @type {number} */ sum, /** @type {any} */ b) => sum + b.quantity, 0);
             }
 
-            const initialClientId = lot.clientId || journey.clientId;
-            const initialClientName = lot.clientName || journey.clientName;
-
-            if (clientTrackingMode === 'lot') {
+            if (activeLotClientsSet.size === 0) {
               if (initialClientId) activeLotClientsSet.add(initialClientId);
               if (initialClientName) clientNamesList.push(initialClientName);
-            } else {
-              if (journey.movementHistory) {
-                const activeStepNames = new Set(activeSteps.map((/** @type {any} */ s) => s.stepName));
-                journey.movementHistory.forEach((/** @type {any} */ m) => {
-                  if (!m.isReversed && m.clientId && m.toStepName && activeStepNames.has(m.toStepName)) {
-                    activeLotClientsSet.add(m.clientId);
-                    if (m.clientName && !clientNamesList.includes(m.clientName)) {
-                      clientNamesList.push(m.clientName);
-                    }
-                  }
-                });
-              }
-
-              if (activeLotClientsSet.size === 0) {
-                if (initialClientId) activeLotClientsSet.add(initialClientId);
-                if (initialClientName) clientNamesList.push(initialClientName);
-              }
             }
           }
+        }
 
-          return {
-            ...lot,
-            activeSteps,
-            totalWipQty,
-            clientIds: Array.from(activeLotClientsSet),
-            clientNamesDisplay: clientNamesList.length > 0 ? clientNamesList.join(', ') : 'Unassigned',
-            createdDate: new Date(lot.createdAtUtc || lot.creationDate || Date.now())
-          };
-        })
-      );
+        return {
+          ...lot,
+          activeSteps,
+          totalWipQty,
+          clientIds: Array.from(activeLotClientsSet),
+          clientNamesDisplay: clientNamesList.length > 0 ? clientNamesList.join(', ') : 'Unassigned',
+          createdDate: new Date(lot.createdAtUtc || lot.creationDate || Date.now())
+        };
+      });
 
       enrichedLots = enriched;
     } catch (/** @type {any} */ err) {
@@ -316,7 +318,7 @@
           <input
             type="text"
             bind:value={searchQuery}
-            placeholder="Search by lot number, client, or item..."
+            placeholder="Search by lot number or client..."
             class="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant/70 rounded-xl text-xs sm:text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -437,7 +439,6 @@
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Lot Number</th>
-              <th class="px-4 py-3">Item / Name</th>
               <th class="px-4 py-3 text-right">Current Quantity</th>
               <th class="px-4 py-3">Active Steps & WIP</th>
               <th class="px-4 py-3">Created Date</th>
@@ -457,7 +458,6 @@
                     {lot.lotNumber}
                   </div>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap font-medium">{lot.itemName}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
                   {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
                 </td>
@@ -496,7 +496,7 @@
             {/each}
             {#if filteredLots.length === 0}
               <tr>
-                <td colspan="6" class="px-4 py-12 text-center text-on-surface-variant">
+                <td colspan="5" class="px-4 py-12 text-center text-on-surface-variant">
                   <EmptyState icon="filter_alt_off" title="No matching production lots found" message="Try adjusting the search query or filters above." />
                 </td>
               </tr>

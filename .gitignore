@@ -367,3 +367,4 @@ FodyWeavers.xsd
 tracklord-service.json
 *.service-account.json
 /TrackLord.Api/appsettings.Development.json
+TrackLord.StressTest/appsettings.json

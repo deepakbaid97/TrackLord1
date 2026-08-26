@@ -15,10 +15,10 @@ describe('configRegistry.js', () => {
     });
   });
 
-  it('defines 3 configuration categories in CONFIG_SCHEMA', () => {
-    expect(CONFIG_SCHEMA).toHaveLength(3);
+  it('defines 4 configuration categories in CONFIG_SCHEMA', () => {
+    expect(CONFIG_SCHEMA).toHaveLength(4);
     const categoryIds = CONFIG_SCHEMA.map(c => c.categoryId);
-    expect(categoryIds).toEqual(['pages', 'forms', 'fields']);
+    expect(categoryIds).toEqual(['pages', 'dashboard', 'forms', 'fields']);
   });
 
   it('guarantees unique keys across all schema configuration items', () => {
@@ -54,5 +54,17 @@ describe('configRegistry.js', () => {
     expect(pageKeys).toContain('pages.materials');
     expect(pageKeys).toContain('pages.clients');
     expect(pageKeys).toContain('pages.users');
+  });
+
+  it('contains expected dashboard widgets in dashboard category', () => {
+    const dashboardCategory = CONFIG_SCHEMA.find(c => c.categoryId === 'dashboard');
+    expect(dashboardCategory).toBeDefined();
+    const dashboardKeys = dashboardCategory.items.map(i => i.key);
+    expect(dashboardKeys).toContain('dashboard.kpi.activeLots');
+    expect(dashboardKeys).toContain('dashboard.kpi.totalWip');
+    expect(dashboardKeys).toContain('dashboard.sections.wipByStep');
+    expect(dashboardKeys).toContain('dashboard.sections.clientDistribution');
+    expect(dashboardKeys).toContain('dashboard.sections.materialAvailability');
+    expect(dashboardKeys).toContain('dashboard.sections.activeLots');
   });
 });

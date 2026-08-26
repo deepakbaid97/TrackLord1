@@ -19,6 +19,8 @@
   let searchQuery = $state('');
   let searchInputEl = $state(/** @type {HTMLInputElement | null} */ (null));
   let buttonEl = $state(/** @type {HTMLButtonElement | null} */ (null));
+  let menuEl = $state(/** @type {HTMLDivElement | null} */ (null));
+  let dropdownStyle = $state('');
 
   let selectedOption = $derived(
     options.find((opt) => String(opt.value) === String(value))
@@ -32,31 +34,39 @@
         )
   );
 
+  function updatePosition() {
+    if (!buttonEl) return;
+    const rect = buttonEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    const openUp = spaceBelow < 220 && spaceAbove > spaceBelow;
+    openDirection = openUp ? 'up' : 'down';
+
+    if (openUp) {
+      const bottom = viewportHeight - rect.top + 6;
+      const maxHeight = Math.max(120, Math.min(240, spaceAbove - 24));
+      dropdownStyle = `position: fixed; left: ${rect.left}px; width: ${rect.width}px; bottom: ${bottom}px; max-height: ${maxHeight}px; z-index: 9999;`;
+    } else {
+      const top = rect.bottom + 6;
+      const maxHeight = Math.max(120, Math.min(240, spaceBelow - 24));
+      dropdownStyle = `position: fixed; left: ${rect.left}px; width: ${rect.width}px; top: ${top}px; max-height: ${maxHeight}px; z-index: 9999;`;
+    }
+  }
+
   function toggle() {
     if (disabled) return;
-    if (!isOpen && buttonEl) {
-      const rect = buttonEl.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      
-      // If space below is less than 240px and space above is greater, open upwards
-      if (spaceBelow < 240 && spaceAbove > spaceBelow) {
-        openDirection = 'up';
-      } else {
-        openDirection = 'down';
-      }
+    if (!isOpen) {
+      updatePosition();
     }
-
     isOpen = !isOpen;
     if (isOpen) {
       searchQuery = '';
       setTimeout(() => {
+        updatePosition();
         searchInputEl?.focus();
-        if (buttonEl) {
-          buttonEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 50);
+      }, 30);
     }
   }
 
@@ -71,7 +81,8 @@
   /** @param {HTMLElement} node */
   function handleClickOutside(node) {
     const handle = (/** @type {MouseEvent} */ e) => {
-      if (!node.contains(/** @type {Node} */ (e.target))) {
+      const target = /** @type {Node} */ (e.target);
+      if (!node.contains(target) && (!menuEl || !menuEl.contains(target))) {
         isOpen = false;
         searchQuery = '';
       }
@@ -85,15 +96,30 @@
   }
 
   /** @param {KeyboardEvent} e */
-  function handleKeyDown(e) {
-    if (e.key === 'Escape') {
+  function handleWindowKeyDown(e) {
+    if (isOpen && e.key === 'Escape') {
       isOpen = false;
       searchQuery = '';
     }
   }
+
+  function handleWindowResizeOrScroll() {
+    if (isOpen) {
+      updatePosition();
+    }
+  }
 </script>
 
-<div class="flex flex-col gap-1 w-full relative" use:handleClickOutside onkeydown={handleKeyDown}>
+<svelte:window
+  onkeydown={handleWindowKeyDown}
+  onresize={handleWindowResizeOrScroll}
+  onscroll={handleWindowResizeOrScroll}
+/>
+
+<div
+  class="flex flex-col gap-1 w-full relative"
+  use:handleClickOutside
+>
   {#if label}
     <label for={id} class="text-xs font-bold uppercase tracking-wider text-on-surface-variant font-mono">
       {label} {#if required}<span class="text-[#ba1a1a]">*</span>{/if}
@@ -124,10 +150,12 @@
 
     {#if isOpen}
       <div 
-        class="absolute {openDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} left-0 right-0 bg-surface dark:bg-slate-900 border border-outline-variant/80 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in {openDirection === 'up' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-150"
+        bind:this={menuEl}
+        style={dropdownStyle}
+        class="bg-surface dark:bg-slate-900 border border-outline-variant/80 rounded-xl shadow-2xl overflow-hidden animate-in fade-in {openDirection === 'up' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-150 flex flex-col"
       >
         {#if searchable}
-          <div class="p-2 border-b border-outline-variant/60 bg-surface dark:bg-slate-900">
+          <div class="p-2 border-b border-outline-variant/60 bg-surface dark:bg-slate-900 shrink-0">
             <div class="relative flex items-center">
               <span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[18px] pointer-events-none">search</span>
               <input
@@ -141,7 +169,7 @@
           </div>
         {/if}
 
-        <div class="max-h-48 sm:max-h-56 overflow-y-auto py-1 divide-y divide-outline-variant/20">
+        <div class="overflow-y-auto py-1 divide-y divide-outline-variant/20 flex-1">
           {#each filteredOptions as opt}
             {@const isSelected = String(opt.value) === String(value)}
             <button
@@ -164,4 +192,5 @@
     {/if}
   </div>
 </div>
+
 
