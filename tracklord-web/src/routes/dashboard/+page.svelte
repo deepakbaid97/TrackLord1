@@ -325,10 +325,9 @@
                 <table class="w-full text-left border-collapse text-xs sm:text-sm">
                   <thead>
                     <tr class="bg-surface-container-low border-b border-outline-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-                      <th class="px-3 py-2.5">Lot</th>
+                      <th class="px-3 py-2.5">Lot Number</th>
                       <th class="px-3 py-2.5">Material</th>
-                      <th class="px-3 py-2.5 text-right">Available</th>
-                      <th class="px-3 py-2.5 text-right">Rate</th>
+                      <th class="px-3 py-2.5 text-left">Available Stock</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-outline-variant/50 text-on-surface">
@@ -338,18 +337,23 @@
                       {@const usagePercent = initial > 0 ? (remaining / initial) * 100 : 0}
                       <tr class="hover:bg-surface-container-low/60 transition-colors">
                         <td class="px-3 py-2.5 font-bold text-on-surface">
-                          <div class="flex items-center gap-1">
+                          <div class="flex items-center gap-1.5">
                             <span class="material-symbols-outlined text-[15px] text-green-600 shrink-0">package_2</span>
-                            <span class="truncate max-w-[90px]">{mat.lotNumber}</span>
+                            <span class="truncate max-w-[110px]">{mat.lotNumber}</span>
                           </div>
                         </td>
-                        <td class="px-3 py-2.5 text-on-surface truncate max-w-[100px]">{mat.materialName ?? '—'}</td>
-                        <td class="px-3 py-2.5 text-right font-mono">
-                          <span class="font-bold text-green-600">{Number(remaining).toLocaleString()}</span>
-                          <span class="text-[10px] text-on-surface-variant ml-0.5">{mat.unit}</span>
-                        </td>
-                        <td class="px-3 py-2.5 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                          {mat.unitRate ? `₹${Number(mat.unitRate).toLocaleString('en-IN', { minimumFractionDigits: 0 })}` : '—'}
+                        <td class="px-3 py-2.5 text-on-surface truncate max-w-[120px]">{mat.materialName ?? '—'}</td>
+                        <td class="px-3 py-2.5 text-left">
+                          <div class="flex items-center gap-1.5">
+                            <div class="w-12 bg-surface-variant/60 rounded-full h-1.5 hidden sm:block">
+                              <div
+                                class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                style="width: {Math.min(usagePercent, 100)}%"
+                              ></div>
+                            </div>
+                            <span class="font-bold text-green-600 font-mono">{Number(remaining).toLocaleString()}</span>
+                            <span class="text-[10px] text-on-surface-variant font-mono">{mat.unit || ''}</span>
+                          </div>
                         </td>
                       </tr>
                     {/each}
