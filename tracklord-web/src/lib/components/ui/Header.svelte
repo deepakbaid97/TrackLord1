@@ -55,6 +55,20 @@
       activeDropdownIndex = null;
     }
   }
+
+  function getInitials(name, phone) {
+    if (name && name.trim()) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return name.slice(0, 2).toUpperCase();
+    }
+    if (phone) {
+      return phone.slice(-2);
+    }
+    return 'U';
+  }
 </script>
 
 <svelte:window onclick={handleDocumentClick} />
@@ -168,8 +182,28 @@
       </div>
     {/if}
 
-    <!-- User Auth / Sign In -->
-    {#if !isAuthenticated}
+    <!-- User Profile Button (when authenticated) -->
+    {#if isAuthenticated && user}
+      <button
+        type="button"
+        onclick={() => authStore.openProfileModal()}
+        title="View Profile & Company Details ({user.name || user.phoneNumber})"
+        class="flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/80 transition-all active:scale-95 cursor-pointer shadow-xs group"
+      >
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0">
+          {getInitials(user.name, user.phoneNumber)}
+        </div>
+        <div class="hidden md:flex flex-col text-left leading-tight max-w-[120px]">
+          <span class="text-xs font-bold text-on-surface truncate group-hover:text-primary transition-colors">
+            {user.name || user.phoneNumber}
+          </span>
+          <span class="text-[10px] text-on-surface-variant font-medium truncate">
+            {user.role}
+          </span>
+        </div>
+      </button>
+    {:else if !isAuthenticated}
+      <!-- User Auth / Sign In -->
       <button
         onclick={handleLoginClick}
         class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"

@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import FeatureGate from './FeatureGate.svelte';
   import { permissionStore } from '$lib/stores/permissionStore.js';
+  import { authStore } from '$lib/stores/authStore.js';
 
   const primaryItems = [
     { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', featureKey: 'pages.dashboard', permissionKey: 'dashboard' },
@@ -114,6 +115,17 @@
                     </a>
                   </FeatureGate>
                 {/each}
+
+                {#if $authStore.isAuthenticated}
+                  <button
+                    type="button"
+                    onclick={() => { isMoreOpen = false; authStore.openProfileModal(); }}
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-[20px] text-primary">account_circle</span>
+                    <span class="font-['JetBrains_Mono'] uppercase tracking-wider">Profile</span>
+                  </button>
+                {/if}
               </div>
             </div>
           {/if}
