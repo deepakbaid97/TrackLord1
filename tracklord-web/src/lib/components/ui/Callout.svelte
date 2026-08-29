@@ -51,7 +51,7 @@
 
 {#if message}
   <div
-    class="fixed top-16 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:max-w-md flex items-start justify-between gap-3 p-4 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 {
+    class="fixed top-16 right-4 left-4 sm:left-auto sm:right-6 z-[120] sm:max-w-md flex items-start justify-between gap-3 p-4 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 {
       type === 'error'
         ? 'bg-red-50/95 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 shadow-red-500/10'
         : type === 'success'
