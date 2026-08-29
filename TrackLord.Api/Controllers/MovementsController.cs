@@ -1,8 +1,12 @@
+using System;
+using System.Threading.Tasks;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.Authorization;
 using TrackLord.Api.DTOs;
 using TrackLord.Application.Commands;
+using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Api.Controllers;
 
@@ -22,6 +26,7 @@ public class MovementsController : ControllerBase
     /// Moves lot quantity from one step to another (supports partial & backdated movements).
     /// </summary>
     [HttpPost]
+    [RequirePermission(PermissionFeatures.Movements, AccessLevels.Write)]
     public async Task<IActionResult> MoveLot([FromBody] MoveLotCommand command)
     {
         var movementId = await _mediator.Send(command);
@@ -32,6 +37,7 @@ public class MovementsController : ControllerBase
     /// Edits a historical movement (triggers full ledger replay recalculation).
     /// </summary>
     [HttpPut("{id:guid}")]
+    [RequirePermission(PermissionFeatures.Movements, AccessLevels.Write)]
     public async Task<IActionResult> EditMovement(Guid id, [FromBody] EditMovementRequest request)
     {
         var command = new EditMovementCommand(id, request.FromStepId, request.ToStepId, request.NewQuantity, request.NewMovementDate, request.Remarks, request.ReferenceNumber);
@@ -41,8 +47,10 @@ public class MovementsController : ControllerBase
 
     /// <summary>
     /// Reverses a historical movement (creates a soft reversal transaction).
+    /// Requires elevated movement reversal permission.
     /// </summary>
     [HttpPost("{id:guid}/reverse")]
+    [RequirePermission(PermissionFeatures.MovementReversals, AccessLevels.Write)]
     public async Task<IActionResult> ReverseMovement(Guid id, [FromBody] ReverseMovementRequest request)
     {
         var command = new ReverseMovementCommand(id, request.Reason, request.User);

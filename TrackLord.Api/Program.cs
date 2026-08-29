@@ -138,6 +138,7 @@ builder.Services.AddScoped<IMaterialConsumptionRepository, MaterialConsumptionRe
 builder.Services.AddScoped<IRejectionRecordRepository, RejectionRecordRepository>();
 builder.Services.AddScoped<IClientRepository, ClientRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
 // CORS for Frontend SvelteKit App
 builder.Services.AddCors(options =>
@@ -164,14 +165,36 @@ using (var scope = app.Services.CreateScope())
     {
         dbContext.Database.Migrate();
 
+        var defaultTenantId = TrackLord.Domain.Aggregates.TenantAggregate.Tenant.DefaultTenantId;
         if (!dbContext.Tenants.Any())
         {
             var defaultTenant = new TrackLord.Domain.Aggregates.TenantAggregate.Tenant(
-                TrackLord.Domain.Aggregates.TenantAggregate.Tenant.DefaultTenantId,
+                defaultTenantId,
                 "Default Tenant",
                 "DEFAULT");
             dbContext.Tenants.Add(defaultTenant);
             dbContext.SaveChanges();
+        }
+
+        // Ensure default roles exist
+        if (!dbContext.Roles.IgnoreQueryFilters().Any())
+        {
+            var defaultRoles = TrackLord.Domain.Aggregates.RoleAggregate.Role.CreateDefaultSystemRoles(defaultTenantId);
+            dbContext.Roles.AddRange(defaultRoles);
+            dbContext.SaveChanges();
+
+            // Link existing users to matching default roles
+            var allUsers = dbContext.Users.IgnoreQueryFilters().ToList();
+            foreach (var u in allUsers)
+            {
+                var matchingRole = defaultRoles.FirstOrDefault(r => string.Equals(r.Name, u.Role, StringComparison.OrdinalIgnoreCase))
+                                   ?? defaultRoles.First(r => r.Name == "Operator");
+                u.AssignRole(matchingRole.Id, matchingRole.Name);
+            }
+            if (allUsers.Count > 0)
+            {
+                dbContext.SaveChanges();
+            }
         }
 
         logger.LogInformation("Database initialized.");

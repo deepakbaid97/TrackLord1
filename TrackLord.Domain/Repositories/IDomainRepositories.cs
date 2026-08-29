@@ -7,11 +7,11 @@ using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
+using TrackLord.Domain.Aggregates.RoleAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
-
 using TrackLord.Domain.Enums;
 
 namespace TrackLord.Domain.Repositories;
@@ -106,4 +106,14 @@ public interface ITenantRepository
     Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken = default);
 }
 
-
+public interface IRoleRepository
+{
+    Task<Role?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Role?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Role>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(Role role, CancellationToken cancellationToken = default);
+    Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Role role, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Role role, CancellationToken cancellationToken = default);
+    Task<bool> HasUsersAssignedAsync(Guid roleId, CancellationToken cancellationToken = default);
+}

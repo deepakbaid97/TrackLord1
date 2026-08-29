@@ -1,12 +1,20 @@
+using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.Authorization;
 using TrackLord.Api.DTOs;
+using TrackLord.Domain.Aggregates.RoleAggregate;
 using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Repositories;
+using TrackLord.Domain.ValueObjects;
 using TrackLord.Infrastructure.Services;
 
 namespace TrackLord.Api.Controllers;
@@ -19,6 +27,7 @@ public class AuthController : ControllerBase
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IUserRepository _userRepository;
     private readonly ITenantRepository _tenantRepository;
+    private readonly IRoleRepository _roleRepository;
     private readonly ITenantContext _tenantContext;
 
     public AuthController(
@@ -26,18 +35,20 @@ public class AuthController : ControllerBase
         IJwtTokenService jwtTokenService,
         IUserRepository userRepository,
         ITenantRepository tenantRepository,
+        IRoleRepository roleRepository,
         ITenantContext tenantContext)
     {
         _firebaseTokenVerifier = firebaseTokenVerifier;
         _jwtTokenService = jwtTokenService;
         _userRepository = userRepository;
         _tenantRepository = tenantRepository;
+        _roleRepository = roleRepository;
         _tenantContext = tenantContext;
     }
 
     /// <summary>
     /// Verifies Firebase ID Token from Phone OTP authentication and generates custom backend JWT token.
-    /// Persists/updates User table in database.
+    /// Persists/updates User table in database and returns permissions dictionary.
     /// </summary>
     [HttpPost("verify-otp")]
     [HttpPost("firebase-verify")]
@@ -72,7 +83,10 @@ public class AuthController : ControllerBase
             await _userRepository.UpdateAsync(user);
         }
 
-        var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber, user.TenantId);
+        // Ensure user has valid Role entity linked
+        var role = await EnsureUserRoleAsync(user, user.TenantId);
+
+        var tokenResult = _jwtTokenService.GenerateToken(user.Id.ToString(), user.PhoneNumber, user.TenantId, user.Role, user.RoleId);
         var tenant = await _tenantRepository.GetByIdAsync(user.TenantId);
         var tenantSettings = ParseTenantSettings(tenant?.SettingsJson);
 
@@ -89,6 +103,8 @@ public class AuthController : ControllerBase
                 phoneNumber = user.PhoneNumber,
                 name = user.Name,
                 role = user.Role,
+                roleId = user.RoleId,
+                permissions = role.GetPermissionsDictionary(),
                 createdAtUtc = user.CreatedAtUtc,
                 lastLoginAtUtc = user.LastLoginAtUtc,
                 tenantSettings = new
@@ -101,7 +117,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Gets current authenticated user details from JWT token and User table.
+    /// Gets current authenticated user details, assigned role, and resolved permissions from JWT token and database.
     /// </summary>
     [HttpGet("me")]
     [Authorize]
@@ -125,6 +141,12 @@ public class AuthController : ControllerBase
         var tenant = await _tenantRepository.GetByIdAsync(targetTenantId);
         var tenantSettings = ParseTenantSettings(tenant?.SettingsJson);
 
+        Role? role = null;
+        if (user != null)
+        {
+            role = await EnsureUserRoleAsync(user, targetTenantId);
+        }
+
         return Ok(new
         {
             id = user?.Id.ToString() ?? userIdStr,
@@ -134,6 +156,8 @@ public class AuthController : ControllerBase
             phoneNumber = user?.PhoneNumber ?? phoneNumber ?? "Unknown",
             name = user?.Name,
             role = user?.Role ?? "Operator",
+            roleId = user?.RoleId,
+            permissions = role?.GetPermissionsDictionary() ?? new Dictionary<string, List<string>>(),
             isAuthenticated = true,
             tenantSettings = new
             {
@@ -143,32 +167,12 @@ public class AuthController : ControllerBase
         });
     }
 
-    private static TenantSettings ParseTenantSettings(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return new TenantSettings();
-        try
-        {
-            return JsonSerializer.Deserialize<TenantSettings>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new TenantSettings();
-        }
-        catch
-        {
-            return new TenantSettings();
-        }
-    }
-
-    private static string FormatClientMode(ClientTrackingMode mode) => mode switch
-    {
-        ClientTrackingMode.LotLevel => "lot",
-        ClientTrackingMode.StepLevel => "step",
-        ClientTrackingMode.None => "none",
-        _ => "step"
-    };
-
     /// <summary>
-    /// Gets users in the tenant. Admins/Supervisors receive all tenant users; non-admins receive only themselves.
+    /// Gets users in the tenant.
     /// </summary>
     [HttpGet("users")]
     [Authorize]
+    [RequirePermission(PermissionFeatures.Users, AccessLevels.Read)]
     public async Task<IActionResult> GetAllUsers()
     {
         var currentUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -186,8 +190,8 @@ public class AuthController : ControllerBase
 
         var allUsers = await _userRepository.GetAllAsync();
 
-        // Non-admin / non-supervisor users can only see their own account
-        if (currentUser != null && currentUser.Role != "Admin" && currentUser.Role != "Supervisor")
+        // Non-admin / non-supervisor users can only see their own account if they lack full user management access
+        if (currentUser != null && currentUser.Role != "Admin" && currentUser.Role != "Supervisor" && currentUser.Role != "Manager")
         {
             allUsers = allUsers.Where(u => u.Id == currentUser.Id || u.PhoneNumber == currentUser.PhoneNumber).ToList();
         }
@@ -199,6 +203,7 @@ public class AuthController : ControllerBase
             u.PhoneNumber,
             u.Name,
             u.Role,
+            u.RoleId,
             u.FirebaseUid,
             u.CreatedAtUtc,
             u.LastLoginAtUtc,
@@ -207,10 +212,11 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new user within the current tenant (Admin / Supervisor only).
+    /// Creates a new user within the current tenant and assigns their role.
     /// </summary>
     [HttpPost("users")]
     [Authorize]
+    [RequirePermission(PermissionFeatures.Users, AccessLevels.Write)]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
@@ -231,11 +237,6 @@ public class AuthController : ControllerBase
             currentUser = await _userRepository.GetByPhoneNumberAsync(currentUserPhone);
         }
 
-        if (currentUser != null && currentUser.Role != "Admin" && currentUser.Role != "Supervisor")
-        {
-            return StatusCode(403, new { message = "Only Admin users can add new team members." });
-        }
-
         var normalizedPhone = request.PhoneNumber.Trim();
         var existing = await _userRepository.GetByPhoneNumberAsync(normalizedPhone);
         if (existing != null)
@@ -244,12 +245,29 @@ public class AuthController : ControllerBase
         }
 
         var activeTenantId = currentUser?.TenantId ?? _tenantContext.TenantId;
+
+        // Resolve assigned role
+        Role? targetRole = null;
+        if (request.RoleId.HasValue && request.RoleId.Value != Guid.Empty)
+        {
+            targetRole = await _roleRepository.GetByIdAsync(request.RoleId.Value);
+        }
+        if (targetRole == null && !string.IsNullOrWhiteSpace(request.Role))
+        {
+            targetRole = await _roleRepository.GetByNameAsync(request.Role);
+        }
+        if (targetRole == null)
+        {
+            targetRole = await _roleRepository.GetByNameAsync("Operator") ?? (await EnsureTenantRolesExistAsync(activeTenantId)).First(r => r.Name == "Operator");
+        }
+
         var newUser = new User(
             Guid.NewGuid(),
             normalizedPhone,
             name: request.Name,
-            role: string.IsNullOrWhiteSpace(request.Role) ? "Operator" : request.Role,
-            tenantId: activeTenantId
+            role: targetRole.Name,
+            tenantId: activeTenantId,
+            roleId: targetRole.Id
         );
 
         await _userRepository.AddAsync(newUser);
@@ -261,13 +279,14 @@ public class AuthController : ControllerBase
             phoneNumber = newUser.PhoneNumber,
             name = newUser.Name,
             role = newUser.Role,
+            roleId = newUser.RoleId,
             createdAtUtc = newUser.CreatedAtUtc,
             isActive = newUser.IsActive
         });
     }
 
     /// <summary>
-    /// Updates a user's details (Name / Role). Users can update their own profile, Admins can update any user.
+    /// Updates a user's details (Name / Role). Users can update their own profile, Admins/Managers can update any user.
     /// </summary>
     [HttpPut("users/{id:guid}")]
     [Authorize]
@@ -293,16 +312,32 @@ public class AuthController : ControllerBase
         }
 
         var isSelf = currentUser != null && currentUser.Id == id;
-        var isAdmin = currentUser != null && (currentUser.Role == "Admin" || currentUser.Role == "Supervisor");
+        var isAdminOrManager = currentUser != null && (currentUser.Role == "Admin" || currentUser.Role == "Supervisor" || currentUser.Role == "Manager");
 
-        if (!isSelf && !isAdmin)
+        if (!isSelf && !isAdminOrManager)
         {
-            return StatusCode(403, new { message = "You can only update your own profile unless you are an Admin." });
+            return StatusCode(403, new { message = "You can only update your own profile unless you have user management privileges." });
         }
 
-        var newRole = isAdmin && !string.IsNullOrWhiteSpace(request.Role) ? request.Role : targetUser.Role;
+        Role? targetRole = null;
+        if (isAdminOrManager)
+        {
+            if (request.RoleId.HasValue && request.RoleId.Value != Guid.Empty)
+            {
+                targetRole = await _roleRepository.GetByIdAsync(request.RoleId.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.Role))
+            {
+                targetRole = await _roleRepository.GetByNameAsync(request.Role);
+            }
+        }
 
-        targetUser.UpdateProfile(request.Name, newRole);
+        if (targetRole != null)
+        {
+            targetUser.AssignRole(targetRole.Id, targetRole.Name);
+        }
+
+        targetUser.UpdateProfile(request.Name, targetUser.Role, targetUser.RoleId);
         await _userRepository.UpdateAsync(targetUser);
 
         return Ok(new
@@ -312,9 +347,73 @@ public class AuthController : ControllerBase
             phoneNumber = targetUser.PhoneNumber,
             name = targetUser.Name,
             role = targetUser.Role,
+            roleId = targetUser.RoleId,
             createdAtUtc = targetUser.CreatedAtUtc,
             lastLoginAtUtc = targetUser.LastLoginAtUtc,
             isActive = targetUser.IsActive
         });
     }
+
+    private async Task<Role> EnsureUserRoleAsync(User user, Guid tenantId)
+    {
+        Role? role = null;
+        if (user.RoleId.HasValue && user.RoleId.Value != Guid.Empty)
+        {
+            role = await _roleRepository.GetByIdAsync(user.RoleId.Value);
+        }
+
+        if (role == null && !string.IsNullOrWhiteSpace(user.Role))
+        {
+            role = await _roleRepository.GetByNameAsync(user.Role);
+        }
+
+        if (role == null)
+        {
+            var seededRoles = await EnsureTenantRolesExistAsync(tenantId);
+            role = seededRoles.FirstOrDefault(r => string.Equals(r.Name, user.Role, StringComparison.OrdinalIgnoreCase))
+                   ?? seededRoles.First(r => r.Name == "Operator");
+        }
+
+        if (user.RoleId != role.Id || user.Role != role.Name)
+        {
+            user.AssignRole(role.Id, role.Name);
+            await _userRepository.UpdateAsync(user);
+        }
+
+        return role;
+    }
+
+    private async Task<IReadOnlyList<Role>> EnsureTenantRolesExistAsync(Guid tenantId)
+    {
+        var existing = await _roleRepository.GetAllAsync();
+        if (existing != null && existing.Count > 0)
+        {
+            return existing;
+        }
+
+        var defaultRoles = Role.CreateDefaultSystemRoles(tenantId);
+        await _roleRepository.AddRangeAsync(defaultRoles);
+        return defaultRoles;
+    }
+
+    private static TenantSettings ParseTenantSettings(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new TenantSettings();
+        try
+        {
+            return JsonSerializer.Deserialize<TenantSettings>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new TenantSettings();
+        }
+        catch
+        {
+            return new TenantSettings();
+        }
+    }
+
+    private static string FormatClientMode(ClientTrackingMode mode) => mode switch
+    {
+        ClientTrackingMode.LotLevel => "lot",
+        ClientTrackingMode.StepLevel => "step",
+        ClientTrackingMode.None => "none",
+        _ => "step"
+    };
 }

@@ -330,6 +330,59 @@ namespace TrackLord.Infrastructure.Migrations
                     b.ToTable("production_lots", (string)null);
                 });
 
+            modelBuilder.Entity("TrackLord.Domain.Aggregates.RoleAggregate.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsSystemRole")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_system_role");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PermissionsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("permissions_json");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("roles", (string)null);
+                });
+
             modelBuilder.Entity("TrackLord.Domain.Aggregates.StepAggregate.ManufacturingStep", b =>
                 {
                     b.Property<Guid>("Id")
@@ -464,6 +517,10 @@ namespace TrackLord.Infrastructure.Migrations
                         .HasDefaultValue("Operator")
                         .HasColumnName("role");
 
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -471,6 +528,8 @@ namespace TrackLord.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("FirebaseUid");
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("TenantId", "PhoneNumber")
                         .IsUnique();

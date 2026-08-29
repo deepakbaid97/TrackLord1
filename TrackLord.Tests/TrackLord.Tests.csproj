@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -26,6 +26,7 @@
     <ProjectReference Include="..\TrackLord.Application\TrackLord.Application.csproj" />
     <ProjectReference Include="..\TrackLord.Infrastructure\TrackLord.Infrastructure.csproj" />
     <ProjectReference Include="..\TrackLord.Domain\TrackLord.Domain.csproj" />
+    <ProjectReference Include="..\TrackLord.Api\TrackLord.Api.csproj" />
   </ItemGroup>
 
 </Project>

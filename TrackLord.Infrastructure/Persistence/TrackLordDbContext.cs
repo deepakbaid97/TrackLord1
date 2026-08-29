@@ -6,6 +6,7 @@ using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
+using TrackLord.Domain.Aggregates.RoleAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
@@ -32,6 +33,7 @@ public class TrackLordDbContext : DbContext
     public DbSet<RejectionRecord> RejectionRecords => Set<RejectionRecord>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
 
     public Guid CurrentTenantId => _tenantContext?.TenantId ?? Tenant.DefaultTenantId;
 

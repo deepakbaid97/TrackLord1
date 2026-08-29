@@ -9,11 +9,11 @@ using TrackLord.Domain.Aggregates.TenantAggregate;
 
 namespace TrackLord.Infrastructure.Services;
 
-public record AuthTokenResult(string Token, DateTime ExpiresAt, string UserId, string PhoneNumber, Guid TenantId);
+public record AuthTokenResult(string Token, DateTime ExpiresAt, string UserId, string PhoneNumber, Guid TenantId, string? Role = null, Guid? RoleId = null);
 
 public interface IJwtTokenService
 {
-    AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null);
+    AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null, string? role = null, Guid? roleId = null);
 }
 
 public class JwtTokenService : IJwtTokenService
@@ -25,7 +25,7 @@ public class JwtTokenService : IJwtTokenService
         _configuration = configuration;
     }
 
-    public AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null)
+    public AuthTokenResult GenerateToken(string userId, string phoneNumber, Guid? tenantId = null, string? role = null, Guid? roleId = null)
     {
         var activeTenantId = tenantId.HasValue && tenantId.Value != Guid.Empty ? tenantId.Value : Tenant.DefaultTenantId;
         var secretKey = _configuration["JwtSettings:SecretKey"] ?? "TrackLordSuperSecretAuthenticationKey2026!#ForJwtTokens";
@@ -48,6 +48,17 @@ public class JwtTokenService : IJwtTokenService
             new("tenant_id", activeTenantId.ToString())
         };
 
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            claims.Add(new Claim("role", role));
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        if (roleId.HasValue && roleId.Value != Guid.Empty)
+        {
+            claims.Add(new Claim("role_id", roleId.Value.ToString()));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
@@ -61,6 +72,6 @@ public class JwtTokenService : IJwtTokenService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
 
-        return new AuthTokenResult(tokenString, expiresAt, userId, phoneNumber, activeTenantId);
+        return new AuthTokenResult(tokenString, expiresAt, userId, phoneNumber, activeTenantId, role, roleId);
     }
 }

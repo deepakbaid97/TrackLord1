@@ -175,3 +175,14 @@ public record DashboardOverviewDto(
     IReadOnlyList<DashboardStepSummaryDto> StepSummaries,
     IReadOnlyList<DashboardClientSummaryDto> ClientSummaries,
     IReadOnlyList<DashboardActiveLotDto> ActiveLotSummaries);
+
+public record RoleDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    bool IsSystemRole,
+    bool IsActive,
+    string PermissionsJson,
+    Dictionary<string, List<string>> Permissions,
+    DateTime CreatedAtUtc);
+
