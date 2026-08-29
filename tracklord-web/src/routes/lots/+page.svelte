@@ -63,35 +63,48 @@
     customEndDate = '';
   }
 
-  usePageHeader(() => ({
-    title: 'Production Lots',
-    subtitle: 'Directory & Batches',
-    icon: 'reorder',
-    actions: [
-      {
-        label: 'Actions',
-        icon: 'bolt',
-        variant: 'primary',
-        dropdownItems: [
-          {
-            label: 'New Production Lot',
-            icon: 'add_circle',
-            onclick: () => { isCreateLotModalOpen = true; }
-          },
-          {
-            label: 'Import Lots (Excel/CSV)',
-            icon: 'file_upload',
-            onclick: () => { isImportModalOpen = true; }
-          },
-          {
-            label: 'Refresh Lots Data',
-            icon: 'refresh',
-            onclick: () => { refreshData(); }
-          }
-        ]
-      }
-    ]
-  }));
+  import { permissionStore } from '$lib/stores/permissionStore.js';
+
+  usePageHeader(() => {
+    /** @type {any[]} */
+    const dropdownItems = [];
+
+    if ($permissionStore.can('production_lots', 'write')) {
+      dropdownItems.push({
+        label: 'New Production Lot',
+        icon: 'add_circle',
+        onclick: () => { isCreateLotModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('imports', 'write')) {
+      dropdownItems.push({
+        label: 'Import Lots (Excel/CSV)',
+        icon: 'file_upload',
+        onclick: () => { isImportModalOpen = true; }
+      });
+    }
+
+    dropdownItems.push({
+      label: 'Refresh Lots Data',
+      icon: 'refresh',
+      onclick: () => { refreshData(); }
+    });
+
+    return {
+      title: 'Production Lots',
+      subtitle: 'Directory & Batches',
+      icon: 'reorder',
+      actions: [
+        {
+          label: 'Actions',
+          icon: 'bolt',
+          variant: 'primary',
+          dropdownItems
+        }
+      ]
+    };
+  });
 
   onMount(async () => {
     const urlParams = $page.url.searchParams;

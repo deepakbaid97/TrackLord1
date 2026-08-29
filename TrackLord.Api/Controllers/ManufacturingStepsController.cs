@@ -25,9 +25,10 @@ public class ManufacturingStepsController : ControllerBase
 
     /// <summary>
     /// Gets all manufacturing steps.
+    /// Accessible to any role that can view steps, movements, or production lots.
     /// </summary>
     [HttpGet]
-    [RequirePermission(PermissionFeatures.ManufacturingSteps, AccessLevels.Read)]
+    [RequirePermission(new[] { PermissionFeatures.ManufacturingSteps, PermissionFeatures.Movements, PermissionFeatures.ProductionLots }, AccessLevels.Read)]
     public async Task<IActionResult> GetAll()
     {
         var steps = await _mediator.Send(new GetAllManufacturingStepsQuery());

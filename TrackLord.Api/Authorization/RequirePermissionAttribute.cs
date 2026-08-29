@@ -14,12 +14,18 @@ namespace TrackLord.Api.Authorization;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public class RequirePermissionAttribute : Attribute, IAsyncActionFilter
 {
-    public string Feature { get; }
+    public string[] Features { get; }
     public string AccessLevel { get; }
 
     public RequirePermissionAttribute(string feature, string accessLevel)
     {
-        Feature = feature;
+        Features = new[] { feature };
+        AccessLevel = accessLevel;
+    }
+
+    public RequirePermissionAttribute(string[] features, string accessLevel)
+    {
+        Features = features;
         AccessLevel = accessLevel;
     }
 
@@ -99,12 +105,23 @@ public class RequirePermissionAttribute : Attribute, IAsyncActionFilter
             return;
         }
 
-        if (!role.HasPermission(Feature, AccessLevel))
+        bool hasAccess = false;
+        foreach (var feat in Features)
         {
+            if (role.HasPermission(feat, AccessLevel))
+            {
+                hasAccess = true;
+                break;
+            }
+        }
+
+        if (!hasAccess)
+        {
+            var featuresDisplay = string.Join(" or ", Features);
             context.Result = new ObjectResult(new
             {
-                message = $"Access denied. Role '{role.Name}' does not have '{AccessLevel}' permission for '{Feature}'.",
-                requiredFeature = Feature,
+                message = $"Access denied. Role '{role.Name}' does not have '{AccessLevel}' permission for '{featuresDisplay}'.",
+                requiredFeature = featuresDisplay,
                 requiredAccessLevel = AccessLevel
             })
             {

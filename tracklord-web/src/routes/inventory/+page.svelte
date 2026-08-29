@@ -21,6 +21,8 @@
   import MaterialTraceability from '$lib/components/features/inventory/MaterialTraceability.svelte';
 
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+  import { permissionStore } from '$lib/stores/permissionStore.js';
+  import PermissionGate from '$lib/components/ui/PermissionGate.svelte';
   import { STEP_ICON_MAP } from '$lib/services/lotService.js';
   import { usePageHeader } from '$lib/utils/usePageHeader.js';
 
@@ -78,73 +80,96 @@
 
   let selectedLotObj = $derived(productionLots.find(l => l.id === selectedLotId));
 
-  usePageHeader(() => ({
-    title: 'Lot Inventory',
-    subtitle: selectedLotObj ? `${selectedLotObj.lotNumber} • ${selectedLotObj.clientName || 'Live WIP'}` : 'Live Production WIP',
-    icon: 'inventory_2',
-    actions: [
-      {
+  usePageHeader(() => {
+    /** @type {any[]} */
+    const dropdownItems = [];
+
+    if ($permissionStore.can('movements', 'write')) {
+      dropdownItems.push({
+        label: 'Move Qty',
+        icon: 'move_item',
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          openMoveModal('');
+        }
+      });
+    }
+
+    if ($permissionStore.can('production_lots', 'write')) {
+      dropdownItems.push({
+        label: 'New Lot',
+        icon: 'add',
+        onclick: () => { isCreateLotModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('material_lots', 'write')) {
+      dropdownItems.push({
+        label: 'Material',
+        icon: 'inventory',
+        onclick: () => { isCreateMaterialModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('material_consumptions', 'write')) {
+      dropdownItems.push({
+        label: 'Consume',
+        icon: 'local_mall',
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          isConsumeMaterialModalOpen = true;
+        }
+      });
+    }
+
+    if ($permissionStore.can('rejection_records', 'write')) {
+      dropdownItems.push({
+        label: 'Rejection',
+        icon: 'report_problem',
+        danger: true,
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          isRejectModalOpen = true;
+        }
+      });
+    }
+
+    const actions = [];
+    if (dropdownItems.length > 0) {
+      actions.push({
         label: 'Actions',
         icon: 'bolt',
         variant: /** @type {const} */ ('primary'),
-        dropdownItems: [
-          {
-            label: 'Move Qty',
-            icon: 'move_item',
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              openMoveModal('');
-            }
-          },
-          {
-            label: 'New Lot',
-            icon: 'add',
-            onclick: () => { isCreateLotModalOpen = true; }
-          },
-          {
-            label: 'Material',
-            icon: 'inventory',
-            onclick: () => { isCreateMaterialModalOpen = true; }
-          },
-          {
-            label: 'Consume',
-            icon: 'local_mall',
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              isConsumeMaterialModalOpen = true;
-            }
-          },
-          {
-            label: 'Rejection',
-            icon: 'report_problem',
-            danger: true,
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              isRejectModalOpen = true;
-            }
-          }
-        ]
-      },
-      {
-        label: 'Refresh',
-        icon: 'refresh',
-        variant: /** @type {const} */ ('outline'),
-        onclick: () => { refreshAllData(); }
-      }
-    ]
-  }));
+        dropdownItems
+      });
+    }
+
+    actions.push({
+      label: 'Refresh',
+      icon: 'refresh',
+      variant: /** @type {const} */ ('outline'),
+      onclick: () => { refreshAllData(); }
+    });
+
+    return {
+      title: 'Lot Inventory',
+      subtitle: selectedLotObj ? `${selectedLotObj.lotNumber} • ${selectedLotObj.clientName || 'Live WIP'}` : 'Live Production WIP',
+      icon: 'inventory_2',
+      actions
+    };
+  });
 
   let lastUrlLotParam = '';
   $effect(() => {
@@ -474,15 +499,17 @@
             {/if}
           </div>
 
-          <button
-            type="button"
-            onclick={handleDeleteLot}
-            title="Delete Production Lot"
-            class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
-          >
-            <span class="material-symbols-outlined text-[14px]">delete</span>
-            <span class="hidden sm:inline">Delete Lot</span>
-          </button>
+          <PermissionGate feature="production_lots" access="delete">
+            <button
+              type="button"
+              onclick={handleDeleteLot}
+              title="Delete Production Lot"
+              class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
+            >
+              <span class="material-symbols-outlined text-[14px]">delete</span>
+              <span class="hidden sm:inline">Delete Lot</span>
+            </button>
+          </PermissionGate>
         </div>
 
         <!-- 3-Metric Clean Strip -->

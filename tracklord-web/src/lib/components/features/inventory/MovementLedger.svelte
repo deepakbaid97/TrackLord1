@@ -1,6 +1,7 @@
 <script>
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import PermissionGate from '$lib/components/ui/PermissionGate.svelte';
 
   let {
     movements = [],
@@ -39,13 +40,15 @@
                   Reversed
                 </span>
               {:else if onReverseClick}
-                <button
-                  type="button"
-                  onclick={() => onReverseClick(m)}
-                  class="px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors"
-                >
-                  Reverse
-                </button>
+                <PermissionGate feature="movement_reversals" access="write">
+                  <button
+                    type="button"
+                    onclick={() => onReverseClick(m)}
+                    class="px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors"
+                  >
+                    Reverse
+                  </button>
+                </PermissionGate>
               {/if}
             </div>
           </div>
@@ -96,13 +99,15 @@
               </td>
               <td class="px-3.5 py-2.5 text-right">
                 {#if !m.isReversed && onReverseClick}
-                  <button
-                    type="button"
-                    onclick={() => onReverseClick(m)}
-                    class="px-2 py-1 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer"
-                  >
-                    Reverse
-                  </button>
+                  <PermissionGate feature="movement_reversals" access="write">
+                    <button
+                      type="button"
+                      onclick={() => onReverseClick(m)}
+                      class="px-2 py-1 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer"
+                    >
+                      Reverse
+                    </button>
+                  </PermissionGate>
                 {/if}
               </td>
             </tr>

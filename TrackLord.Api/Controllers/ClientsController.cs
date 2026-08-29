@@ -24,9 +24,10 @@ public class ClientsController : ControllerBase
 
     /// <summary>
     /// Gets all registered clients.
+    /// Accessible to any role that can view clients, movements, or production lots.
     /// </summary>
     [HttpGet]
-    [RequirePermission(PermissionFeatures.Clients, AccessLevels.Read)]
+    [RequirePermission(new[] { PermissionFeatures.Clients, PermissionFeatures.Movements, PermissionFeatures.ProductionLots }, AccessLevels.Read)]
     public async Task<IActionResult> GetAll()
     {
         var clients = await _mediator.Send(new GetAllClientsQuery());

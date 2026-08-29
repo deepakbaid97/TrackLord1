@@ -195,6 +195,8 @@ public class Role : AggregateRoot<Guid>, ITenantScopedEntity
         {
             [PermissionFeatures.ProductionLots] = new() { AccessLevels.Read },
             [PermissionFeatures.Movements] = new() { AccessLevels.Read, AccessLevels.Write },
+            [PermissionFeatures.ManufacturingSteps] = new() { AccessLevels.Read },
+            [PermissionFeatures.Clients] = new() { AccessLevels.Read },
             [PermissionFeatures.MaterialLots] = new() { AccessLevels.Read },
             [PermissionFeatures.MaterialConsumptions] = new() { AccessLevels.Read, AccessLevels.Write },
             [PermissionFeatures.RejectionRecords] = new() { AccessLevels.Read, AccessLevels.Write },
