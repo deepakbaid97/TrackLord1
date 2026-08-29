@@ -44,10 +44,6 @@
     authStore.openModal();
   }
 
-  function handleLogoutClick() {
-    authStore.logout();
-  }
-
   function handleInstallClick() {
     pwaStore.openInstallModal();
   }
@@ -172,16 +168,8 @@
       </div>
     {/if}
 
-    <!-- User Auth / Sign Out -->
-    {#if isAuthenticated && user}
-      <button
-        onclick={handleLogoutClick}
-        title="Sign Out ({user.phoneNumber || user.tenantName})"
-        class="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/40 dark:text-slate-300 dark:hover:text-red-400 transition-all border border-slate-200 dark:border-slate-700 active:scale-95 flex items-center cursor-pointer"
-      >
-        <span class="material-symbols-outlined text-[18px]">logout</span>
-      </button>
-    {:else if !isAuthenticated}
+    <!-- User Auth / Sign In -->
+    {#if !isAuthenticated}
       <button
         onclick={handleLoginClick}
         class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"

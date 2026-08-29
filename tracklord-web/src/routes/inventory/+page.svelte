@@ -84,9 +84,63 @@
     icon: 'inventory_2',
     actions: [
       {
+        label: 'Actions',
+        icon: 'bolt',
+        variant: /** @type {const} */ ('primary'),
+        dropdownItems: [
+          {
+            label: 'Move Qty',
+            icon: 'move_item',
+            onclick: () => {
+              if (!selectedLotId) {
+                errorMessage = 'Please select a production lot first.';
+                isLotPickerModalOpen = true;
+                return;
+              }
+              openMoveModal('');
+            }
+          },
+          {
+            label: 'New Lot',
+            icon: 'add',
+            onclick: () => { isCreateLotModalOpen = true; }
+          },
+          {
+            label: 'Material',
+            icon: 'inventory',
+            onclick: () => { isCreateMaterialModalOpen = true; }
+          },
+          {
+            label: 'Consume',
+            icon: 'local_mall',
+            onclick: () => {
+              if (!selectedLotId) {
+                errorMessage = 'Please select a production lot first.';
+                isLotPickerModalOpen = true;
+                return;
+              }
+              isConsumeMaterialModalOpen = true;
+            }
+          },
+          {
+            label: 'Rejection',
+            icon: 'report_problem',
+            danger: true,
+            onclick: () => {
+              if (!selectedLotId) {
+                errorMessage = 'Please select a production lot first.';
+                isLotPickerModalOpen = true;
+                return;
+              }
+              isRejectModalOpen = true;
+            }
+          }
+        ]
+      },
+      {
         label: 'Refresh',
         icon: 'refresh',
-        variant: 'outline',
+        variant: /** @type {const} */ ('outline'),
         onclick: () => { refreshAllData(); }
       }
     ]
