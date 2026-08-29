@@ -13,3 +13,9 @@ public class BatchLotJourneysRequest
 {
     public List<Guid>? LotIds { get; set; } = new();
 }
+
+public record UpdateProductionLotRequest(
+    Guid? ClientId,
+    string? ClientName,
+    DateTime? CreatedAtUtc,
+    string? Remarks = null);

@@ -73,6 +73,22 @@ public class ProductionLot : AggregateRoot<Guid>, ITenantScopedEntity
         return lot;
     }
 
+    public void UpdateDetails(Guid? clientId, string? clientName, DateTime? createdAtUtc, string? remarks = null)
+    {
+        ClientId = clientId.HasValue && clientId.Value != Guid.Empty ? clientId.Value : null;
+        ClientName = string.IsNullOrWhiteSpace(clientName) ? null : clientName.Trim();
+        if (createdAtUtc.HasValue)
+        {
+            CreatedAtUtc = createdAtUtc.Value.Kind == DateTimeKind.Utc
+                ? createdAtUtc.Value
+                : DateTime.SpecifyKind(createdAtUtc.Value, DateTimeKind.Utc);
+        }
+        if (remarks != null)
+        {
+            Remarks = remarks.Trim();
+        }
+    }
+
     public void CompleteLot()
     {
         if (Status != LotStatus.Active)

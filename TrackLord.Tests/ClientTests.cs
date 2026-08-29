@@ -57,4 +57,41 @@ public class ClientTests
         savedMovement!.ClientId.Should().Be(clientId);
         savedMovement.ClientName.Should().Be("Apex Textiles");
     }
+
+    [Fact]
+    public async Task UpdateProductionLot_ShouldUpdateClientAndCreationDate()
+    {
+        // Arrange
+        using var db = TestDbContextFactory.CreateInMemoryDbContext(Guid.NewGuid().ToString());
+        var clientRepo = new ClientRepository(db);
+        var lotRepo = new ProductionLotRepository(db);
+        var stepRepo = new ManufacturingStepRepository(db);
+        var movementRepo = new ManufacturingMovementRepository(db);
+
+        var createClientHandler = new CreateClientCommandHandler(clientRepo);
+        var clientId = await createClientHandler.Handle(new CreateClientCommand("Zara Fashion", "9876543210", "Buyer"), default);
+
+        var step1 = new ManufacturingStep(Guid.NewGuid(), "CUT", "Cutting", 1, Guid.NewGuid());
+        await stepRepo.AddAsync(step1);
+
+        var createLotHandler = new CreateProductionLotCommandHandler(lotRepo, stepRepo, movementRepo, _replayEngine);
+        var lotId = await createLotHandler.Handle(new CreateProductionLotCommand("LOT-EDIT-TEST", Guid.NewGuid(), 100, UnitType.Pieces, step1.Id), default);
+
+        var updateHandler = new UpdateProductionLotCommandHandler(lotRepo, clientRepo);
+
+        // Act - update client and date
+        var newDate = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc);
+        var result = await updateHandler.Handle(new UpdateProductionLotCommand(lotId, clientId, null, newDate, "Updated batch notes"), default);
+
+        // Assert
+        result.Should().BeTrue();
+        var updatedLot = await lotRepo.GetByIdAsync(lotId);
+        updatedLot.Should().NotBeNull();
+        updatedLot!.ClientId.Should().Be(clientId);
+        updatedLot.ClientName.Should().Be("Zara Fashion");
+        updatedLot.CreatedAtUtc.Should().Be(newDate);
+        updatedLot.Remarks.Should().Be("Updated batch notes");
+        updatedLot.LotNumber.Value.Should().Be("LOT-EDIT-TEST"); // immutable lot number preserved
+        updatedLot.InitialQuantity.Value.Should().Be(100); // immutable initial quantity preserved
+    }
 }

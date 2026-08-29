@@ -47,6 +47,23 @@ public class ProductionLotsController : ControllerBase
     }
 
     /// <summary>
+    /// Updates client assignment, created date, and remarks for a production lot.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [RequirePermission(PermissionFeatures.ProductionLots, AccessLevels.Write)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductionLotRequest request)
+    {
+        var command = new UpdateProductionLotCommand(
+            id,
+            request.ClientId,
+            request.ClientName,
+            request.CreatedAtUtc,
+            request.Remarks);
+        await _mediator.Send(command);
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
     /// Imports multiple production lots from a parsed file structure.
     /// </summary>
     [HttpPost("import")]
