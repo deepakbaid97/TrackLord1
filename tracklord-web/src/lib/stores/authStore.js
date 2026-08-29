@@ -14,6 +14,7 @@ function createAuthStore() {
     isAuthenticated: !!initialToken,
     isLoading: false,
     showModal: false,
+    showProfileModal: false,
     error: null
   });
 
@@ -189,6 +190,62 @@ function createAuthStore() {
 
     closeModal() {
       update(s => ({ ...s, showModal: false }));
+    },
+
+    openProfileModal() {
+      update(s => ({ ...s, showProfileModal: true }));
+    },
+
+    closeProfileModal() {
+      update(s => ({ ...s, showProfileModal: false }));
+    },
+
+    /**
+     * Updates current user's profile display name.
+     * @param {string} name
+     */
+    async updateProfileName(name) {
+      const state = get(store);
+      const user = state.user;
+      const token = state.token || this.getToken();
+      if (!user || !user.id || !token) {
+        throw new Error('User is not authenticated.');
+      }
+
+      const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+      const res = await fetch(`${API_BASE}/auth/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: name?.trim() || null,
+          role: user.role,
+          roleId: user.roleId
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update profile name.');
+      }
+
+      const updatedUser = {
+        ...user,
+        name: name?.trim() || null
+      };
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      }
+
+      update(s => ({
+        ...s,
+        user: updatedUser
+      }));
+
+      return updatedUser;
     }
   };
 }

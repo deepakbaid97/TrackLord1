@@ -433,6 +433,7 @@
         </div>
         <span class="material-symbols-outlined text-on-surface-variant text-[18px] group-hover:text-primary transition-colors shrink-0">unfold_more</span>
       </button>
+    </div>
 
     <!-- Right: Desktop Toolbar -->
     <div class="hidden md:flex items-center gap-2">

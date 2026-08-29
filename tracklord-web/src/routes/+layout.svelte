@@ -5,6 +5,7 @@
   import Navbar from '$lib/components/ui/Navbar.svelte';
   import PhoneAuthModal from '$lib/components/ui/PhoneAuthModal.svelte';
   import TenantSettingsModal from '$lib/components/ui/TenantSettingsModal.svelte';
+  import UserProfileModal from '$lib/components/ui/UserProfileModal.svelte';
   import PwaInstallPrompt from '$lib/components/ui/PwaInstallPrompt.svelte';
   import { authStore } from '$lib/stores/authStore.js';
   import { pwaStore } from '$lib/stores/pwaStore.js';
@@ -31,6 +32,9 @@
 
 <!-- Floating Bottom Navbar -->
 <Navbar />
+
+<!-- User Profile Modal -->
+<UserProfileModal />
 
 <!-- Tenant Settings & Feature Configuration Modal -->
 <TenantSettingsModal />
