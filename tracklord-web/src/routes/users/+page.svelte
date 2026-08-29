@@ -31,19 +31,33 @@
   /** @type {any} */
   let editingUser = $state(null);
 
-  usePageHeader(() => ({
-    title: 'User Management',
-    subtitle: 'Access & Operators',
-    icon: 'manage_accounts',
-    actions: [
+  usePageHeader(() => {
+    /** @type {import('$lib/stores/headerStore.js').HeaderAction[]} */
+    const actions = [
       {
         label: 'Refresh',
         icon: 'refresh',
         variant: 'outline',
         onclick: () => refreshUsers()
       }
-    ]
-  }));
+    ];
+
+    if (isAuthenticated) {
+      actions.push({
+        label: 'Log Out',
+        icon: 'logout',
+        variant: 'outline',
+        onclick: () => authStore.logout()
+      });
+    }
+
+    return {
+      title: 'User Management',
+      subtitle: 'Access & Operators',
+      icon: 'manage_accounts',
+      actions
+    };
+  });
 
   onMount(async () => {
     await refreshUsers();
@@ -157,6 +171,16 @@
             <p class="text-[10px] text-on-surface-variant font-mono truncate">{currentUser.phoneNumber} • {currentUser.tenantName || 'Tenant'}</p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onclick={() => authStore.logout()}
+          class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-400 font-semibold text-xs rounded-lg border border-red-200 dark:border-red-800 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+          title="Sign out of your account"
+        >
+          <span class="material-symbols-outlined text-[16px]">logout</span>
+          <span>Log Out</span>
+        </button>
       </div>
     {/if}
 
