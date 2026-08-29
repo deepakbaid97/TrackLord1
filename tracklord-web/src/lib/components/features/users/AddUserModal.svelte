@@ -3,26 +3,62 @@
   import Input from '$lib/components/ui/Input.svelte';
   import Select from '$lib/components/ui/Select.svelte';
   import Button from '$lib/components/ui/Button.svelte';
-  import { createUser } from '$lib/api.js';
+  import { createUser, getRoles } from '$lib/api.js';
 
+  /**
+   * @type {{
+   *   isOpen: boolean,
+   *   availableRoles?: Array<any>,
+   *   onSuccess?: (phone: string) => void,
+   *   onError?: (err: any) => void
+   * }}
+   */
   let {
     isOpen = $bindable(false),
+    availableRoles = [],
     onSuccess,
     onError
   } = $props();
 
   let formName = $state('');
   let formPhone = $state('');
-  let formRole = $state('Operator');
+  let formRoleId = $state('');
   let isSubmitting = $state(false);
   let modalError = $state('');
+  let loadedRoles = $state(/** @type {Array<any>} */ ([]));
 
-  const roleOptions = [
-    { label: 'Operator (View / Move)', value: 'Operator' },
-    { label: 'Supervisor (Reverse / Adjust)', value: 'Supervisor' },
-    { label: 'Manager (Manage / Reports)', value: 'Manager' },
-    { label: 'Admin (Full Tenant Access)', value: 'Admin' }
-  ];
+  const effectiveRoles = $derived(availableRoles.length > 0 ? availableRoles : loadedRoles);
+
+  const roleOptions = $derived(
+    effectiveRoles.length > 0
+      ? effectiveRoles.map(r => ({
+          label: `${r.name}${r.isSystemRole ? ' (System)' : ''}`,
+          value: r.id
+        }))
+      : [
+          { label: 'Operator (View / Move)', value: 'Operator' },
+          { label: 'Supervisor (Reverse / Adjust)', value: 'Supervisor' },
+          { label: 'Manager (Manage / Reports)', value: 'Manager' },
+          { label: 'Admin (Full Tenant Access)', value: 'Admin' }
+        ]
+  );
+
+  $effect(() => {
+    if (isOpen) {
+      if (effectiveRoles.length === 0) {
+        getRoles().then(data => {
+          if (data && data.length > 0) {
+            loadedRoles = data;
+            const op = data.find((r) => r.name?.toLowerCase() === 'operator') || data[0];
+            if (op && !formRoleId) formRoleId = op.id;
+          }
+        }).catch(() => {});
+      } else if (!formRoleId) {
+        const op = effectiveRoles.find((r) => r.name?.toLowerCase() === 'operator') || effectiveRoles[0];
+        if (op) formRoleId = op.id;
+      }
+    }
+  });
 
   /** @param {SubmitEvent} e */
   async function handleSubmit(e) {
@@ -37,17 +73,19 @@
     modalError = '';
     try {
       const fullPhone = `+91${cleanPhone.slice(-10)}`;
+      const selectedRoleObj = effectiveRoles.find(r => r.id === formRoleId);
+
       await createUser({
         phoneNumber: fullPhone,
         name: formName.trim() || null,
-        role: formRole
+        role: selectedRoleObj?.name || 'Operator',
+        roleId: selectedRoleObj?.id || null
       });
 
       isOpen = false;
       const phone = fullPhone;
       formName = '';
       formPhone = '';
-      formRole = 'Operator';
       if (onSuccess) onSuccess(phone);
     } catch (/** @type {any} */ err) {
       modalError = err.message || 'Failed to add user.';
@@ -86,7 +124,7 @@
 
     <Select
       label="Assigned Role"
-      bind:value={formRole}
+      bind:value={formRoleId}
       options={roleOptions}
       icon="admin_panel_settings"
       required={true}

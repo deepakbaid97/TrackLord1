@@ -19,6 +19,7 @@ DECLARE
     v_tenant_id      UUID := gen_random_uuid();
     v_factory_id     UUID := gen_random_uuid();
     v_admin_user_id  UUID := gen_random_uuid();
+    v_admin_role_id  UUID := gen_random_uuid();
     v_now            TIMESTAMP WITH TIME ZONE := NOW();
 BEGIN
     v_tenant_code := UPPER(TRIM(v_tenant_code));
@@ -37,7 +38,15 @@ BEGIN
     INSERT INTO tenants (id, name, code, created_at_utc, is_active)
     VALUES (v_tenant_id, TRIM(v_tenant_name), v_tenant_code, v_now, TRUE);
 
-    -- 3. Insert Initial Manufacturing Steps for Tenant
+    -- 3. Insert Default System Roles for Tenant
+    INSERT INTO roles (id, tenant_id, name, description, is_system_role, is_active, permissions_json, created_at_utc)
+    VALUES 
+        (v_admin_role_id, v_tenant_id, 'Admin', 'Unrestricted administrator access across all features', TRUE, TRUE, '{"production_lots":["read","write","delete"],"movements":["read","write"],"movement_reversals":["write"],"material_lots":["read","write","delete"],"material_consumptions":["read","write"],"rejection_records":["read","write"],"manufacturing_steps":["read","write"],"clients":["read","write"],"users":["read","write"],"roles":["read","write"],"tenant_settings":["read","write"],"dashboard":["read"],"imports":["write"]}', v_now),
+        (gen_random_uuid(), v_tenant_id, 'Supervisor', 'Production oversight, step configuration, and movement reversals', TRUE, TRUE, '{"production_lots":["read","write"],"movements":["read","write"],"movement_reversals":["write"],"material_lots":["read","write"],"material_consumptions":["read","write"],"rejection_records":["read","write"],"manufacturing_steps":["read","write"],"clients":["read","write"],"users":["read"],"dashboard":["read"],"imports":["write"]}', v_now),
+        (gen_random_uuid(), v_tenant_id, 'Manager', 'Plant manager with team and operational oversight', TRUE, TRUE, '{"production_lots":["read","write","delete"],"movements":["read","write"],"movement_reversals":["write"],"material_lots":["read","write"],"material_consumptions":["read","write"],"rejection_records":["read","write"],"manufacturing_steps":["read","write"],"clients":["read","write"],"users":["read","write"],"roles":["read"],"dashboard":["read"],"imports":["write"]}', v_now),
+        (gen_random_uuid(), v_tenant_id, 'Operator', 'Factory floor worker for movements, material logs, and defect reporting', TRUE, TRUE, '{"production_lots":["read"],"movements":["read","write"],"manufacturing_steps":["read"],"clients":["read"],"material_lots":["read"],"material_consumptions":["read","write"],"rejection_records":["read","write"],"dashboard":["read"]}', v_now);
+
+    -- 4. Insert Initial Manufacturing Steps for Tenant
     INSERT INTO manufacturing_steps (id, tenant_id, code, name, sequence_order, is_active, is_terminating, factory_id)
     VALUES 
         (gen_random_uuid(), v_tenant_id, 'CUT',    'Cutting',   1, TRUE, FALSE, v_factory_id),
@@ -46,16 +55,17 @@ BEGIN
         (gen_random_uuid(), v_tenant_id, 'FIN',    'Finishing', 4, TRUE, FALSE, v_factory_id),
         (gen_random_uuid(), v_tenant_id, 'PACK',   'Packing',   5, TRUE, TRUE,  v_factory_id);
 
-    -- 4. Insert Primary Admin User for Tenant
-    INSERT INTO users (id, tenant_id, phone_number, name, role, created_at_utc, is_active)
-    VALUES (v_admin_user_id, v_tenant_id, TRIM(v_admin_phone), TRIM(v_admin_name), TRIM(v_admin_role), v_now, TRUE)
+    -- 5. Insert Primary Admin User for Tenant
+    INSERT INTO users (id, tenant_id, phone_number, name, role, role_id, created_at_utc, is_active)
+    VALUES (v_admin_user_id, v_tenant_id, TRIM(v_admin_phone), TRIM(v_admin_name), TRIM(v_admin_role), v_admin_role_id, v_now, TRUE)
     ON CONFLICT (tenant_id, phone_number) DO UPDATE 
-        SET name = EXCLUDED.name, role = EXCLUDED.role, is_active = TRUE;
+        SET name = EXCLUDED.name, role = EXCLUDED.role, role_id = EXCLUDED.role_id, is_active = TRUE;
 
     RAISE NOTICE 'SUCCESS: Tenant "%" created successfully.', v_tenant_name;
     RAISE NOTICE '  - Tenant ID  : %', v_tenant_id;
     RAISE NOTICE '  - Tenant Code: %', v_tenant_code;
     RAISE NOTICE '  - Admin User : % (%)', v_admin_name, v_admin_phone;
+    RAISE NOTICE '  - System Roles Created: Admin, Supervisor, Manager, Operator';
     RAISE NOTICE '  - Initial Steps Created: CUT, STITCH, WASH, FIN, PACK';
     RAISE NOTICE '------------------------------------------------------------';
 
@@ -63,3 +73,4 @@ EXCEPTION
     WHEN OTHERS THEN
         RAISE EXCEPTION 'Failed to create tenant: %', SQLERRM;
 END $$;
+

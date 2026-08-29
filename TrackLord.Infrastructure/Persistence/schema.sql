@@ -132,12 +132,25 @@ CREATE INDEX IF NOT EXISTS ix_material_consumptions_mat_lot
 CREATE INDEX IF NOT EXISTS ix_rejection_records_prod_lot 
     ON rejection_records (tenant_id, production_lot_id);
 
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    is_system_role BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    permissions_json TEXT NOT NULL DEFAULT '{}',
+    created_at_utc TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT uq_roles_tenant_name UNIQUE (tenant_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     phone_number VARCHAR(50) NOT NULL,
     name VARCHAR(150),
     role VARCHAR(50) NOT NULL DEFAULT 'Operator',
+    role_id UUID REFERENCES roles(id),
     firebase_uid VARCHAR(128),
     created_at_utc TIMESTAMP WITH TIME ZONE NOT NULL,
     last_login_at_utc TIMESTAMP WITH TIME ZONE,
@@ -147,3 +160,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS ix_users_phone_number ON users (phone_number);
 CREATE INDEX IF NOT EXISTS ix_users_firebase_uid ON users (firebase_uid);
+CREATE INDEX IF NOT EXISTS ix_users_role_id ON users (role_id);
+CREATE INDEX IF NOT EXISTS ix_roles_tenant_id ON roles (tenant_id);
+

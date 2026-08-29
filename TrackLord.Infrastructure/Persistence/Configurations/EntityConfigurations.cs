@@ -5,6 +5,7 @@ using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
+using TrackLord.Domain.Aggregates.RoleAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
@@ -253,6 +254,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PhoneNumber).HasColumnName("phone_number").HasMaxLength(50).IsRequired();
         builder.Property(u => u.Name).HasColumnName("name").HasMaxLength(150);
         builder.Property(u => u.Role).HasColumnName("role").HasMaxLength(50).IsRequired().HasDefaultValue("Operator");
+        builder.Property(u => u.RoleId).HasColumnName("role_id");
         builder.Property(u => u.FirebaseUid).HasColumnName("firebase_uid").HasMaxLength(128);
         builder.Property(u => u.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(u => u.LastLoginAtUtc).HasColumnName("last_login_at_utc");
@@ -260,7 +262,30 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => new { u.TenantId, u.PhoneNumber }).IsUnique();
         builder.HasIndex(u => u.FirebaseUid);
+        builder.HasIndex(u => u.RoleId);
     }
 }
+
+public class RoleConfiguration : IEntityTypeConfiguration<Role>
+{
+    public void Configure(EntityTypeBuilder<Role> builder)
+    {
+        builder.ToTable("roles");
+
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).HasColumnName("id");
+
+        builder.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(r => r.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+        builder.Property(r => r.Description).HasColumnName("description").HasMaxLength(500);
+        builder.Property(r => r.IsSystemRole).HasColumnName("is_system_role").IsRequired().HasDefaultValue(false);
+        builder.Property(r => r.IsActive).HasColumnName("is_active").IsRequired().HasDefaultValue(true);
+        builder.Property(r => r.PermissionsJson).HasColumnName("permissions_json").IsRequired().HasDefaultValue("{}");
+        builder.Property(r => r.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
+    }
+}
+
 
 

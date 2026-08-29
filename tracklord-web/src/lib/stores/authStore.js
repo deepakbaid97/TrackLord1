@@ -55,6 +55,8 @@ function createAuthStore() {
             phoneNumber: data.phoneNumber,
             name: data.name,
             role: data.role,
+            roleId: data.roleId,
+            permissions: data.permissions || {},
             tenantSettings: data.tenantSettings
           };
           localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -160,6 +162,25 @@ function createAuthStore() {
     getTenantId() {
       const state = get(store);
       return state.user?.tenantId || null;
+    },
+
+    /**
+     * Directly sets user and token state (e.g. after profile updates or during testing).
+     * @param {any} user
+     * @param {string | null} [token]
+     */
+    setUser(user, token = null) {
+      const activeToken = token || this.getToken();
+      if (typeof window !== 'undefined') {
+        if (activeToken) localStorage.setItem(TOKEN_KEY, activeToken);
+        if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+      }
+      update(s => ({
+        ...s,
+        token: activeToken,
+        user,
+        isAuthenticated: !!activeToken && !!user
+      }));
     },
 
     openModal() {

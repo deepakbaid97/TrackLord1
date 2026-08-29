@@ -9,6 +9,7 @@ using TrackLord.Domain.Aggregates.ConsumptionAggregate;
 using TrackLord.Domain.Aggregates.MaterialLotAggregate;
 using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Aggregates.ProductionLotAggregate;
+using TrackLord.Domain.Aggregates.RoleAggregate;
 using TrackLord.Domain.Aggregates.StepAggregate;
 using TrackLord.Domain.Aggregates.UserAggregate;
 using TrackLord.Domain.Entities;
@@ -463,5 +464,73 @@ public class UserRepository : IUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
+
+public class RoleRepository : IRoleRepository
+{
+    private readonly TrackLordDbContext _dbContext;
+
+    public RoleRepository(TrackLordDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Role?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Roles.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+    }
+
+    public async Task<Role?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        var targetName = name.Trim();
+        return await _dbContext.Roles.FirstOrDefaultAsync(r => r.Name.ToLower() == targetName.ToLower(), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Role>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Roles
+            .AsNoTracking()
+            .OrderByDescending(r => r.IsSystemRole)
+            .ThenBy(r => r.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(Role role, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Roles.AddAsync(role, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Roles.AddRangeAsync(roles, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(Role role, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Roles.Update(role);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(Role role, CancellationToken cancellationToken = default)
+    {
+        var tracked = _dbContext.Roles.Local.FirstOrDefault(x => x.Id == role.Id);
+        if (tracked is not null)
+        {
+            _dbContext.Roles.Remove(tracked);
+        }
+        else
+        {
+            _dbContext.Roles.Remove(role);
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasUsersAssignedAsync(Guid roleId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users.AnyAsync(u => u.RoleId == roleId && u.IsActive, cancellationToken);
+    }
+}
+
 
 

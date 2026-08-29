@@ -2,10 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import MovementLedger from './MovementLedger.svelte';
 import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+import { authStore } from '$lib/stores/authStore.js';
 
 describe('MovementLedger component', () => {
   beforeEach(() => {
     tenantConfigStore.resetToDefaults();
+    authStore.setUser({
+      id: 'admin-1',
+      name: 'Admin User',
+      role: 'Admin',
+      permissions: { movement_reversals: ['write'] }
+    }, 'test-token');
   });
 
   it('renders empty state when movements list is empty', () => {

@@ -11,6 +11,7 @@ public class User : AggregateRoot<Guid>, ITenantScopedEntity
     public string PhoneNumber { get; private set; } = default!;
     public string? Name { get; private set; }
     public string Role { get; private set; } = "Operator";
+    public Guid? RoleId { get; private set; }
     public string? FirebaseUid { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? LastLoginAtUtc { get; private set; }
@@ -18,7 +19,15 @@ public class User : AggregateRoot<Guid>, ITenantScopedEntity
 
     private User() { } // EF Core constructor
 
-    public User(Guid id, string phoneNumber, string? name = null, string role = "Operator", string? firebaseUid = null, DateTime? createdAtUtc = null, Guid? tenantId = null)
+    public User(
+        Guid id,
+        string phoneNumber,
+        string? name = null,
+        string role = "Operator",
+        string? firebaseUid = null,
+        DateTime? createdAtUtc = null,
+        Guid? tenantId = null,
+        Guid? roleId = null)
     {
         if (id == Guid.Empty) throw new DomainException("User Id cannot be empty.");
         if (string.IsNullOrWhiteSpace(phoneNumber)) throw new DomainException("User phone number is required.");
@@ -28,19 +37,33 @@ public class User : AggregateRoot<Guid>, ITenantScopedEntity
         PhoneNumber = phoneNumber.Trim();
         Name = name?.Trim();
         Role = string.IsNullOrWhiteSpace(role) ? "Operator" : role.Trim();
+        RoleId = roleId;
         FirebaseUid = firebaseUid?.Trim();
         CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow;
         LastLoginAtUtc = DateTime.UtcNow;
         IsActive = true;
     }
 
-    public void UpdateProfile(string? name, string role)
+    public void UpdateProfile(string? name, string role, Guid? roleId = null)
     {
         Name = name?.Trim();
         if (!string.IsNullOrWhiteSpace(role))
         {
             Role = role.Trim();
         }
+        if (roleId.HasValue)
+        {
+            RoleId = roleId.Value;
+        }
+    }
+
+    public void AssignRole(Guid roleId, string roleName)
+    {
+        if (roleId == Guid.Empty) throw new DomainException("Role Id cannot be empty.");
+        if (string.IsNullOrWhiteSpace(roleName)) throw new DomainException("Role name is required.");
+
+        RoleId = roleId;
+        Role = roleName.Trim();
     }
 
     public void SetFirebaseUid(string firebaseUid)

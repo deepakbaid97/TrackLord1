@@ -5,9 +5,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.Authorization;
 using TrackLord.Domain.Aggregates.TenantAggregate;
 using TrackLord.Domain.Common;
 using TrackLord.Domain.Repositories;
+using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Api.Controllers;
 
@@ -72,6 +74,7 @@ public class TenantsController : ControllerBase
     /// </summary>
     [HttpGet("current/settings")]
     [Authorize]
+    [RequirePermission(PermissionFeatures.TenantSettings, AccessLevels.Read)]
     public async Task<IActionResult> GetCurrentTenantSettings()
     {
         var tenantId = _tenantContext.TenantId;
@@ -97,6 +100,7 @@ public class TenantsController : ControllerBase
     /// </summary>
     [HttpPut("current/settings")]
     [Authorize]
+    [RequirePermission(PermissionFeatures.TenantSettings, AccessLevels.Write)]
     public async Task<IActionResult> UpdateCurrentTenantSettings([FromBody] UpdateTenantSettingsRequest request)
     {
         var tenantId = _tenantContext.TenantId;

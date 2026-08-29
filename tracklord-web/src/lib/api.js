@@ -220,6 +220,22 @@ export async function createProductionLot(data) {
   return result;
 }
 
+// 7b. Update Production Lot (Client, Creation Date, Remarks)
+/**
+ * @param {string} id
+ * @param {any} data
+ */
+export async function updateProductionLot(id, data) {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
+}
+
 // 7b. Import Production Lots
 /** @param {any} data */
 export async function importProductionLots(data) {
@@ -467,3 +483,79 @@ export async function getBatchLotJourneys(lotIds) {
     return fallbackMap;
   }
 }
+
+// ─── Role & Permission Management (RBAC) ──────────────────────────────────────
+const CK_ROLES = 'roles';
+
+// 23. Fetch All Roles in Current Tenant (cached 30s)
+export async function getRoles() {
+  return cachedFetch(CK_ROLES, async () => {
+    const response = await authFetch(`${API_BASE_URL}/Roles`);
+    return await handleResponse(response);
+  }, 30_000);
+}
+
+// 24. Fetch Specific Role Details by ID
+/** @param {string} roleId */
+export async function getRoleById(roleId) {
+  const response = await authFetch(`${API_BASE_URL}/Roles/${roleId}`);
+  return await handleResponse(response);
+}
+
+// 25. Create New Custom Role
+/** @param {{ name: string, description?: string, permissionsJson?: string }} data */
+export async function createRole(data) {
+  const response = await authFetch(`${API_BASE_URL}/Roles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  invalidateCache(CK_ROLES);
+  return result;
+}
+
+// 26. Update Role Details & Permissions
+/**
+ * @param {string} roleId
+ * @param {{ name: string, description?: string, permissionsJson?: string, isActive?: boolean }} data
+ */
+export async function updateRole(roleId, data) {
+  const response = await authFetch(`${API_BASE_URL}/Roles/${roleId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  invalidateCache(CK_ROLES);
+  return result;
+}
+
+// 27. Delete Custom Role
+/** @param {string} roleId */
+export async function deleteRole(roleId) {
+  const response = await authFetch(`${API_BASE_URL}/Roles/${roleId}`, {
+    method: 'DELETE'
+  });
+  const result = await handleResponse(response);
+  invalidateCache(CK_ROLES);
+  return result;
+}
+
+// 28. Get System Permission Features Catalog
+export async function getPermissionCatalog() {
+  const response = await authFetch(`${API_BASE_URL}/Roles/permissions/catalog`);
+  return await handleResponse(response);
+}
+
+// 29. Assign Role to User
+/** @param {string} userId @param {string} roleId */
+export async function assignRole(userId, roleId) {
+  const response = await authFetch(`${API_BASE_URL}/Roles/assign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, roleId })
+  });
+  return await handleResponse(response);
+}
+

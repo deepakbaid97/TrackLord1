@@ -1,9 +1,13 @@
+using System;
+using System.Threading.Tasks;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrackLord.Api.Authorization;
 using TrackLord.Api.DTOs;
 using TrackLord.Application.Commands;
 using TrackLord.Application.Queries;
+using TrackLord.Domain.ValueObjects;
 
 namespace TrackLord.Api.Controllers;
 
@@ -21,8 +25,10 @@ public class ManufacturingStepsController : ControllerBase
 
     /// <summary>
     /// Gets all manufacturing steps.
+    /// Accessible to any role that can view steps, movements, or production lots.
     /// </summary>
     [HttpGet]
+    [RequirePermission(new[] { PermissionFeatures.ManufacturingSteps, PermissionFeatures.Movements, PermissionFeatures.ProductionLots }, AccessLevels.Read)]
     public async Task<IActionResult> GetAll()
     {
         var steps = await _mediator.Send(new GetAllManufacturingStepsQuery());
@@ -33,6 +39,7 @@ public class ManufacturingStepsController : ControllerBase
     /// Creates a new manufacturing step.
     /// </summary>
     [HttpPost]
+    [RequirePermission(PermissionFeatures.ManufacturingSteps, AccessLevels.Write)]
     public async Task<IActionResult> Create([FromBody] CreateManufacturingStepCommand command)
     {
         var id = await _mediator.Send(command);
@@ -43,6 +50,7 @@ public class ManufacturingStepsController : ControllerBase
     /// Updates an existing manufacturing step.
     /// </summary>
     [HttpPut("{id:guid}")]
+    [RequirePermission(PermissionFeatures.ManufacturingSteps, AccessLevels.Write)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateManufacturingStepRequest request)
     {
         var command = new UpdateManufacturingStepCommand(
@@ -59,6 +67,7 @@ public class ManufacturingStepsController : ControllerBase
     /// Reorders manufacturing steps.
     /// </summary>
     [HttpPut("reorder")]
+    [RequirePermission(PermissionFeatures.ManufacturingSteps, AccessLevels.Write)]
     public async Task<IActionResult> Reorder([FromBody] ReorderManufacturingStepsRequest request)
     {
         var command = new ReorderManufacturingStepsCommand(request.Steps);

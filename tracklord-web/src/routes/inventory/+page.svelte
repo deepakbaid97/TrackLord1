@@ -9,6 +9,7 @@
   // Feature Components
   import LotPickerModal from '$lib/components/features/lots/LotPickerModal.svelte';
   import CreateLotModal from '$lib/components/features/lots/CreateLotModal.svelte';
+  import EditLotModal from '$lib/components/features/lots/EditLotModal.svelte';
   import MoveLotModal from '$lib/components/features/lots/MoveLotModal.svelte';
   import RejectItemsModal from '$lib/components/features/lots/RejectItemsModal.svelte';
   import ReverseMovementModal from '$lib/components/features/lots/ReverseMovementModal.svelte';
@@ -21,6 +22,8 @@
   import MaterialTraceability from '$lib/components/features/inventory/MaterialTraceability.svelte';
 
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+  import { permissionStore } from '$lib/stores/permissionStore.js';
+  import PermissionGate from '$lib/components/ui/PermissionGate.svelte';
   import { STEP_ICON_MAP } from '$lib/services/lotService.js';
   import { usePageHeader } from '$lib/utils/usePageHeader.js';
 
@@ -60,6 +63,7 @@
   // Modals Visibility State
   let isLotPickerModalOpen = $state(false);
   let isCreateLotModalOpen = $state(false);
+  let isEditLotModalOpen = $state(false);
   let isMoveModalOpen = $state(false);
   let isCreateMaterialModalOpen = $state(false);
   let isConsumeMaterialModalOpen = $state(false);
@@ -78,73 +82,96 @@
 
   let selectedLotObj = $derived(productionLots.find(l => l.id === selectedLotId));
 
-  usePageHeader(() => ({
-    title: 'Lot Inventory',
-    subtitle: selectedLotObj ? `${selectedLotObj.lotNumber} • ${selectedLotObj.clientName || 'Live WIP'}` : 'Live Production WIP',
-    icon: 'inventory_2',
-    actions: [
-      {
+  usePageHeader(() => {
+    /** @type {any[]} */
+    const dropdownItems = [];
+
+    if ($permissionStore.can('movements', 'write')) {
+      dropdownItems.push({
+        label: 'Move Qty',
+        icon: 'move_item',
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          openMoveModal('');
+        }
+      });
+    }
+
+    if ($permissionStore.can('production_lots', 'write')) {
+      dropdownItems.push({
+        label: 'New Lot',
+        icon: 'add',
+        onclick: () => { isCreateLotModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('material_lots', 'write')) {
+      dropdownItems.push({
+        label: 'Material',
+        icon: 'inventory',
+        onclick: () => { isCreateMaterialModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('material_consumptions', 'write')) {
+      dropdownItems.push({
+        label: 'Consume',
+        icon: 'local_mall',
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          isConsumeMaterialModalOpen = true;
+        }
+      });
+    }
+
+    if ($permissionStore.can('rejection_records', 'write')) {
+      dropdownItems.push({
+        label: 'Rejection',
+        icon: 'report_problem',
+        danger: true,
+        onclick: () => {
+          if (!selectedLotId) {
+            errorMessage = 'Please select a production lot first.';
+            isLotPickerModalOpen = true;
+            return;
+          }
+          isRejectModalOpen = true;
+        }
+      });
+    }
+
+    const actions = [];
+    if (dropdownItems.length > 0) {
+      actions.push({
         label: 'Actions',
         icon: 'bolt',
         variant: /** @type {const} */ ('primary'),
-        dropdownItems: [
-          {
-            label: 'Move Qty',
-            icon: 'move_item',
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              openMoveModal('');
-            }
-          },
-          {
-            label: 'New Lot',
-            icon: 'add',
-            onclick: () => { isCreateLotModalOpen = true; }
-          },
-          {
-            label: 'Material',
-            icon: 'inventory',
-            onclick: () => { isCreateMaterialModalOpen = true; }
-          },
-          {
-            label: 'Consume',
-            icon: 'local_mall',
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              isConsumeMaterialModalOpen = true;
-            }
-          },
-          {
-            label: 'Rejection',
-            icon: 'report_problem',
-            danger: true,
-            onclick: () => {
-              if (!selectedLotId) {
-                errorMessage = 'Please select a production lot first.';
-                isLotPickerModalOpen = true;
-                return;
-              }
-              isRejectModalOpen = true;
-            }
-          }
-        ]
-      },
-      {
-        label: 'Refresh',
-        icon: 'refresh',
-        variant: /** @type {const} */ ('outline'),
-        onclick: () => { refreshAllData(); }
-      }
-    ]
-  }));
+        dropdownItems
+      });
+    }
+
+    actions.push({
+      label: 'Refresh',
+      icon: 'refresh',
+      variant: /** @type {const} */ ('outline'),
+      onclick: () => { refreshAllData(); }
+    });
+
+    return {
+      title: 'Lot Inventory',
+      subtitle: selectedLotObj ? `${selectedLotObj.lotNumber} • ${selectedLotObj.clientName || 'Live WIP'}` : 'Live Production WIP',
+      icon: 'inventory_2',
+      actions
+    };
+  });
 
   let lastUrlLotParam = '';
   $effect(() => {
@@ -388,9 +415,14 @@
         <div class="flex items-center gap-2 truncate">
           <span class="material-symbols-outlined text-primary text-[20px] shrink-0">inventory_2</span>
           {#if selectedLotObj}
-            <div class="truncate">
+            <div class="truncate flex items-center gap-1.5">
               <span class="font-bold text-sm text-on-surface tracking-tight font-mono">{selectedLotObj.lotNumber}</span>
-              <span class="text-xs text-on-surface-variant ml-1.5 font-mono">({selectedLotObj.initialQuantity} Pcs)</span>
+              {#if $tenantConfigStore.clientMode === 'lot' && (selectedLotObj.clientName || currentLotJourney?.clientName)}
+                <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-surface-container text-on-surface border border-outline-variant/60 font-mono truncate max-w-[130px]">
+                  {selectedLotObj.clientName || currentLotJourney?.clientName}
+                </span>
+              {/if}
+              <span class="text-xs text-on-surface-variant font-mono">({selectedLotObj.initialQuantity} Pcs)</span>
             </div>
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary shrink-0">
               {selectedLotObj.status}
@@ -401,16 +433,6 @@
         </div>
         <span class="material-symbols-outlined text-on-surface-variant text-[18px] group-hover:text-primary transition-colors shrink-0">unfold_more</span>
       </button>
-
-      <button
-        type="button"
-        onclick={() => refreshAllData()}
-        title="Refresh Live Data"
-        class="p-2 rounded-xl border border-outline-variant/80 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-      >
-        <span class="material-symbols-outlined text-[18px]">refresh</span>
-      </button>
-    </div>
 
     <!-- Right: Desktop Toolbar -->
     <div class="hidden md:flex items-center gap-2">
@@ -460,37 +482,94 @@
     {#if currentLotJourney}
       <!-- Compact Lot Summary Card -->
       <section class="bg-surface p-3.5 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
-        <div class="flex items-center justify-between gap-2 flex-wrap">
-          <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
             <h1 class="text-xl sm:text-2xl text-primary font-bold tracking-tight font-mono">{currentLotJourney.lotNumber}</h1>
             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
               {currentLotJourney.status}
             </span>
-            {#if currentLotJourney.clientName}
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface flex items-center gap-1 border border-outline-variant/50">
-                <span class="material-symbols-outlined text-[13px] text-primary">badge</span>
-                {currentLotJourney.clientName}
-              </span>
-            {/if}
           </div>
 
-          <button
-            type="button"
-            onclick={handleDeleteLot}
-            title="Delete Production Lot"
-            class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
-          >
-            <span class="material-symbols-outlined text-[14px]">delete</span>
-            <span class="hidden sm:inline">Delete Lot</span>
-          </button>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <PermissionGate feature="production_lots" access="write">
+              <button
+                type="button"
+                onclick={() => isEditLotModalOpen = true}
+                title="Edit Production Lot (Client & Date)"
+                class="px-2 sm:px-2.5 py-1 text-xs text-primary hover:bg-primary/10 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-primary/20 bg-primary/5"
+              >
+                <span class="material-symbols-outlined text-[15px]">edit</span>
+                <span class="hidden sm:inline">Edit</span>
+              </button>
+            </PermissionGate>
+
+            <PermissionGate feature="production_lots" access="delete">
+              <button
+                type="button"
+                onclick={handleDeleteLot}
+                title="Delete Production Lot"
+                class="px-2 sm:px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
+              >
+                <span class="material-symbols-outlined text-[15px]">delete</span>
+                <span class="hidden sm:inline">Delete</span>
+              </button>
+            </PermissionGate>
+          </div>
         </div>
 
-        <!-- 3-Metric Clean Strip -->
-        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/50 font-mono text-center">
+        <!-- Mobile Metrics Layout: Unified Hero Banner (<sm) -->
+        <div class="sm:hidden flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-outline-variant/60 gap-3 font-mono">
+          <!-- Hero WIP Metric -->
+          <div class="flex flex-col shrink-0">
+            <span class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Total WIP</span>
+            <span class="text-xl font-bold text-primary mt-0.5 leading-tight">
+              {totalLotWip} <span class="text-xs font-normal">Pcs</span>
+            </span>
+          </div>
+
+          <!-- Divider -->
+          <div class="w-px h-11 bg-outline-variant/70 shrink-0"></div>
+
+          <!-- Metadata Rows (Client, Stage, Date) -->
+          <div class="flex flex-col justify-center gap-1 min-w-0 flex-1 text-xs">
+            {#if $tenantConfigStore.clientMode === 'lot' && currentLotJourney.clientName}
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="material-symbols-outlined text-[13px] text-primary shrink-0">badge</span>
+                <span class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold shrink-0">Client:</span>
+                <span class="font-bold text-on-surface truncate text-[11px]">
+                  {currentLotJourney.clientName}
+                </span>
+              </div>
+            {/if}
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="material-symbols-outlined text-[13px] text-on-surface-variant shrink-0">alt_route</span>
+              <span class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold shrink-0">Stage:</span>
+              <span class="font-semibold text-on-surface truncate text-[11px]">
+                {currentActiveStepName}
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 text-on-surface-variant text-[11px] truncate">
+              <span class="material-symbols-outlined text-[13px] shrink-0">calendar_today</span>
+              <span class="text-[10px] uppercase font-sans font-semibold shrink-0">Created:</span>
+              <span class="font-medium text-on-surface">{new Date(currentLotJourney.createdAtUtc).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desktop Metric Clean Strip (>=sm) -->
+        <div class="hidden sm:grid {$tenantConfigStore.clientMode === 'lot' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2 pt-2 border-t border-outline-variant/50 font-mono text-center">
           <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
             <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Total WIP</div>
             <div class="text-base sm:text-lg font-bold text-primary mt-0.5">{totalLotWip} <span class="text-xs font-normal">Pcs</span></div>
           </div>
+          {#if $tenantConfigStore.clientMode === 'lot'}
+            <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
+              <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Client</div>
+              <div class="text-xs sm:text-sm font-bold text-on-surface truncate mt-1" title={currentLotJourney?.clientName || '—'}>
+                {currentLotJourney?.clientName || '—'}
+              </div>
+            </div>
+          {/if}
           <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
             <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Current Stage</div>
             <div class="text-xs sm:text-sm font-bold text-on-surface truncate mt-1">{currentActiveStepName}</div>
@@ -643,4 +722,18 @@
   onError={(err) => {
     errorMessage = err.message || 'Failed to create client.';
   }}
+/>
+
+<EditLotModal
+  bind:isOpen={isEditLotModalOpen}
+  lot={currentLotJourney ? { ...currentLotJourney, id: selectedLotId || currentLotJourney.lotId || currentLotJourney.id, initialQuantity: selectedLotObj?.initialQuantity } : selectedLotObj}
+  {clients}
+  onSuccess={async (updatedLot) => {
+    successMessage = `Production Lot '${updatedLot?.lotNumber || ''}' updated successfully!`;
+    await refreshAllData();
+  }}
+  onError={(err) => {
+    errorMessage = err.message || 'Failed to update production lot.';
+  }}
+  onCreateClientClick={() => isCreateClientModalOpen = true}
 />

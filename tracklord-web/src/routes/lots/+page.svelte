@@ -63,35 +63,48 @@
     customEndDate = '';
   }
 
-  usePageHeader(() => ({
-    title: 'Production Lots',
-    subtitle: 'Directory & Batches',
-    icon: 'reorder',
-    actions: [
-      {
-        label: 'Actions',
-        icon: 'bolt',
-        variant: 'primary',
-        dropdownItems: [
-          {
-            label: 'New Production Lot',
-            icon: 'add_circle',
-            onclick: () => { isCreateLotModalOpen = true; }
-          },
-          {
-            label: 'Import Lots (Excel/CSV)',
-            icon: 'file_upload',
-            onclick: () => { isImportModalOpen = true; }
-          },
-          {
-            label: 'Refresh Lots Data',
-            icon: 'refresh',
-            onclick: () => { refreshData(); }
-          }
-        ]
-      }
-    ]
-  }));
+  import { permissionStore } from '$lib/stores/permissionStore.js';
+
+  usePageHeader(() => {
+    /** @type {any[]} */
+    const dropdownItems = [];
+
+    if ($permissionStore.can('production_lots', 'write')) {
+      dropdownItems.push({
+        label: 'New Production Lot',
+        icon: 'add_circle',
+        onclick: () => { isCreateLotModalOpen = true; }
+      });
+    }
+
+    if ($permissionStore.can('imports', 'write')) {
+      dropdownItems.push({
+        label: 'Import Lots (Excel/CSV)',
+        icon: 'file_upload',
+        onclick: () => { isImportModalOpen = true; }
+      });
+    }
+
+    dropdownItems.push({
+      label: 'Refresh Lots Data',
+      icon: 'refresh',
+      onclick: () => { refreshData(); }
+    });
+
+    return {
+      title: 'Production Lots',
+      subtitle: 'Directory & Batches',
+      icon: 'reorder',
+      actions: [
+        {
+          label: 'Actions',
+          icon: 'bolt',
+          variant: 'primary',
+          dropdownItems
+        }
+      ]
+    };
+  });
 
   onMount(async () => {
     const urlParams = $page.url.searchParams;
@@ -439,6 +452,9 @@
           <thead>
             <tr class="bg-surface-container-low border-b border-outline-variant text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
               <th class="px-4 py-3">Lot Number</th>
+              {#if $tenantConfigStore.clientMode === 'lot'}
+                <th class="px-4 py-3">Client</th>
+              {/if}
               <th class="px-4 py-3 text-right">Current Quantity</th>
               <th class="px-4 py-3">Active Steps & WIP</th>
               <th class="px-4 py-3">Created Date</th>
@@ -458,6 +474,23 @@
                     {lot.lotNumber}
                   </div>
                 </td>
+                {#if $tenantConfigStore.clientMode === 'lot'}
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    {#if lot.clientNamesDisplay && lot.clientNamesDisplay !== 'Unassigned'}
+                      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-container text-on-surface flex items-center gap-1 border border-outline-variant/50 w-fit">
+                        <span class="material-symbols-outlined text-[13px] text-primary">badge</span>
+                        {lot.clientNamesDisplay}
+                      </span>
+                    {:else if lot.clientName}
+                      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-container text-on-surface flex items-center gap-1 border border-outline-variant/50 w-fit">
+                        <span class="material-symbols-outlined text-[13px] text-primary">badge</span>
+                        {lot.clientName}
+                      </span>
+                    {:else}
+                      <span class="text-xs text-on-surface-variant font-mono">—</span>
+                    {/if}
+                  </td>
+                {/if}
                 <td class="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-primary">
                   {(selectedStepId !== 'ALL' ? (lot.activeSteps.find(s => s.stepId === selectedStepId)?.quantity ?? 0) : lot.totalWipQty).toLocaleString()} Pcs
                 </td>
@@ -496,7 +529,7 @@
             {/each}
             {#if filteredLots.length === 0}
               <tr>
-                <td colspan="5" class="px-4 py-12 text-center text-on-surface-variant">
+                <td colspan={$tenantConfigStore.clientMode === 'lot' ? 6 : 5} class="px-4 py-12 text-center text-on-surface-variant">
                   <EmptyState icon="filter_alt_off" title="No matching production lots found" message="Try adjusting the search query or filters above." />
                 </td>
               </tr>

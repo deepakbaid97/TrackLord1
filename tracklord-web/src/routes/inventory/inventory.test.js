@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import InventoryPage from './+page.svelte';
 import { headerStore } from '$lib/stores/headerStore.js';
+import { authStore } from '$lib/stores/authStore.js';
 import * as api from '$lib/api.js';
 
 vi.mock('$app/stores', () => {
@@ -61,6 +62,11 @@ describe('Inventory Page Header Actions', () => {
 
   beforeEach(() => {
     headerStore.reset();
+    authStore.setUser({
+      id: 'admin-1',
+      name: 'Admin User',
+      role: 'Admin'
+    }, 'test-token');
     vi.clearAllMocks();
 
     vi.mocked(api.getManufacturingSteps).mockResolvedValue(mockSteps);
