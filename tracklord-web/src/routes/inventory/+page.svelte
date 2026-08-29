@@ -434,16 +434,6 @@
         <span class="material-symbols-outlined text-on-surface-variant text-[18px] group-hover:text-primary transition-colors shrink-0">unfold_more</span>
       </button>
 
-      <button
-        type="button"
-        onclick={() => refreshAllData()}
-        title="Refresh Live Data"
-        class="p-2 rounded-xl border border-outline-variant/80 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-      >
-        <span class="material-symbols-outlined text-[18px]">refresh</span>
-      </button>
-    </div>
-
     <!-- Right: Desktop Toolbar -->
     <div class="hidden md:flex items-center gap-2">
       <Button variant="primary" icon="move_item" disabled={!selectedLotId} onclick={() => openMoveModal('')}>
