@@ -220,6 +220,22 @@ export async function createProductionLot(data) {
   return result;
 }
 
+// 7b. Update Production Lot (Client, Creation Date, Remarks)
+/**
+ * @param {string} id
+ * @param {any} data
+ */
+export async function updateProductionLot(id, data) {
+  const response = await authFetch(`${API_BASE_URL}/ProductionLots/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  invalidateCache(CK_LOTS);
+  return result;
+}
+
 // 7b. Import Production Lots
 /** @param {any} data */
 export async function importProductionLots(data) {

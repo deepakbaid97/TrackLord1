@@ -9,6 +9,7 @@
   // Feature Components
   import LotPickerModal from '$lib/components/features/lots/LotPickerModal.svelte';
   import CreateLotModal from '$lib/components/features/lots/CreateLotModal.svelte';
+  import EditLotModal from '$lib/components/features/lots/EditLotModal.svelte';
   import MoveLotModal from '$lib/components/features/lots/MoveLotModal.svelte';
   import RejectItemsModal from '$lib/components/features/lots/RejectItemsModal.svelte';
   import ReverseMovementModal from '$lib/components/features/lots/ReverseMovementModal.svelte';
@@ -62,6 +63,7 @@
   // Modals Visibility State
   let isLotPickerModalOpen = $state(false);
   let isCreateLotModalOpen = $state(false);
+  let isEditLotModalOpen = $state(false);
   let isMoveModalOpen = $state(false);
   let isCreateMaterialModalOpen = $state(false);
   let isConsumeMaterialModalOpen = $state(false);
@@ -504,17 +506,31 @@
             {/if}
           </div>
 
-          <PermissionGate feature="production_lots" access="delete">
-            <button
-              type="button"
-              onclick={handleDeleteLot}
-              title="Delete Production Lot"
-              class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
-            >
-              <span class="material-symbols-outlined text-[14px]">delete</span>
-              <span class="hidden sm:inline">Delete Lot</span>
-            </button>
-          </PermissionGate>
+          <div class="flex items-center gap-2">
+            <PermissionGate feature="production_lots" access="write">
+              <button
+                type="button"
+                onclick={() => isEditLotModalOpen = true}
+                title="Edit Production Lot (Client & Date)"
+                class="px-2.5 py-1 text-xs text-primary hover:bg-primary/10 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-primary/20 bg-primary/5"
+              >
+                <span class="material-symbols-outlined text-[14px]">edit</span>
+                <span class="hidden sm:inline">Edit Lot</span>
+              </button>
+            </PermissionGate>
+
+            <PermissionGate feature="production_lots" access="delete">
+              <button
+                type="button"
+                onclick={handleDeleteLot}
+                title="Delete Production Lot"
+                class="px-2.5 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer border border-red-200 dark:border-red-900/60"
+              >
+                <span class="material-symbols-outlined text-[14px]">delete</span>
+                <span class="hidden sm:inline">Delete Lot</span>
+              </button>
+            </PermissionGate>
+          </div>
         </div>
 
         <!-- Metric Clean Strip -->
@@ -683,4 +699,18 @@
   onError={(err) => {
     errorMessage = err.message || 'Failed to create client.';
   }}
+/>
+
+<EditLotModal
+  bind:isOpen={isEditLotModalOpen}
+  lot={currentLotJourney ? { ...currentLotJourney, id: selectedLotId || currentLotJourney.lotId || currentLotJourney.id, initialQuantity: selectedLotObj?.initialQuantity } : selectedLotObj}
+  {clients}
+  onSuccess={async (updatedLot) => {
+    successMessage = `Production Lot '${updatedLot?.lotNumber || ''}' updated successfully!`;
+    await refreshAllData();
+  }}
+  onError={(err) => {
+    errorMessage = err.message || 'Failed to update production lot.';
+  }}
+  onCreateClientClick={() => isCreateClientModalOpen = true}
 />
