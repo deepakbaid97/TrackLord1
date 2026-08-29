@@ -37,6 +37,7 @@
   let canManageUsers = $derived($permissionStore.canWrite('users'));
   let canViewRoles = $derived($permissionStore.canRead('roles'));
   let canManageRoles = $derived($permissionStore.canWrite('roles'));
+  let canViewTenantSettings = $derived($permissionStore.canRead('tenant_settings') || $permissionStore.canWrite('tenant_settings'));
 
   // User Modals State
   let showAddUserModal = $state(false);
@@ -62,15 +63,6 @@
         onclick: () => refreshAll()
       }
     ];
-
-    if (isAuthenticated) {
-      actions.push({
-        label: 'Log Out',
-        icon: 'logout',
-        variant: 'outline',
-        onclick: () => authStore.logout()
-      });
-    }
 
     return {
       title: 'Team & Access',
@@ -211,14 +203,16 @@
       </div>
 
       <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-        <button
-          onclick={() => tenantConfigStore.openModal()}
-          class="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface font-semibold text-xs sm:text-sm rounded-xl border border-outline-variant shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-          title="Configure Tenant Settings, Visibility & Modes"
-        >
-          <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">settings</span>
-          <span>Tenant Settings</span>
-        </button>
+        {#if canViewTenantSettings}
+          <button
+            onclick={() => tenantConfigStore.openModal()}
+            class="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface font-semibold text-xs sm:text-sm rounded-xl border border-outline-variant shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            title="Configure Tenant Settings, Visibility & Modes"
+          >
+            <span class="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">settings</span>
+            <span>Tenant Settings</span>
+          </button>
+        {/if}
 
         {#if activeTab === 'users' && canManageUsers}
           <button

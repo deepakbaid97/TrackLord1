@@ -1,5 +1,6 @@
 <script>
   import { tenantConfigStore } from '../../stores/tenantConfigStore.js';
+  import { permissionStore } from '../../stores/permissionStore.js';
   import { CLIENT_MODES, CONFIG_SCHEMA } from '../../configRegistry.js';
   import Button from './Button.svelte';
 
@@ -7,6 +8,7 @@
   let isSaving = $derived($tenantConfigStore.isSaving);
   let saveSuccess = $derived($tenantConfigStore.saveSuccess);
   let errorMessage = $derived($tenantConfigStore.errorMessage);
+  let canWriteSettings = $derived($permissionStore.canWrite('tenant_settings') || $permissionStore.isAdmin);
 
   let activeTab = $state('all'); // 'all' | 'clientMode' | 'pages' | 'forms' | 'fields'
   let searchQuery = $state('');
@@ -52,14 +54,17 @@
   );
 
   function handleModeSelect(modeId) {
+    if (!canWriteSettings) return;
     tenantConfigStore.setClientMode(modeId);
   }
 
   function handleToggle(key, currentValue) {
+    if (!canWriteSettings) return;
     tenantConfigStore.setFeature(key, !currentValue);
   }
 
   async function handleSave() {
+    if (!canWriteSettings) return;
     try {
       await tenantConfigStore.saveSettings();
     } catch {
@@ -314,7 +319,12 @@
       <!-- Modal Footer -->
       <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between shrink-0">
         <div>
-          {#if saveSuccess}
+          {#if !canWriteSettings}
+            <div class="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold animate-in fade-in">
+              <span class="material-symbols-outlined text-[18px]">lock</span>
+              <span>View-Only Mode (Write access restricted for this role)</span>
+            </div>
+          {:else if saveSuccess}
             <div class="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold animate-in fade-in">
               <span class="material-symbols-outlined text-[18px]">check_circle</span>
               <span>Settings saved successfully!</span>
@@ -336,16 +346,18 @@
             onclick={handleClose}
             class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            Cancel
+            {canWriteSettings ? 'Cancel' : 'Close'}
           </button>
-          <Button
-            onclick={handleSave}
-            disabled={isSaving}
-            icon={isSaving ? 'sync' : 'save'}
-            class="shadow-md shadow-primary/20"
-          >
-            {isSaving ? 'Saving...' : 'Save Configuration'}
-          </Button>
+          {#if canWriteSettings}
+            <Button
+              onclick={handleSave}
+              disabled={isSaving}
+              icon={isSaving ? 'sync' : 'save'}
+              class="shadow-md shadow-primary/20"
+            >
+              {isSaving ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          {/if}
         </div>
       </div>
 

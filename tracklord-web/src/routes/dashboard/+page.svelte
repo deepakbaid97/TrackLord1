@@ -10,6 +10,7 @@
   import { STEP_ICON_MAP, STEP_COLOR_MAP } from '$lib/services/lotService.js';
   import { usePageHeader } from '$lib/utils/usePageHeader.js';
   import { tenantConfigStore } from '$lib/stores/tenantConfigStore.js';
+  import { permissionStore } from '$lib/stores/permissionStore.js';
 
   let loading = $state(true);
   let errorMessage = $state('');
@@ -145,9 +146,11 @@
             All KPI cards and analytics sections are currently disabled in Tenant Settings. You can enable them anytime.
           </p>
         </div>
-        <Button variant="primary" icon="settings" onclick={() => tenantConfigStore.openModal()}>
-          Configure Tenant Settings
-        </Button>
+        {#if $permissionStore.can('tenant_settings', 'read') || $permissionStore.can('tenant_settings', 'write')}
+          <Button variant="primary" icon="settings" onclick={() => tenantConfigStore.openModal()}>
+            Configure Tenant Settings
+          </Button>
+        {/if}
       </div>
     {:else}
       <!-- KPI Summary Cards (Auto-adjusts to 1 or 2 columns based on enabled cards) -->
