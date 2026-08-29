@@ -6,6 +6,8 @@
     totalLotWip = 0,
     onMoveStep
   } = $props();
+
+  let activeSteps = $derived(timelineSteps.filter(s => s.quantity > 0));
 </script>
 
 <section class="bg-surface p-4 sm:p-5 rounded-2xl border border-outline-variant/70 shadow-sm space-y-3">
@@ -19,7 +21,7 @@
 
   {#if totalLotWip > 0}
     <div class="h-2.5 w-full rounded-full bg-surface-container overflow-hidden flex shadow-inner">
-      {#each timelineSteps as step}
+      {#each activeSteps as step}
         {@const pct = (step.quantity / totalLotWip) * 100}
         {#if pct > 0}
           <div
@@ -33,12 +35,11 @@
   {/if}
 
   <div class="space-y-1.5 pt-1">
-    {#each timelineSteps as step}
-      {@const hasWip = step.quantity > 0}
-      <div class="flex items-center justify-between p-2 rounded-xl transition-colors {hasWip ? 'bg-primary/5 border border-primary/20' : 'hover:bg-surface-container-low opacity-60'}">
+    {#each activeSteps as step}
+      <div class="flex items-center justify-between p-2 rounded-xl transition-colors bg-primary/5 border border-primary/20">
         <div class="flex items-center gap-2 min-w-0 flex-1">
-          <span class="w-2 h-2 rounded-full shrink-0 {hasWip ? 'bg-primary animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}"></span>
-          <span class="text-xs sm:text-sm font-semibold {hasWip ? 'text-primary' : 'text-on-surface'} truncate">{step.name}</span>
+          <span class="w-2 h-2 rounded-full shrink-0 bg-primary animate-pulse"></span>
+          <span class="text-xs sm:text-sm font-semibold text-primary truncate">{step.name}</span>
           <span class="text-[11px] font-mono text-on-surface-variant shrink-0">({step.code})</span>
           {#if $tenantConfigStore.clientMode !== 'none' && step.clientName}
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-900 dark:text-amber-300 border border-amber-500/25 shrink-0 max-w-[130px] sm:max-w-[200px]">
@@ -48,8 +49,8 @@
           {/if}
         </div>
         <div class="flex items-center gap-2 shrink-0 pl-2">
-          <span class="font-mono text-xs sm:text-sm font-bold {hasWip ? 'text-primary' : 'text-on-surface-variant'}">{step.quantity} Pcs</span>
-          {#if hasWip && onMoveStep}
+          <span class="font-mono text-xs sm:text-sm font-bold text-primary">{step.quantity} Pcs</span>
+          {#if onMoveStep}
             <button
               type="button"
               onclick={() => onMoveStep(step.id)}
@@ -61,5 +62,11 @@
         </div>
       </div>
     {/each}
+
+    {#if activeSteps.length === 0}
+      <div class="py-6 text-center text-xs text-on-surface-variant italic">
+        No active quantity in any manufacturing step.
+      </div>
+    {/if}
   </div>
 </section>
