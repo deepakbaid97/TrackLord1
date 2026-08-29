@@ -413,9 +413,14 @@
         <div class="flex items-center gap-2 truncate">
           <span class="material-symbols-outlined text-primary text-[20px] shrink-0">inventory_2</span>
           {#if selectedLotObj}
-            <div class="truncate">
+            <div class="truncate flex items-center gap-1.5">
               <span class="font-bold text-sm text-on-surface tracking-tight font-mono">{selectedLotObj.lotNumber}</span>
-              <span class="text-xs text-on-surface-variant ml-1.5 font-mono">({selectedLotObj.initialQuantity} Pcs)</span>
+              {#if $tenantConfigStore.clientMode === 'lot' && (selectedLotObj.clientName || currentLotJourney?.clientName)}
+                <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-surface-container text-on-surface border border-outline-variant/60 font-mono truncate max-w-[130px]">
+                  {selectedLotObj.clientName || currentLotJourney?.clientName}
+                </span>
+              {/if}
+              <span class="text-xs text-on-surface-variant font-mono">({selectedLotObj.initialQuantity} Pcs)</span>
             </div>
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary shrink-0">
               {selectedLotObj.status}
@@ -512,12 +517,20 @@
           </PermissionGate>
         </div>
 
-        <!-- 3-Metric Clean Strip -->
-        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/50 font-mono text-center">
+        <!-- Metric Clean Strip -->
+        <div class="grid {$tenantConfigStore.clientMode === 'lot' ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 pt-2 border-t border-outline-variant/50 font-mono text-center">
           <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
             <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Total WIP</div>
             <div class="text-base sm:text-lg font-bold text-primary mt-0.5">{totalLotWip} <span class="text-xs font-normal">Pcs</span></div>
           </div>
+          {#if $tenantConfigStore.clientMode === 'lot'}
+            <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
+              <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Client</div>
+              <div class="text-xs sm:text-sm font-bold text-on-surface truncate mt-1" title={currentLotJourney?.clientName || '—'}>
+                {currentLotJourney?.clientName || '—'}
+              </div>
+            </div>
+          {/if}
           <div class="p-2 rounded-xl bg-surface-container-low border border-outline-variant/40">
             <div class="text-[10px] text-on-surface-variant uppercase font-sans font-semibold tracking-wider">Current Stage</div>
             <div class="text-xs sm:text-sm font-bold text-on-surface truncate mt-1">{currentActiveStepName}</div>
