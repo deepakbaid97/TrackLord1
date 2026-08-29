@@ -301,75 +301,7 @@
           </FeatureGate>
         </FeatureGate>
 
-        <!-- Widget 3: Material Availability -->
-        <FeatureGate feature="dashboard.sections.materialAvailability">
-          <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm h-full flex flex-col">
-            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-4">
-              <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
-                <span class="material-symbols-outlined text-green-600 text-[22px]">inventory_2</span>
-                Material Availability
-              </h2>
-              <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
-                {materialLots.length} lots &middot; {totalMaterialAvailable.toLocaleString()}
-              </span>
-            </div>
-
-            {#if materialLoading}
-              <div class="p-6 text-center text-on-surface-variant flex flex-col items-center gap-2 flex-1 justify-center">
-                <span class="material-symbols-outlined animate-spin text-[24px] text-green-600">sync</span>
-                <span class="text-xs">Loading materials...</span>
-              </div>
-            {:else if materialError}
-              <div class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-xs">
-                {materialError}
-              </div>
-            {:else if materialLots.length > 0}
-              <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface flex-1">
-                <table class="w-full text-left border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr class="bg-surface-container-low border-b border-outline-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
-                      <th class="px-3 py-2.5">Lot Number</th>
-                      <th class="px-3 py-2.5">Material</th>
-                      <th class="px-3 py-2.5 text-left">Available Stock</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-outline-variant/50 text-on-surface">
-                    {#each materialLots as mat}
-                      {@const remaining = mat.remainingQuantity ?? mat.initialQuantity ?? 0}
-                      {@const initial = mat.initialQuantity ?? 0}
-                      {@const usagePercent = initial > 0 ? (remaining / initial) * 100 : 0}
-                      <tr class="hover:bg-surface-container-low/60 transition-colors">
-                        <td class="px-3 py-2.5 font-bold text-on-surface">
-                          <div class="flex items-center gap-1.5">
-                            <span class="material-symbols-outlined text-[15px] text-green-600 shrink-0">package_2</span>
-                            <span class="truncate max-w-[110px]">{mat.lotNumber}</span>
-                          </div>
-                        </td>
-                        <td class="px-3 py-2.5 text-on-surface truncate max-w-[120px]">{mat.materialName ?? '—'}</td>
-                        <td class="px-3 py-2.5 text-left">
-                          <div class="flex items-center gap-1.5">
-                            <div class="w-12 bg-surface-variant/60 rounded-full h-1.5 hidden sm:block">
-                              <div
-                                class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-                                style="width: {Math.min(usagePercent, 100)}%"
-                              ></div>
-                            </div>
-                            <span class="font-bold text-green-600 font-mono">{Number(remaining).toLocaleString()}</span>
-                            <span class="text-[10px] text-on-surface-variant font-mono">{mat.unit || ''}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {:else}
-              <EmptyState icon="inventory_2" title="No material lots" message="Create a material lot from the Inventory page." />
-            {/if}
-          </section>
-        </FeatureGate>
-
-        <!-- Widget 4: Active Production Lots -->
+        <!-- Widget 3: Active Production Lots -->
         <FeatureGate feature="dashboard.sections.activeLots">
           <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm h-full flex flex-col">
             <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-4">
@@ -437,6 +369,74 @@
               </div>
             {:else}
               <EmptyState icon="inventory_2" title="No active lots" message="Create a new lot from the Inventory page." />
+            {/if}
+          </section>
+        </FeatureGate>
+
+        <!-- Widget 4: Material Availability -->
+        <FeatureGate feature="dashboard.sections.materialAvailability">
+          <section class="bg-surface p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm h-full flex flex-col">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-3 sm:mb-4">
+              <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-2">
+                <span class="material-symbols-outlined text-green-600 text-[22px]">inventory_2</span>
+                Material Availability
+              </h2>
+              <span class="text-xs text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded">
+                {materialLots.length} lots &middot; {totalMaterialAvailable.toLocaleString()}
+              </span>
+            </div>
+
+            {#if materialLoading}
+              <div class="p-6 text-center text-on-surface-variant flex flex-col items-center gap-2 flex-1 justify-center">
+                <span class="material-symbols-outlined animate-spin text-[24px] text-green-600">sync</span>
+                <span class="text-xs">Loading materials...</span>
+              </div>
+            {:else if materialError}
+              <div class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-xs">
+                {materialError}
+              </div>
+            {:else if materialLots.length > 0}
+              <div class="w-full overflow-x-auto rounded-xl border border-outline-variant bg-surface flex-1">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr class="bg-surface-container-low border-b border-outline-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant font-mono">
+                      <th class="px-3 py-2.5">Lot Number</th>
+                      <th class="px-3 py-2.5">Material</th>
+                      <th class="px-3 py-2.5 text-left">Available Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+                    {#each materialLots as mat}
+                      {@const remaining = mat.remainingQuantity ?? mat.initialQuantity ?? 0}
+                      {@const initial = mat.initialQuantity ?? 0}
+                      {@const usagePercent = initial > 0 ? (remaining / initial) * 100 : 0}
+                      <tr class="hover:bg-surface-container-low/60 transition-colors">
+                        <td class="px-3 py-2.5 font-bold text-on-surface">
+                          <div class="flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[15px] text-green-600 shrink-0">package_2</span>
+                            <span class="truncate max-w-[110px]">{mat.lotNumber}</span>
+                          </div>
+                        </td>
+                        <td class="px-3 py-2.5 text-on-surface truncate max-w-[120px]">{mat.materialName ?? '—'}</td>
+                        <td class="px-3 py-2.5 text-left">
+                          <div class="flex items-center gap-1.5">
+                            <div class="w-12 bg-surface-variant/60 rounded-full h-1.5 hidden sm:block">
+                              <div
+                                class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                style="width: {Math.min(usagePercent, 100)}%"
+                              ></div>
+                            </div>
+                            <span class="font-bold text-green-600 font-mono">{Number(remaining).toLocaleString()}</span>
+                            <span class="text-[10px] text-on-surface-variant font-mono">{mat.unit || ''}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {:else}
+              <EmptyState icon="inventory_2" title="No material lots" message="Create a material lot from the Inventory page." />
             {/if}
           </section>
         </FeatureGate>

@@ -360,11 +360,11 @@
 
     <!-- Right: Desktop Toolbar -->
     <div class="hidden md:flex items-center gap-2">
-      <Button variant="primary" icon="add" onclick={() => isCreateLotModalOpen = true}>
-        New Lot
-      </Button>
-      <Button variant="outline" icon="move_item" disabled={!selectedLotId} onclick={() => openMoveModal('')}>
+      <Button variant="primary" icon="move_item" disabled={!selectedLotId} onclick={() => openMoveModal('')}>
         Move Qty
+      </Button>
+      <Button variant="outline" icon="add" onclick={() => isCreateLotModalOpen = true}>
+        New Lot
       </Button>
       <Button variant="outline" icon="inventory" onclick={() => isCreateMaterialModalOpen = true}>
         Material
