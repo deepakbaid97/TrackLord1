@@ -121,7 +121,7 @@
 
         return {
           rowNum: idx + 1,
-          clientName: clientName || 'General Client',
+          clientName: clientName || '',
           quantity,
           lotNumber,
           stepId: rowStepId,
@@ -285,7 +285,7 @@
                       <tr class="hover:bg-surface-container-low/50 {row.isValid ? '' : 'bg-red-50/50 dark:bg-red-950/20 text-red-700'}">
                         <td class="px-3 py-2 font-mono">{row.rowNum}</td>
                         <td class="px-3 py-2 font-bold font-mono">{row.lotNumber || 'MISSING'}</td>
-                        <td class="px-3 py-2">{row.clientName}</td>
+                        <td class="px-3 py-2">{row.clientName || '—'}</td>
                         <td class="px-3 py-2 text-right font-mono">{row.quantity} Pcs</td>
                         <td class="px-3 py-2">{row.stepName || (hasStepColumn ? '—' : selectedGlobalStepName)}</td>
                         <td class="px-3 py-2 text-center">
