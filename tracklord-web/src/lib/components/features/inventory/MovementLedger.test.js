@@ -60,4 +60,44 @@ describe('MovementLedger component', () => {
 
     expect(handleReverse).toHaveBeenCalledWith(movements[0]);
   });
+
+  it('reveals additional movement details when a movement is clicked', async () => {
+    const movements = [
+      {
+        id: 'm1',
+        from: 'Cutting',
+        to: 'Stitching',
+        qty: '100 Pcs',
+        date: '2026-02-20',
+        isReversed: false,
+        referenceNumber: 'REF-EXP-001',
+        user: 'Operator Joe',
+        type: 'StepTransfer',
+        remarks: 'Transferred for urgent batch',
+        clientName: 'Acme Corp'
+      }
+    ];
+
+    render(MovementLedger, {
+      props: {
+        movements
+      }
+    });
+
+    // Before click: Remarks not visible
+    expect(screen.queryByText(/Transferred for urgent batch/i)).not.toBeInTheDocument();
+
+    // Click movement to expand
+    const cuttingElement = screen.getAllByText('Cutting')[0];
+    await fireEvent.click(cuttingElement);
+
+    // After click: Expanded details revealed
+    expect(screen.getAllByText(/Transferred for urgent batch/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('REF-EXP-001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('StepTransfer').length).toBeGreaterThan(0);
+
+    // Click again to collapse
+    await fireEvent.click(cuttingElement);
+    expect(screen.queryByText(/Transferred for urgent batch/i)).not.toBeInTheDocument();
+  });
 });

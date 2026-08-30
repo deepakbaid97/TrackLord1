@@ -41,7 +41,40 @@ describe('MoveLotModal component', () => {
       productionLotId: 'lot-123',
       fromStepId: 's1',
       toStepId: 's2',
-      quantity: 100
+      quantity: 100,
+      referenceNumber: null
+    }));
+
+    expect(handleSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits WIP transfer with user provided reference number', async () => {
+    vi.mocked(api.moveLot).mockResolvedValue({ id: 'mov-2' });
+    const handleSuccess = vi.fn();
+
+    render(MoveLotModal, {
+      props: {
+        isOpen: true,
+        lotId: 'lot-123',
+        steps: mockSteps,
+        initialFromStepId: 's1',
+        initialQuantity: 100,
+        onSuccess: handleSuccess
+      }
+    });
+
+    const refInput = screen.getByLabelText(/reference number/i);
+    await fireEvent.input(refInput, { target: { value: 'REF-TEST-999' } });
+
+    const submitBtn = screen.getByRole('button', { name: /record movement/i });
+    await fireEvent.click(submitBtn);
+
+    expect(api.moveLot).toHaveBeenCalledWith(expect.objectContaining({
+      productionLotId: 'lot-123',
+      fromStepId: 's1',
+      toStepId: 's2',
+      quantity: 100,
+      referenceNumber: 'REF-TEST-999'
     }));
 
     expect(handleSuccess).toHaveBeenCalledTimes(1);
