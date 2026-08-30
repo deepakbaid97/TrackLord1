@@ -109,19 +109,21 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 continue;
             }
 
-            string rawClientName = string.IsNullOrWhiteSpace(item.ClientName) ? "General Client" : item.ClientName.Trim();
-            string clientKey = rawClientName.ToLowerInvariant();
-
-            Client client;
-            if (clientMap.TryGetValue(clientKey, out var foundClient))
+            Client? client = null;
+            if (!string.IsNullOrWhiteSpace(item.ClientName))
             {
-                client = foundClient;
-            }
-            else
-            {
-                client = new Client(Guid.NewGuid(), rawClientName, "", "Buyer");
-                await _clientRepository.AddAsync(client, cancellationToken);
-                clientMap[clientKey] = client;
+                string rawClientName = item.ClientName.Trim();
+                string clientKey = rawClientName.ToLowerInvariant();
+                if (clientMap.TryGetValue(clientKey, out var foundClient))
+                {
+                    client = foundClient;
+                }
+                else
+                {
+                    client = new Client(Guid.NewGuid(), rawClientName, "", "Buyer");
+                    await _clientRepository.AddAsync(client, cancellationToken);
+                    clientMap[clientKey] = client;
+                }
             }
 
             ManufacturingStep targetStep = importStep;
@@ -172,7 +174,10 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 initialQtyObj,
                 targetStep.Id,
                 request.CreatedBy,
-                $"Imported production lot (Original: '{rawLotNumber}')");
+                $"Imported production lot (Original: '{rawLotNumber}')",
+                tenantId: null,
+                clientId: client?.Id,
+                clientName: client?.Name);
 
             var initialMovement = ManufacturingMovement.Create(
                 Guid.NewGuid(),
@@ -182,8 +187,8 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 quantity: item.Quantity,
                 type: MovementType.InitialProduction,
                 movementDate: now,
-                clientId: client.Id,
-                clientName: client.Name,
+                clientId: client?.Id,
+                clientName: client?.Name,
                 createdBy: request.CreatedBy,
                 remarks: $"Initial imported lot creation movement to step '{targetStep.Name}'",
                 referenceNumber: $"INIT-{finalLotNumber}");
@@ -197,7 +202,7 @@ public class ImportProductionLotsCommandHandler : IRequestHandler<ImportProducti
                 lotId,
                 rawLotNumber,
                 finalLotNumber,
-                client.Name,
+                client?.Name ?? "—",
                 item.Quantity));
         }
 

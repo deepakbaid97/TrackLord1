@@ -118,6 +118,12 @@ public class ProductionTests
 
         var clients = await clientRepo.GetAllAsync();
         clients.Should().ContainSingle(c => c.Name == "Apex Textiles");
+
+        // Verify ProductionLot itself contains the ClientId and ClientName
+        var savedLot1 = await lotRepo.GetByIdAsync(result1.ImportedLots[0].LotId);
+        savedLot1.Should().NotBeNull();
+        savedLot1!.ClientId.Should().Be(clients[0].Id);
+        savedLot1.ClientName.Should().Be("Apex Textiles");
     }
 
     [Fact]
@@ -151,12 +157,14 @@ public class ProductionTests
         var lot1 = await lotRepo.GetByIdAsync(result.ImportedLots[0].LotId);
         lot1.Should().NotBeNull();
         lot1!.InitialStepId.Should().Be(cuttingStep.Id);
+        lot1.ClientName.Should().Be("Apex Textiles");
 
         var lot2 = await lotRepo.GetByIdAsync(result.ImportedLots[1].LotId);
         lot2.Should().NotBeNull();
         var stitchingStep = await stepRepo.GetByCodeAsync("STITCHING");
         stitchingStep.Should().NotBeNull();
         lot2!.InitialStepId.Should().Be(stitchingStep!.Id);
+        lot2.ClientName.Should().Be("Apex Textiles");
     }
 
 
