@@ -33,6 +33,10 @@
     if (isOpen) {
       form.fromStepId = initialFromStepId || (steps[0] ? steps[0].id : '');
       form.quantity = initialQuantity || 0;
+      form.remarks = '';
+      form.referenceNumber = '';
+      form.clientId = '';
+      form.clientName = '';
       if (steps.length > 1) {
         const fromIdx = steps.findIndex(s => s.id === form.fromStepId);
         const nextStep = steps[fromIdx + 1] || steps.find(s => s.id !== form.fromStepId);
@@ -81,7 +85,7 @@
         clientName: selectedClient ? selectedClient.name : (form.clientName || '').trim(),
         createdBy: 'Operator',
         remarks: form.remarks,
-        referenceNumber: form.referenceNumber || `REF-${Math.floor(Math.random() * 900 + 100)}`
+        referenceNumber: (form.referenceNumber || '').trim() || null
       };
 
       await moveLot(payload);
@@ -119,14 +123,24 @@
       />
     </div>
 
-    <Input
-      label="Quantity to Move (Pcs)"
-      type="number"
-      bind:value={form.quantity}
-      placeholder="e.g. 50"
-      icon="numbers"
-      required={true}
-    />
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Input
+        label="Quantity to Move (Pcs)"
+        type="number"
+        bind:value={form.quantity}
+        placeholder="e.g. 50"
+        icon="numbers"
+        required={true}
+      />
+
+      <Input
+        label="Reference Number"
+        bind:value={form.referenceNumber}
+        placeholder="e.g. REF-001 or DC-884"
+        icon="tag"
+        required={false}
+      />
+    </div>
 
     <ClientModeGate mode="step">
       <div class="space-y-1">
