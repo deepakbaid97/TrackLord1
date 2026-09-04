@@ -46,7 +46,7 @@ public interface IManufacturingMovementRepository
     Task<ManufacturingMovement?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotAsync(Guid productionLotId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ManufacturingMovement>> GetMovementsForLotsAsync(IEnumerable<Guid> productionLotIds, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Guid>> GetCandidateLotIdsForStepAsync(Guid stepId, DateTime? maxMovementDate = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> GetCandidateLotIdsForStepAsync(Guid stepId, DateTime? maxMovementDate = null, DateTime? minMovementDate = null, CancellationToken cancellationToken = default);
     Task AddAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
     Task UpdateAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default);
     Task DeleteRangeAsync(IEnumerable<ManufacturingMovement> movements, CancellationToken cancellationToken = default);

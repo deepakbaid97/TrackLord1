@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using TrackLord.Domain.Aggregates.MovementAggregate;
 using TrackLord.Domain.Exceptions;
 using TrackLord.Domain.Repositories;
 using TrackLord.Domain.Services;
@@ -83,10 +84,14 @@ public class GetLotsAtStepQueryHandler : IRequestHandler<GetLotsAtStepQuery, Ste
             minDate = DateTime.SpecifyKind(minDate.Value, DateTimeKind.Utc);
         }
 
-        // 1. Indexed seek: Find only production lots that had an incoming movement to this step up to maxDate
+        // In period mode (FromDate / ToDate), seek candidates that had incoming movements in that window
+        DateTime? candidateMinDate = (request.FromDate.HasValue || request.ToDate.HasValue) ? minDate : null;
+
+        // 1. Indexed seek: Find only production lots that had an incoming movement to this step within the requested window
         var candidateLotIds = await _movementRepository.GetCandidateLotIdsForStepAsync(
             request.StepId,
             maxDate,
+            candidateMinDate,
             cancellationToken);
 
         if (candidateLotIds.Count == 0)
@@ -133,25 +138,20 @@ public class GetLotsAtStepQueryHandler : IRequestHandler<GetLotsAtStepQuery, Ste
             }
             else if (request.FromDate.HasValue || request.ToDate.HasValue)
             {
-                // Date period [minDate, maxDate]
-                var effectiveStart = minDate ?? DateTime.MinValue;
-                var effectiveEnd = maxDate ?? DateTime.UtcNow;
+                // Date period [minDate, maxDate]: Only match lots that entered this step during this period
+                var periodMovements = movements
+                    .Where(m => m.ToStepId == request.StepId &&
+                                !m.IsReversed &&
+                                (!minDate.HasValue || m.MovementDate >= minDate.Value) &&
+                                (!maxDate.HasValue || m.MovementDate <= maxDate.Value))
+                    .OrderByDescending(m => m.MovementDate)
+                    .ThenByDescending(m => m.CreatedAtUtc)
+                    .ToList();
 
-                // Did the lot have balance at effectiveStart?
-                var snapshotStart = _replayEngine.ReplayLedger(lotId, movements, terminatingStepIds, asOfDate: effectiveStart);
-                var hadBalanceAtStart = snapshotStart.StepBalances.TryGetValue(request.StepId, out var qtyStart) && qtyStart > 0;
-
-                // Did the lot receive any movements into this step during the period?
-                var hasIncomingMovementInPeriod = movements.Any(m =>
-                    m.ToStepId == request.StepId &&
-                    !m.IsReversed &&
-                    m.MovementDate >= effectiveStart &&
-                    m.MovementDate <= effectiveEnd);
-
-                if (hadBalanceAtStart || hasIncomingMovementInPeriod)
+                if (periodMovements.Count > 0)
                 {
                     isMatching = true;
-                    // Balance as of effectiveEnd (or incoming movement qty if it was consumed/moved later)
+                    var effectiveEnd = maxDate ?? DateTime.UtcNow;
                     var snapshotEnd = _replayEngine.ReplayLedger(lotId, movements, terminatingStepIds, asOfDate: effectiveEnd);
                     if (snapshotEnd.StepBalances.TryGetValue(request.StepId, out var qtyEnd) && qtyEnd > 0)
                     {
@@ -159,11 +159,7 @@ public class GetLotsAtStepQueryHandler : IRequestHandler<GetLotsAtStepQuery, Ste
                     }
                     else
                     {
-                        var periodIncoming = movements
-                            .Where(m => m.ToStepId == request.StepId && !m.IsReversed && m.MovementDate <= effectiveEnd)
-                            .OrderByDescending(m => m.MovementDate)
-                            .FirstOrDefault();
-                        qtyAtStep = periodIncoming?.Quantity ?? (hadBalanceAtStart ? qtyStart : 0m);
+                        qtyAtStep = periodMovements.First().Quantity;
                     }
                 }
             }
@@ -180,17 +176,40 @@ public class GetLotsAtStepQueryHandler : IRequestHandler<GetLotsAtStepQuery, Ste
 
             if (!isMatching) continue;
 
-            // Find the movement that created/entered this step (the latest non-reversed movement to this step up to maxDate)
-            var stepEntryMovement = movements
-                .Where(m => m.ToStepId == request.StepId && !m.IsReversed && (!maxDate.HasValue || m.MovementDate <= maxDate.Value))
-                .OrderByDescending(m => m.MovementDate)
-                .ThenByDescending(m => m.CreatedAtUtc)
-                .FirstOrDefault();
+            // Find the movement that created/entered this step
+            ManufacturingMovement? stepEntryMovement;
+            if (request.FromDate.HasValue || request.ToDate.HasValue)
+            {
+                // In period mode: must be the movement that entered this step within the period
+                stepEntryMovement = movements
+                    .Where(m => m.ToStepId == request.StepId &&
+                                !m.IsReversed &&
+                                (!minDate.HasValue || m.MovementDate >= minDate.Value) &&
+                                (!maxDate.HasValue || m.MovementDate <= maxDate.Value))
+                    .OrderByDescending(m => m.MovementDate)
+                    .ThenByDescending(m => m.CreatedAtUtc)
+                    .FirstOrDefault();
+            }
+            else
+            {
+                // In Current or AsOfDate mode: latest movement up to maxDate
+                stepEntryMovement = movements
+                    .Where(m => m.ToStepId == request.StepId &&
+                                !m.IsReversed &&
+                                (!maxDate.HasValue || m.MovementDate <= maxDate.Value))
+                    .OrderByDescending(m => m.MovementDate)
+                    .ThenByDescending(m => m.CreatedAtUtc)
+                    .FirstOrDefault();
+            }
 
             var stepCreatedAt = stepEntryMovement?.MovementDate ?? lot.CreatedAtUtc;
             var stepCreatedAtUtc = stepEntryMovement?.CreatedAtUtc ?? lot.CreatedAtUtc;
             var movementId = stepEntryMovement?.Id;
             var remarks = stepEntryMovement?.Remarks ?? lot.Remarks;
+
+            // In Period filter mode: strictly enforce that stepCreatedAt is within [minDate, maxDate]
+            if (minDate.HasValue && stepCreatedAt < minDate.Value) continue;
+            if (maxDate.HasValue && stepCreatedAt > maxDate.Value) continue;
 
             // Optional search filter
             if (!string.IsNullOrWhiteSpace(request.Search))

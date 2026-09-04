@@ -39,6 +39,13 @@
     }
   });
 
+  function formatLocalDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   /** @type {any[]} */
   let lots = $state([]);
   let totalQuantity = $state(0);
@@ -47,11 +54,32 @@
   // Filter Toolbar States
   // filterMode: 'CURRENT' | 'AS_OF' | 'PERIOD'
   let filterMode = $state('CURRENT');
-  let asOfDate = $state(new Date().toISOString().slice(0, 10));
+  let asOfDate = $state(formatLocalDate(new Date()));
   let fromDate = $state('');
-  let toDate = $state(new Date().toISOString().slice(0, 10));
+  let toDate = $state(formatLocalDate(new Date()));
   let searchQuery = $state('');
   let periodPreset = $state('7DAYS'); // 'TODAY' | '7DAYS' | '30DAYS' | 'CUSTOM'
+
+  // Safeguard: Ensure displayed lots strictly obey the period filter boundaries
+  let displayedLots = $derived.by(() => {
+    if (filterMode === 'PERIOD' && (fromDate || toDate)) {
+      const fromMs = fromDate ? new Date(`${fromDate}T00:00:00.000`).getTime() : -Infinity;
+      const toMs = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : Infinity;
+      return lots.filter(lot => {
+        if (!lot.stepCreatedAt) return true;
+        const lotMs = new Date(lot.stepCreatedAt).getTime();
+        return lotMs >= fromMs && lotMs <= toMs;
+      });
+    }
+    return lots;
+  });
+
+  let displayedQuantity = $derived(
+    filterMode === 'PERIOD'
+      ? displayedLots.reduce((sum, l) => sum + (l.quantityAtStep || 0), 0)
+      : totalQuantity
+  );
+  let displayedLotsCount = $derived(displayedLots.length);
 
   let searchTimeout;
 
@@ -70,18 +98,18 @@
 
   function initPeriodDates(preset) {
     const today = new Date();
-    toDate = today.toISOString().slice(0, 10);
+    toDate = formatLocalDate(today);
 
     if (preset === 'TODAY') {
-      fromDate = today.toISOString().slice(0, 10);
+      fromDate = formatLocalDate(today);
     } else if (preset === '7DAYS') {
       const d = new Date(today);
       d.setDate(d.getDate() - 7);
-      fromDate = d.toISOString().slice(0, 10);
+      fromDate = formatLocalDate(d);
     } else if (preset === '30DAYS') {
       const d = new Date(today);
       d.setDate(d.getDate() - 30);
-      fromDate = d.toISOString().slice(0, 10);
+      fromDate = formatLocalDate(d);
     }
   }
 
@@ -116,10 +144,10 @@
       const params = {};
 
       if (filterMode === 'AS_OF' && asOfDate) {
-        params.asOfDate = new Date(`${asOfDate}T23:59:59Z`).toISOString();
+        params.asOfDate = new Date(`${asOfDate}T23:59:59.999`).toISOString();
       } else if (filterMode === 'PERIOD') {
-        if (fromDate) params.fromDate = new Date(`${fromDate}T00:00:00Z`).toISOString();
-        if (toDate) params.toDate = new Date(`${toDate}T23:59:59Z`).toISOString();
+        if (fromDate) params.fromDate = new Date(`${fromDate}T00:00:00.000`).toISOString();
+        if (toDate) params.toDate = new Date(`${toDate}T23:59:59.999`).toISOString();
       }
 
       if (searchQuery.trim()) {
@@ -246,11 +274,11 @@
     <div class="flex items-center gap-2 self-start sm:self-center shrink-0">
       <div class="bg-surface-container-low rounded-lg px-2.5 py-1 border border-outline-variant/60 flex items-center gap-1.5 font-mono text-xs">
         <span class="text-on-surface-variant text-[10px] uppercase font-semibold">Active Lots:</span>
-        <span class="font-bold text-primary">{totalLots}</span>
+        <span class="font-bold text-primary">{displayedLotsCount}</span>
       </div>
       <div class="bg-surface-container-low rounded-lg px-2.5 py-1 border border-outline-variant/60 flex items-center gap-1.5 font-mono text-xs">
         <span class="text-on-surface-variant text-[10px] uppercase font-semibold">Total WIP:</span>
-        <span class="font-bold text-primary">{totalQuantity.toLocaleString()} Pcs</span>
+        <span class="font-bold text-primary">{displayedQuantity.toLocaleString()} Pcs</span>
       </div>
     </div>
   </div>
@@ -309,7 +337,7 @@
         <button
           type="button"
           class="px-2 py-0.5 rounded-md bg-surface hover:bg-surface-container border border-outline-variant/60 text-on-surface-variant font-medium cursor-pointer text-xs"
-          onclick={() => { asOfDate = new Date().toISOString().slice(0, 10); fetchLots(); }}
+          onclick={() => { asOfDate = formatLocalDate(new Date()); fetchLots(); }}
         >
           Today
         </button>
@@ -319,7 +347,7 @@
           onclick={() => {
             const y = new Date();
             y.setDate(y.getDate() - 1);
-            asOfDate = y.toISOString().slice(0, 10);
+            asOfDate = formatLocalDate(y);
             fetchLots();
           }}
         >
@@ -344,14 +372,14 @@
           <input
             type="date"
             bind:value={fromDate}
-            onchange={fetchLots}
+            onchange={() => { periodPreset = 'CUSTOM'; fetchLots(); }}
             class="px-2 py-1 bg-surface-container-low border border-outline-variant/70 rounded-lg font-mono text-xs text-on-surface outline-none focus:ring-1 focus:ring-primary cursor-pointer"
           />
           <span class="text-on-surface-variant font-mono text-[10px]">to</span>
           <input
             type="date"
             bind:value={toDate}
-            onchange={fetchLots}
+            onchange={() => { periodPreset = 'CUSTOM'; fetchLots(); }}
             class="px-2 py-1 bg-surface-container-low border border-outline-variant/70 rounded-lg font-mono text-xs text-on-surface outline-none focus:ring-1 focus:ring-primary cursor-pointer"
           />
         </div>
@@ -365,11 +393,11 @@
       <h2 class="font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5">
         <span>Lots in Stage</span>
         <span class="px-2 py-0.2 rounded-full bg-primary/10 text-primary font-mono text-xs font-bold">
-          {lots.length}
+          {displayedLotsCount}
         </span>
       </h2>
       <span class="text-xs text-on-surface-variant font-mono">
-        Total Quantity: {totalQuantity.toLocaleString()} Pcs
+        Total Quantity: {displayedQuantity.toLocaleString()} Pcs
       </span>
     </div>
 
@@ -383,7 +411,7 @@
         <span>{errorMessage}</span>
         <button type="button" onclick={fetchLots} class="underline font-semibold ml-auto cursor-pointer">Retry</button>
       </div>
-    {:else if lots.length === 0}
+    {:else if displayedLots.length === 0}
       <div class="py-8">
         <EmptyState
           icon="inventory_2"
@@ -394,7 +422,7 @@
     {:else}
       <!-- Mobile View: Clean, Compact, Clickable Cards Stack -->
       <div class="block md:hidden space-y-2">
-        {#each lots as lot (lot.lotId)}
+        {#each displayedLots as lot (lot.lotId)}
           <div
             role="button"
             tabindex="0"
@@ -460,7 +488,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant/50 text-on-surface">
-            {#each lots as lot (lot.lotId)}
+            {#each displayedLots as lot (lot.lotId)}
               <tr class="hover:bg-surface-container-low/60 transition-colors">
                 <td class="px-4 py-3 whitespace-nowrap">
                   <a
