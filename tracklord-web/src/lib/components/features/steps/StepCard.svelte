@@ -30,10 +30,10 @@
   ondragend={onDragEnd}
   role="button"
   tabindex="0"
-  onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
-  onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/lots?step=${step.id}`)}
+  onclick={() => { if (!isDragging) window.location.href = `/steps/${step.id}/lots`; }}
+  onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isDragging && (window.location.href = `/steps/${step.id}/lots`)}
   class="bg-surface px-3 py-2.5 rounded-xl border border-outline-variant/70 hover:border-primary/50 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-2 active:scale-[0.99] select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5 border-dashed border-primary' : ''} {dragOverStepIndex === index && draggedStepIndex !== index ? 'ring-2 ring-primary ring-inset bg-primary/10 shadow-md' : ''}"
-  title="Click to view lots at '{step.name}', or drag grip to reorder"
+  title="Click to view lots in '{step.name}', or drag grip to reorder"
 >
   <!-- Left: Drag Grip | Seq # | Icon | Name + Code | Status Flags -->
   <div class="flex items-center gap-1.5 min-w-0">
@@ -111,5 +111,9 @@
     >
       <span class="material-symbols-outlined text-[15px]">edit</span>
     </button>
+
+    <span class="material-symbols-outlined text-[18px] text-on-surface-variant/40 group-hover:text-primary transition-colors">
+      chevron_right
+    </span>
   </div>
 </div>

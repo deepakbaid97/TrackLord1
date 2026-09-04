@@ -147,6 +147,10 @@ public class ManufacturingMovementConfiguration : IEntityTypeConfiguration<Manuf
         // Crucial index for Ledger Replay Engine deterministic sorting
         builder.HasIndex(m => new { m.TenantId, m.ProductionLotId, m.MovementDate, m.CreatedAtUtc, m.Id })
             .HasDatabaseName("ix_movements_lot_replay_order");
+
+        // Composite index for fast step movements and candidate lots lookup
+        builder.HasIndex(m => new { m.TenantId, m.ToStepId, m.MovementDate })
+            .HasDatabaseName("ix_movements_to_step_lookup");
     }
 }
 

@@ -262,6 +262,9 @@ namespace TrackLord.Infrastructure.Migrations
 
                     b.HasIndex("ClientId");
 
+                    b.HasIndex("TenantId", "ToStepId", "MovementDate")
+                        .HasDatabaseName("ix_movements_to_step_lookup");
+
                     b.HasIndex("TenantId", "ProductionLotId", "MovementDate", "CreatedAtUtc", "Id")
                         .HasDatabaseName("ix_movements_lot_replay_order");
 
