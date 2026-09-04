@@ -559,3 +559,20 @@ export async function assignRole(userId, roleId) {
   return await handleResponse(response);
 }
 
+// 30. Get Lots At Manufacturing Step (with optional historical time-travel date filter)
+/**
+ * @param {string} stepId 
+ * @param {{ asOfDate?: string, fromDate?: string, toDate?: string, search?: string }} [params] 
+ */
+export async function getLotsAtStep(stepId, { asOfDate, fromDate, toDate, search } = {}) {
+  const query = new URLSearchParams();
+  if (asOfDate) query.set('asOfDate', asOfDate);
+  if (fromDate) query.set('fromDate', fromDate);
+  if (toDate) query.set('toDate', toDate);
+  if (search) query.set('search', search);
+
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps/${stepId}/lots${qs}`);
+  return await handleResponse(response);
+}
+

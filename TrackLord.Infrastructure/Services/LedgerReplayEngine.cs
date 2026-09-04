@@ -10,15 +10,19 @@ namespace TrackLord.Infrastructure.Services;
 
 public class LedgerReplayEngine : ILedgerReplayEngine
 {
-    public LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null)
+    public LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null, DateTime? asOfDate = null)
     {
         if (movements is null)
         {
             throw new ArgumentNullException(nameof(movements));
         }
 
+        var candidateMovements = asOfDate.HasValue
+            ? movements.Where(m => m.MovementDate <= asOfDate.Value)
+            : movements;
+
         // Rule 12: Movement ordering must sort by MovementDate, then CreatedAtUtc, then Id to guarantee deterministic replay
-        var sortedMovements = movements
+        var sortedMovements = candidateMovements
             .OrderBy(m => m.MovementDate)
             .ThenBy(m => m.CreatedAtUtc)
             .ThenBy(m => m.Id)

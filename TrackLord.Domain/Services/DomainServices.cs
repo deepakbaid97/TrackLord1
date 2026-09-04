@@ -27,7 +27,7 @@ public interface ILedgerReplayEngine
     /// Steps whose IDs appear in terminatingStepIds will have their quantities counted as
     /// TotalTerminatedQuantity instead of TotalActiveQuantity.
     /// </summary>
-    LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null);
+    LotLedgerSnapshot ReplayLedger(Guid productionLotId, IEnumerable<ManufacturingMovement> movements, IReadOnlySet<Guid>? terminatingStepIds = null, DateTime? asOfDate = null);
 }
 
 public interface IUnitConverterService

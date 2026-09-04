@@ -74,4 +74,21 @@ public class ManufacturingStepsController : ControllerBase
         await _mediator.Send(command);
         return Ok(new { success = true });
     }
+
+    /// <summary>
+    /// Gets lots currently or historically at a manufacturing step with time-travel date filtering.
+    /// In the createdAt column, returns the movement creation/effective date into the step.
+    /// </summary>
+    [HttpGet("{id:guid}/lots")]
+    [RequirePermission(new[] { PermissionFeatures.ManufacturingSteps, PermissionFeatures.ProductionLots }, AccessLevels.Read)]
+    public async Task<IActionResult> GetLotsAtStep(
+        Guid id,
+        [FromQuery] DateTime? asOfDate,
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate,
+        [FromQuery] string? search)
+    {
+        var result = await _mediator.Send(new GetLotsAtStepQuery(id, asOfDate, fromDate, toDate, search));
+        return Ok(result);
+    }
 }

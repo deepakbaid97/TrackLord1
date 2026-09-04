@@ -334,7 +334,7 @@
       <LoadingSpinner message="Loading manufacturing sequence..." />
     {:else if steps.length > 0}
       <!-- Mobile View: Compact Pipeline Cards -->
-      <div class="block md:hidden space-y-1.5">
+      <div class="block md:hidden space-y-2">
         {#each steps as step, index (step.id)}
           <StepCard
             {step}
@@ -381,9 +381,9 @@
                 ondragenter={(e) => handleDragEnter(index, e)}
                 ondrop={(e) => handleDrop(index, e)}
                 ondragend={handleDragEnd}
-                onclick={() => { if (!isDragging) window.location.href = `/lots?step=${step.id}`; }}
+                onclick={() => { if (!isDragging) window.location.href = `/steps/${step.id}/lots`; }}
                 class="hover:bg-surface-container-low/70 transition-all cursor-pointer group select-none {draggedStepIndex === index ? 'opacity-30 bg-primary/5' : ''} {dragOverStepIndex === index && draggedStepIndex !== index ? 'bg-primary/10 border-t-2 border-primary' : ''}"
-                title="Click to view lots at this step, or drag to reorder"
+                title="Click to view lots in {step.name} (Approach B), or drag to reorder"
               >
                 <!-- Drag Grip & Seq # -->
                 <td class="px-3 py-3.5 text-center text-on-surface-variant/40 group-hover:text-primary transition-colors cursor-grab active:cursor-grabbing">
@@ -437,12 +437,18 @@
                 </td>
 
                 <td class="px-4 py-3.5 text-right">
-                  <button
-                    onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
-                    class="px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Edit
-                  </button>
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      onclick={(e) => { e.stopPropagation(); openEditModal(step); }}
+                      class="px-2.5 py-1 text-xs font-semibold text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                      title="Edit step configuration"
+                    >
+                      Edit
+                    </button>
+                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant/40 group-hover:text-primary transition-colors">
+                      chevron_right
+                    </span>
+                  </div>
                 </td>
               </tr>
             {/each}

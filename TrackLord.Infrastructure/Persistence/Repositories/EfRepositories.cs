@@ -192,6 +192,23 @@ public class ManufacturingMovementRepository : IManufacturingMovementRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetCandidateLotIdsForStepAsync(Guid stepId, DateTime? maxMovementDate = null, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.ManufacturingMovements
+            .AsNoTracking()
+            .Where(m => m.ToStepId == stepId && !m.IsReversed);
+
+        if (maxMovementDate.HasValue)
+        {
+            query = query.Where(m => m.MovementDate <= maxMovementDate.Value);
+        }
+
+        return await query
+            .Select(m => m.ProductionLotId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(ManufacturingMovement movement, CancellationToken cancellationToken = default)
     {
         await _dbContext.ManufacturingMovements.AddAsync(movement, cancellationToken);

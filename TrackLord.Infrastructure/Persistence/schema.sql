@@ -123,6 +123,9 @@ CREATE TABLE IF NOT EXISTS rejection_records (
 CREATE INDEX IF NOT EXISTS ix_movements_lot_replay_order 
     ON manufacturing_movements (tenant_id, production_lot_id, movement_date ASC, created_at_utc ASC, id ASC);
 
+CREATE INDEX IF NOT EXISTS ix_movements_to_step_lookup
+    ON manufacturing_movements (tenant_id, to_step_id, movement_date);
+
 CREATE INDEX IF NOT EXISTS ix_material_consumptions_prod_lot 
     ON material_consumptions (tenant_id, production_lot_id);
 
