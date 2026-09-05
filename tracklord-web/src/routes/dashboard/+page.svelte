@@ -208,9 +208,9 @@
                   {@const barPercent = maxStepWip > 0 ? (step.totalWipQuantity / maxStepWip) * 100 : 0}
                   {@const barColor = STEP_COLOR_MAP[step.stepCode] || 'bg-primary'}
                   <a
-                    href="/lots?step={step.stepId}"
+                    href="/steps/{step.stepId || step.id}/lots"
                     class="group block p-1.5 sm:p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
-                    title="View {step.stepName} lots in directory"
+                    title="View lots in {step.stepName}"
                   >
                     <div class="flex items-center justify-between mb-1 sm:mb-1.5">
                       <div class="flex items-center gap-1.5 sm:gap-2">
@@ -334,9 +334,13 @@
                   </thead>
                   <tbody class="divide-y divide-outline-variant/50 text-on-surface">
                     {#each overview.activeLotSummaries as lot}
-                      <tr class="hover:bg-surface-container-low/60 transition-colors group">
+                      <tr
+                        onclick={() => window.location.href = `/inventory?lot=${lot.lotId || lot.id}`}
+                        class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer"
+                        title="View lot {lot.lotNumber} in inventory"
+                      >
                         <td class="px-3 py-2.5">
-                          <a href="/inventory" class="font-bold text-primary hover:underline flex items-center gap-1">
+                          <a href="/inventory?lot={lot.lotId || lot.id}" class="font-bold text-primary hover:underline flex items-center gap-1">
                             <span class="material-symbols-outlined text-[15px] shrink-0">package_2</span>
                             <span class="truncate max-w-[110px]">{lot.lotNumber}</span>
                           </a>
