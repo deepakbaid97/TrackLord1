@@ -37,10 +37,21 @@ async function handleResponse(response) {
     } catch {
       // Use fallback error message if JSON parsing fails
     }
+
     throw new Error(errorMessage);
   }
   if (response.status === 204) return null;
   return await response.json();
+}
+
+/** @param {string} agentId */
+export async function createVaaniWebRtcSession(agentId) {
+  const response = await authFetch(`${API_BASE_URL}/Vaani/webrtc-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agentId })
+  });
+  return await handleResponse(response);
 }
 
 // ─── TTL In-Memory Request Cache ───────────────────────────────────────────────
@@ -575,4 +586,3 @@ export async function getLotsAtStep(stepId, { asOfDate, fromDate, toDate, search
   const response = await authFetch(`${API_BASE_URL}/ManufacturingSteps/${stepId}/lots${qs}`);
   return await handleResponse(response);
 }
-

@@ -7,6 +7,7 @@
   import TenantSettingsModal from '$lib/components/ui/TenantSettingsModal.svelte';
   import UserProfileModal from '$lib/components/ui/UserProfileModal.svelte';
   import PwaInstallPrompt from '$lib/components/ui/PwaInstallPrompt.svelte';
+  import VaaniVoiceButton from '$lib/components/ui/VaaniVoiceButton.svelte';
   import { authStore } from '$lib/stores/authStore.js';
   import { pwaStore } from '$lib/stores/pwaStore.js';
 
@@ -33,6 +34,10 @@
 <!-- Floating Bottom Navbar -->
 <Navbar />
 
+{#if isAuthenticated}
+  <VaaniVoiceButton />
+{/if}
+
 <!-- User Profile Modal -->
 <UserProfileModal />
 
@@ -46,4 +51,3 @@
 {#if showModal || (!isAuthenticated && !isLoading)}
   <PhoneAuthModal />
 {/if}
-

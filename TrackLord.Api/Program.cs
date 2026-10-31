@@ -11,6 +11,8 @@ using TrackLord.Domain.Services;
 using TrackLord.Infrastructure.Persistence;
 using TrackLord.Infrastructure.Persistence.Repositories;
 using TrackLord.Infrastructure.Services;
+using TrackLord.Api.Controllers;
+using TrackLord.Api.Authorization;
 
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,9 +23,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpClient<VaaniController>();
 
-// Configure JWT Authentication
-var secretKey = builder.Configuration["JwtSettings:SecretKey"] ?? "TrackLordSuperSecretAuthenticationKey2026!#ForJwtTokens";
+// Require unique local/deployment secrets; never fall back to a source-controlled key.
+var secretKey = SigningKeyConfiguration.GetRequiredSecret(
+    builder.Configuration,
+    "JwtSettings:SecretKey");
+VaaniVoiceAccessToken.ValidateConfiguration(builder.Configuration, secretKey);
 var issuer = builder.Configuration["JwtSettings:Issuer"] ?? "TrackLordApi";
 var audience = builder.Configuration["JwtSettings:Audience"] ?? "TrackLordWeb";
 

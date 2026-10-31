@@ -29,6 +29,7 @@
 	},
 	"dependencies": {
 		"firebase": "^11.3.0",
+		"livekit-client": "2.15.6",
 		"xlsx": "^0.18.5"
 	}
 }
