@@ -43,7 +43,7 @@ You can preview the production build with `npm run preview`.
 
 ## Vaani Voice Assistant
 
-The authenticated floating **Talk to Vaani** button starts a WebRTC call. The API key must be configured on the TrackLord API host as `VAANI_API_KEY`; it is never exposed to the browser. For local development, the API can also read `VAANI_API_KEY` from this app's ignored `.env` file.
+The authenticated floating **Talk to Vaani** button starts a WebRTC call using the TrackLord Vaani agent UUID configured in the frontend. The default UUID is the TrackLord Voice Assistant agent; set `VITE_VAANI_AGENT_ID` at build time only if using a different agent. The API key must be configured on the TrackLord API host as `VAANI_API_KEY`; it is never exposed to the browser. For local development, the API can also read `VAANI_API_KEY` from this app's ignored `.env` file.
 
 Create a TrackLord agent in the Vaani dashboard and add the read-only TrackLord tools below under **Agent Config → Training → Tools & Actions**. Replace `https://YOUR_TRACKLORD_API` with the public HTTPS base URL for the deployed TrackLord API. For local development, use the restricted ngrok setup below rather than exposing the API directly. The Vaani tool request body must pass `voiceToken` (and `lotId` for lot-specific tools) through unchanged. In each tool's trigger instructions, tell the agent to use the exact `tracklord_voice_token` value from its system prompt as `voiceToken`.
 
@@ -70,7 +70,7 @@ curl -X POST 'https://YOUR_TRACKLORD_API/api/vaani-tools/dashboard-overview' \
   -d '{"voiceToken":"<voice-token-from-call>"}'
 ```
 
-After creating the agent, copy its UUID into the floating button in TrackLord. Vaani's documented Agent Training API covers knowledge and guardrails, while external tool registration is configured in the dashboard; the TrackLord endpoints above are ready for that registration.
+Vaani's documented Agent Training API covers knowledge and guardrails, while external tool registration is configured in the dashboard; the TrackLord endpoints above are ready for that registration.
 
 ### Signing key configuration
 

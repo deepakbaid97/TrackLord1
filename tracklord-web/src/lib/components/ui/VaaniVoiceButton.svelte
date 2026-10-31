@@ -3,10 +3,9 @@
   import { Room, RoomEvent, Track } from 'livekit-client';
   import { createVaaniWebRtcSession } from '$lib/api.js';
 
-  const AGENT_ID_KEY = 'vaani_agent_id';
+  const AGENT_ID = import.meta.env.VITE_VAANI_AGENT_ID || '41deda67-0ff9-4ff4-b306-4f215058921c';
 
   let isOpen = $state(false);
-  let agentId = $state('');
   let isStarting = $state(false);
   let isConnected = $state(false);
   let errorMessage = $state('');
@@ -14,10 +13,6 @@
   let room = null;
   /** @type {Set<HTMLMediaElement>} */
   let audioElements = new Set();
-
-  if (typeof localStorage !== 'undefined') {
-    agentId = localStorage.getItem(AGENT_ID_KEY) || '';
-  }
 
   function removeRemoteAudio() {
     for (const audio of audioElements) {
@@ -49,22 +44,19 @@
     event.preventDefault();
     errorMessage = '';
 
-    const normalizedAgentId = agentId.trim();
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalizedAgentId)) {
-      errorMessage = 'Enter a valid Vaani agent UUID.';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(AGENT_ID)) {
+      errorMessage = 'The configured Vaani agent UUID is invalid.';
       return;
     }
 
     isStarting = true;
     try {
-      const session = await createVaaniWebRtcSession(normalizedAgentId);
+      const session = await createVaaniWebRtcSession(AGENT_ID);
       const token = session?.token || session?.access_token;
       const connectionUrl = session?.connection_url || session?.room_url;
       if (!token || !connectionUrl) {
         throw new Error('Vaani did not return the WebRTC connection credentials.');
       }
-
-      localStorage.setItem(AGENT_ID_KEY, normalizedAgentId);
 
       const activeRoom = new Room();
       activeRoom.on(RoomEvent.TrackSubscribed, (track) => {
@@ -151,18 +143,9 @@
       </button>
     {:else}
       <form onsubmit={startCall}>
-        <label for="vaani-agent-id" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
-          Vaani agent UUID
-        </label>
-        <input
-          id="vaani-agent-id"
-          bind:value={agentId}
-          autocomplete="off"
-          required
-          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-          disabled={isStarting}
-        />
+        <p class="text-sm text-slate-500 dark:text-slate-400">
+          Calls your TrackLord voice assistant.
+        </p>
         {#if errorMessage}
           <p class="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{errorMessage}</p>
         {/if}
