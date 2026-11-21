@@ -8,7 +8,12 @@ export default defineConfig({
 		// Use http://127.0.0.1:5173 and add 127.0.0.1 to Firebase Authorized Domains.
 		host: '127.0.0.1',
 		proxy: {
-			'/api': 'http://localhost:5217'
+			'/api': 'http://localhost:5217',
+			'/voice-api': {
+				target: 'http://localhost:8000',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/voice-api/, '')
+			}
 		}
 	},
 	plugins: [

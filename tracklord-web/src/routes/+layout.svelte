@@ -7,11 +7,13 @@
   import TenantSettingsModal from '$lib/components/ui/TenantSettingsModal.svelte';
   import UserProfileModal from '$lib/components/ui/UserProfileModal.svelte';
   import PwaInstallPrompt from '$lib/components/ui/PwaInstallPrompt.svelte';
+  import VoiceCopilot from '$lib/components/ui/VoiceCopilot.svelte';
   import { authStore } from '$lib/stores/authStore.js';
   import { pwaStore } from '$lib/stores/pwaStore.js';
 
   let { children } = $props();
 
+  let pageRefreshKey = $state(0);
   let showModal = $derived($authStore.showModal);
   let isAuthenticated = $derived($authStore.isAuthenticated);
   let isLoading = $derived($authStore.isLoading);
@@ -27,11 +29,18 @@
 
 <!-- Main Content Area -->
 <div class="pt-4 pb-24 min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-  {@render children()}
+  {#key pageRefreshKey}
+    {@render children()}
+  {/key}
 </div>
 
 <!-- Floating Bottom Navbar -->
 <Navbar />
+
+<!-- TrackLord Voice Copilot (Agora ConvoAI) -->
+{#if isAuthenticated}
+  <VoiceCopilot onMutation={() => (pageRefreshKey += 1)} />
+{/if}
 
 <!-- User Profile Modal -->
 <UserProfileModal />
