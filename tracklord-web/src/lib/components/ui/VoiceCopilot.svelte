@@ -20,17 +20,44 @@
 	let isDrawerOpen = $state(false);
 	let errorMessage = $state('');
 	let mutationToast = $state('');
-	/** @type {Array<{ id: string, role: 'user' | 'agent', text: string }>} */
-	let messages = $state([]);
+	let textInput = $state('');
+	/** @type {Array<{ kind: 'message', id: string, role: 'user' | 'agent', text: string, ts: number }>} */
+	let transcriptMessages = $state([]);
+	/** @type {Array<{ kind: 'message', id: string, role: 'user', text: string, ts: number }>} */
+	let manualMessages = $state([]);
+	/** @type {Array<{ kind: 'card', id: string, text: string, isMutation: boolean, ts: number }>} */
+	let toolCards = $state([]);
+	let chatContainer = $state(null);
 
 	let rtcClient = null;
 	let rtmClient = null;
 	let voiceAI = null;
 	let micTrack = null;
 	let activeAgentId = '';
+	let activeAgentUid = '';
+	let chatMessageTypes = null;
 	let pollTimer = null;
 	let toastTimer = null;
 	let lastMutationTs = Date.now() / 1000;
+	const messageTimestamps = new Map();
+
+	const quickPrompts = [
+		{ label: '📊 Summary', text: "Give me today's production summary" },
+		{ label: '📦 Lot 412 Status', text: 'Which step is lot 412 in?' },
+		{ label: '➡️ Move 412 Next', text: 'Move lot 412 to the next step' }
+	];
+
+	const chatTimeline = $derived.by(() => {
+		const transcriptUserTexts = new Set(
+			transcriptMessages
+				.filter((m) => m.role === 'user')
+				.map((m) => m.text.trim().toLowerCase())
+		);
+		const pendingManual = manualMessages.filter(
+			(m) => !transcriptUserTexts.has(m.text.trim().toLowerCase())
+		);
+		return [...transcriptMessages, ...pendingManual, ...toolCards].sort((a, b) => a.ts - b.ts);
+	});
 
 	const stateLabel = $derived(
 		callStatus === 'connecting'
@@ -54,25 +81,47 @@
 			.trim();
 	}
 
+	function scrollToBottom() {
+		setTimeout(() => {
+			if (chatContainer) {
+				chatContainer.scrollTop = chatContainer.scrollHeight;
+			}
+		}, 20);
+	}
+
 	async function startCall() {
 		if (callStatus === 'connecting' || callStatus === 'connected') return;
 		callStatus = 'connecting';
 		errorMessage = '';
 		isDrawerOpen = true;
-		messages = [];
+		transcriptMessages = [];
+		manualMessages = [];
+		toolCards = [];
+		messageTimestamps.clear();
 
 		try {
-			const [{ default: AgoraRTC }, { default: AgoraRTM }, { AgoraVoiceAI, AgoraVoiceAIEvents }] =
-				await Promise.all([
-					import('agora-rtc-sdk-ng'),
-					import('agora-rtm'),
-					import('agora-agent-client-toolkit')
-				]);
+			const [
+				{ default: AgoraRTC },
+				{ default: AgoraRTM },
+				{
+					AgoraVoiceAI,
+					AgoraVoiceAIEvents,
+					ChatMessagePriority,
+					ChatMessageType,
+					TranscriptHelperMode
+				}
+			] = await Promise.all([
+				import('agora-rtc-sdk-ng'),
+				import('agora-rtm'),
+				import('agora-agent-client-toolkit')
+			]);
+			chatMessageTypes = { ChatMessagePriority, ChatMessageType };
 
 			const config = await getVoiceConfig();
 			const { app_id: appId, token, uid, channel_name: channelName, agent_uid: agentUid } = config;
 			const numericUid = Number.parseInt(uid, 10);
 			const numericAgentUid = Number.parseInt(agentUid, 10);
+			activeAgentUid = String(agentUid);
 
 			rtcClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 			try {
@@ -89,10 +138,18 @@
 
 			rtmClient = new AgoraRTM.RTM(appId, String(uid));
 			await rtmClient.login({ token });
+			await rtmClient.subscribe(channelName);
+
+			await rtcClient.join(appId, channelName, token, numericUid);
+			micTrack = await AgoraRTC.createMicrophoneAudioTrack();
+			await rtcClient.publish([micTrack]);
 
 			voiceAI = await AgoraVoiceAI.init({
 				rtcEngine: rtcClient,
-				rtmConfig: { rtmEngine: rtmClient }
+				rtmEngine: rtmClient,
+				rtmConfig: { rtmEngine: rtmClient },
+				renderMode: TranscriptHelperMode.TEXT,
+				enableLog: false
 			});
 
 			voiceAI.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId, event) => {
@@ -103,18 +160,23 @@
 
 			voiceAI.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcript) => {
 				if (!Array.isArray(transcript)) return;
-				messages = transcript
+				transcriptMessages = transcript
 					.filter((item) => typeof item.text === 'string' && item.text.trim().length > 0)
-					.map((item, idx) => ({
-						id: `${item.turn_id ?? idx}-${item.uid}`,
-						role: String(item.uid) === '0' || String(item.uid) === String(uid) ? 'user' : 'agent',
-						text: normalizeSpacing(item.text)
-					}));
+					.map((item, idx) => {
+						const id = `${item.turn_id ?? idx}-${item.uid}`;
+						if (!messageTimestamps.has(id)) {
+							messageTimestamps.set(id, Date.now() + idx * 0.01);
+						}
+						return {
+							kind: 'message',
+							id,
+							role: String(item.uid) === '0' || String(item.uid) === String(uid) ? 'user' : 'agent',
+							text: normalizeSpacing(item.text),
+							ts: messageTimestamps.get(id)
+						};
+					});
+				scrollToBottom();
 			});
-
-			await rtcClient.join(appId, channelName, token, numericUid);
-			micTrack = await AgoraRTC.createMicrophoneAudioTrack();
-			await rtcClient.publish([micTrack]);
 
 			voiceAI.subscribeMessage(channelName);
 			activeAgentId = await startVoiceAgent(
@@ -139,17 +201,39 @@
 		stopEventPolling();
 		pollTimer = setInterval(async () => {
 			try {
-				const evt = await getVoiceEvents();
-				if (evt && evt.timestamp > lastMutationTs) {
-					lastMutationTs = evt.timestamp;
-					if (evt.summary) {
-						mutationToast = evt.summary;
-						if (toastTimer) clearTimeout(toastTimer);
-						toastTimer = setTimeout(() => {
-							mutationToast = '';
-						}, 5000);
+				const resp = await getVoiceEvents(lastMutationTs);
+				const newEvents = Array.isArray(resp?.events)
+					? resp.events
+					: resp && resp.timestamp > lastMutationTs
+						? [resp]
+						: [];
+				for (const evt of newEvents) {
+					if (evt.timestamp > lastMutationTs) {
+						lastMutationTs = evt.timestamp;
 					}
-					onMutation?.(evt);
+					if (evt.summary) {
+						toolCards = [
+							...toolCards,
+							{
+								kind: 'card',
+								id: `tool-${evt.timestamp}`,
+								text: evt.summary,
+								isMutation: Boolean(evt.isMutation),
+								ts: Date.now()
+							}
+						];
+						scrollToBottom();
+						if (evt.isMutation) {
+							mutationToast = evt.summary;
+							if (toastTimer) clearTimeout(toastTimer);
+							toastTimer = setTimeout(() => {
+								mutationToast = '';
+							}, 5000);
+						}
+					}
+					if (evt.isMutation) {
+						onMutation?.(evt);
+					}
 				}
 			} catch {
 				// ignore transient poll errors
@@ -161,6 +245,37 @@
 		if (pollTimer) {
 			clearInterval(pollTimer);
 			pollTimer = null;
+		}
+	}
+
+	async function sendPromptText(rawText) {
+		const trimmed = (rawText || '').trim();
+		if (!trimmed) return;
+		if (callStatus !== 'connected') {
+			await startCall();
+		}
+		if (!voiceAI || !activeAgentUid || !chatMessageTypes) return;
+		textInput = '';
+		manualMessages = [
+			...manualMessages,
+			{
+				kind: 'message',
+				id: `manual-${Date.now()}`,
+				role: 'user',
+				text: trimmed,
+				ts: Date.now()
+			}
+		];
+		scrollToBottom();
+		try {
+			await voiceAI.sendText(activeAgentUid, {
+				messageType: chatMessageTypes.ChatMessageType.TEXT,
+				text: trimmed,
+				priority: chatMessageTypes.ChatMessagePriority.INTERRUPTED,
+				responseInterruptable: true
+			});
+		} catch (err) {
+			console.warn('sendText failed:', err);
 		}
 	}
 
@@ -183,6 +298,7 @@
 
 		try {
 			voiceAI?.unsubscribe?.();
+			voiceAI?.destroy?.();
 		} catch {
 			// ignore
 		}
@@ -270,7 +386,10 @@
 			</div>
 
 			<!-- Transcript Area -->
-			<div class="h-60 overflow-y-auto p-3 space-y-2 text-sm bg-white dark:bg-slate-900">
+			<div
+				bind:this={chatContainer}
+				class="h-64 overflow-y-auto p-3 space-y-2 text-sm bg-white dark:bg-slate-900"
+			>
 				{#if mutationToast}
 					<div class="rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-emerald-800 dark:text-emerald-200 text-xs font-medium">
 						✓ {mutationToast}
@@ -280,26 +399,74 @@
 					<div class="rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 p-2.5 text-red-700 dark:text-red-300 text-xs">
 						{errorMessage}
 					</div>
-				{:else if messages.length === 0}
-					<p class="text-xs text-slate-400 dark:text-slate-500 text-center mt-16">
+				{:else if chatTimeline.length === 0}
+					<p class="text-xs text-slate-400 dark:text-slate-500 text-center mt-10">
 						{callStatus === 'connected'
-							? 'Listening — ask about lots, steps, or inventory...'
-							: 'Click Start Voice to talk to TrackLord AI.'}
+							? 'Listening — speak or tap a quick command below:'
+							: 'Click Start Voice or tap a quick command:'}
 					</p>
 				{:else}
-					{#each messages as msg (msg.id)}
-						<div class="flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
-							<div
-								class="max-w-[85%] rounded-xl px-3 py-1.5 text-xs leading-relaxed {msg.role === 'user'
-									? 'bg-blue-600 text-white'
-									: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100'}"
-							>
-								{msg.text}
+					{#each chatTimeline as item (item.id)}
+						{#if item.kind === 'card'}
+							<div class="rounded-xl border px-3 py-2 text-xs font-medium {item.isMutation
+								? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+								: 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200'}">
+								{item.isMutation ? '✓ ' : '📌 '}{item.text}
 							</div>
-						</div>
+						{:else}
+							<div class="flex {item.role === 'user' ? 'justify-end' : 'justify-start'}">
+								<div
+									class="max-w-[85%] rounded-xl px-3 py-1.5 text-xs leading-relaxed {item.role === 'user'
+										? 'bg-blue-600 text-white'
+										: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100'}"
+								>
+									<span class="block text-[10px] font-semibold opacity-70 mb-0.5">
+										{item.role === 'user' ? 'You' : 'TrackLord AI'}
+									</span>
+									{item.text}
+								</div>
+							</div>
+						{/if}
 					{/each}
 				{/if}
 			</div>
+
+			<!-- Quick Prompt Chips -->
+			<div class="flex flex-wrap gap-1.5 px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+				{#each quickPrompts as qp (qp.label)}
+					<button
+						type="button"
+						onclick={() => sendPromptText(qp.text)}
+						class="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors"
+					>
+						{qp.label}
+					</button>
+				{/each}
+			</div>
+
+			<!-- Text Command Fallback Input -->
+			{#if callStatus === 'connected'}
+				<form
+					onsubmit={(e) => {
+						e.preventDefault();
+						sendPromptText(textInput);
+					}}
+					class="flex items-center gap-1.5 px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+				>
+					<input
+						type="text"
+						bind:value={textInput}
+						placeholder="Type a command (e.g. Where is lot 412?)..."
+						class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+					/>
+					<button
+						type="submit"
+						class="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-medium"
+					>
+						Send
+					</button>
+				</form>
+			{/if}
 
 			<!-- Controls -->
 			<div

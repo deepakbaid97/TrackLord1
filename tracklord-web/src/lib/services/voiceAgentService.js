@@ -61,8 +61,8 @@ export async function stopVoiceAgent(agentId) {
 /**
  * Poll the latest voice-triggered TrackLord mutation for live UI refresh.
  */
-export async function getVoiceEvents() {
-	const response = await fetch(`${VOICE_API_BASE}/voice_events`);
+export async function getVoiceEvents(since = 0) {
+	const response = await fetch(`${VOICE_API_BASE}/voice_events?since=${encodeURIComponent(since)}`);
 	if (!response.ok) return null;
 	return response.json();
 }

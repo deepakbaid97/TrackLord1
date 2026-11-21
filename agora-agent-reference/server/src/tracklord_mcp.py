@@ -21,8 +21,9 @@ TRACKLORD_API_URL = os.getenv("TRACKLORD_API_URL", "http://localhost:5217").rstr
 
 router = APIRouter()
 
-# Tracks the latest mutation timestamp so tracklord-web can auto-refresh in Step 4.
-_last_mutation: Dict[str, Any] = {"timestamp": 0.0, "action": None, "summary": None}
+# Event queue so multiple tool calls in a single turn are never dropped by 1.5s polling.
+_last_mutation: Dict[str, Any] = {"timestamp": 0.0, "action": None, "summary": None, "isMutation": False}
+_event_log: List[Dict[str, Any]] = []
 _session_tokens: Dict[str, str] = {}
 _latest_token: Optional[str] = None
 
@@ -38,10 +39,20 @@ def get_last_mutation() -> Dict[str, Any]:
     return _last_mutation
 
 
-def _record_mutation(action: str, summary: str) -> None:
-    _last_mutation["timestamp"] = time.time()
-    _last_mutation["action"] = action
-    _last_mutation["summary"] = summary
+def _record_mutation(action: str, summary: str, is_mutation: bool = True) -> None:
+    now = time.time()
+    if _event_log and now <= _event_log[-1]["timestamp"]:
+        now = _event_log[-1]["timestamp"] + 0.0001
+    entry = {
+        "timestamp": now,
+        "action": action,
+        "summary": summary,
+        "isMutation": is_mutation,
+    }
+    _last_mutation.update(entry)
+    _event_log.append(entry)
+    if len(_event_log) > 100:
+        del _event_log[:-100]
 
 
 TOOLS: List[Dict[str, Any]] = [
@@ -72,6 +83,20 @@ TOOLS: List[Dict[str, Any]] = [
         "inputSchema": {
             "type": "object",
             "properties": {},
+        },
+    },
+    {
+        "name": "get_lot_status",
+        "description": "Get the current manufacturing step(s) and WIP quantity for a specific production lot number (e.g. '412', 'NEW-001').",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lotNumber": {
+                    "type": "string",
+                    "description": "The production lot number (e.g. '412', 'NEW-001').",
+                }
+            },
+            "required": ["lotNumber"],
         },
     },
     {
@@ -280,10 +305,45 @@ async def _get_active_wips(lot_id: str, auth_header: Optional[str]) -> List[Dict
 
 async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[str]) -> Any:
     if name == "get_dashboard_summary":
-        return await _api_request("GET", "/api/Dashboards/overview", auth_header)
+        overview = await _api_request("GET", "/api/Dashboards/overview", auth_header)
+        if isinstance(overview, dict):
+            active_count = overview.get("totalActiveLots") or overview.get("activeLotsCount")
+            total_wip = overview.get("totalWipQuantity")
+            if active_count is not None:
+                _record_mutation(
+                    "get_dashboard_summary",
+                    f"Active Lots: {active_count}" + (f" • Total WIP: {total_wip}" if total_wip is not None else ""),
+                    is_mutation=False,
+                )
+        return overview
+
+    if name == "get_lot_status":
+        lot_query = str(args.get("lotNumber") or "")
+        lots = await _api_request("GET", "/api/ProductionLots", auth_header)
+        lot = _match_by_name_or_number(lots, lot_query, ["lotNumber", "id"])
+        if not lot:
+            return {"error": f"Production lot '{lot_query}' not found.", "didYouMean": _suggest_lots(lots, lot_query)}
+        unit_name = _unit_label(lot.get("unit"))
+        active_wips = await _get_active_wips(lot["id"], auth_header)
+        step_summary = ", ".join(
+            f"{w.get('stepName', 'Unknown')}: {w.get('quantity', 0)} {unit_name}" for w in active_wips
+        ) or "No active WIP"
+        _record_mutation(
+            "get_lot_status",
+            f"Lot #{lot.get('lotNumber')} ({lot.get('clientName') or 'No Client'}) → {step_summary}",
+            is_mutation=False,
+        )
+        return {
+            "lotNumber": lot.get("lotNumber"),
+            "clientName": lot.get("clientName"),
+            "unit": unit_name,
+            "currentSteps": active_wips,
+            "summary": step_summary,
+        }
 
     if name == "list_production_lots":
         lots = await _api_request("GET", "/api/ProductionLots", auth_header)
+        total_count = len(lots) if isinstance(lots, list) else 0
         search = (args.get("search") or "").strip()
         if search and isinstance(lots, list):
             norm_s = _normalize_token(search)
@@ -294,7 +354,28 @@ async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[s
                 or search.lower() in str(lot.get("clientName", "")).lower()
                 or search.lower() in str(lot.get("remarks", "")).lower()
             ]
-        return _enrich_units(lots[:20] if isinstance(lots, list) else lots)
+        if isinstance(lots, list):
+            if len(lots) == 1:
+                only = lots[0]
+                wips = await _get_active_wips(only["id"], auth_header)
+                u = _unit_label(only.get("unit"))
+                step_txt = ", ".join(f"{w.get('stepName')}: {w.get('quantity')} {u}" for w in wips) or "No active WIP"
+                _record_mutation(
+                    "list_production_lots",
+                    f"Lot #{only.get('lotNumber')} → {step_txt}",
+                    is_mutation=False,
+                )
+            else:
+                _record_mutation(
+                    "list_production_lots",
+                    f"Active Production Lots: {len(lots)} (Total: {total_count})",
+                    is_mutation=False,
+                )
+        return {
+            "totalMatchingLots": len(lots) if isinstance(lots, list) else 0,
+            "totalActiveLots": total_count,
+            "lots": _enrich_units(lots[:20] if isinstance(lots, list) else lots),
+        }
 
     if name == "list_manufacturing_steps":
         return await _api_request("GET", "/api/ManufacturingSteps", auth_header)
@@ -327,31 +408,71 @@ async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[s
             }
 
         steps = await _api_request("GET", "/api/ManufacturingSteps", auth_header)
-        to_step = _match_by_name_or_number(steps, to_step_query, ["name", "id"])
-        if not to_step:
-            return {"error": f"Target step '{to_step_query}' not found."}
-
         active_wips = await _get_active_wips(lot["id"], auth_header)
 
         from_step_id = None
+        from_step_name = None
         available_qty = None
         if from_step_query:
             from_step = _match_by_name_or_number(steps, str(from_step_query), ["name", "id"])
             if not from_step:
                 return {"error": f"Source step '{from_step_query}' not found."}
             from_step_id = from_step["id"]
+            from_step_name = from_step.get("name")
             for w in active_wips:
                 if w.get("stepId") == from_step_id or w.get("manufacturingStepId") == from_step_id:
                     available_qty = w.get("quantity") or w.get("currentQuantity")
         elif active_wips:
             first_wip = active_wips[0]
             from_step_id = first_wip.get("stepId") or first_wip.get("manufacturingStepId")
+            from_step_name = first_wip.get("stepName")
             available_qty = first_wip.get("quantity") or first_wip.get("currentQuantity")
 
         if not from_step_id:
             return {"error": f"No active WIP found for lot '{lot.get('lotNumber')}'."}
 
+        # Resolve "next" / "next step" / "agla step" automatically using sequenceOrder
+        norm_target = _normalize_token(to_step_query)
+        to_step = None
+        if norm_target in {"next", "nextstep", "agla", "aglastep", "aglistep", "aage", "forward"}:
+            ordered_steps = sorted(
+                [s for s in (steps or []) if s.get("isActive", True)],
+                key=lambda s: s.get("sequenceOrder", 0),
+            )
+            for idx, s in enumerate(ordered_steps):
+                if s.get("id") == from_step_id:
+                    if idx + 1 < len(ordered_steps):
+                        to_step = ordered_steps[idx + 1]
+                    else:
+                        unit_name = _unit_label(lot.get("unit"))
+                        msg = f"Lot #{lot.get('lotNumber')} is already at the final step ({from_step_name or s.get('name')}: {available_qty} {unit_name})"
+                        _record_mutation("move_lot_to_step", msg, is_mutation=False)
+                        return {"alreadyAtFinalStep": True, "message": msg}
+                    break
+        if not to_step:
+            to_step = _match_by_name_or_number(steps, to_step_query, ["name", "id"])
+        if not to_step:
+            return {"error": f"Target step '{to_step_query}' not found."}
+
+        unit_name = _unit_label(lot.get("unit"))
+
+        # Guard against 400 validation error when lot is already at the target step
+        if from_step_id == to_step["id"]:
+            msg = f"Lot #{lot.get('lotNumber')} is already at {to_step.get('name')} ({available_qty} {unit_name})"
+            _record_mutation("move_lot_to_step", msg, is_mutation=False)
+            return {
+                "alreadyAtStep": True,
+                "lotNumber": lot.get("lotNumber"),
+                "step": to_step.get("name"),
+                "quantity": available_qty,
+                "unit": unit_name,
+                "message": msg,
+            }
+
         move_qty = qty if qty is not None else available_qty
+        if not move_qty or float(move_qty) <= 0:
+            return {"error": f"Lot '{lot.get('lotNumber')}' has 0 {unit_name} available to move from {from_step_name or 'current step'}."}
+
         payload = {
             "productionLotId": lot["id"],
             "fromStepId": from_step_id,
@@ -360,7 +481,6 @@ async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[s
             "movementDate": _utc_now_z(),
             "remarks": args.get("remarks") or "Moved via TrackLord Voice Copilot",
         }
-        unit_name = _unit_label(lot.get("unit"))
         result = await _api_request("POST", "/api/Movements", auth_header, payload)
         _record_mutation(
             "move_lot_to_step",
@@ -435,9 +555,13 @@ async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[s
 
 
 @router.get("/voice_events")
-async def voice_events():
-    """Lightweight polling endpoint for tracklord-web to detect voice-triggered mutations."""
-    return _last_mutation
+async def voice_events(since: float = 0.0):
+    """Returns all voice-triggered events since `since` so rapid multi-tool turns are never dropped."""
+    events = [e for e in _event_log if e["timestamp"] > since]
+    return {
+        **_last_mutation,
+        "events": events,
+    }
 
 
 @router.post("/mcp")
