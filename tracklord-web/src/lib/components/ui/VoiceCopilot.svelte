@@ -1,5 +1,6 @@
 <script>
 	import { onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/authStore.js';
 	import {
 		getVoiceConfig,
@@ -44,7 +45,8 @@
 	const quickPrompts = [
 		{ label: '📊 Summary', text: "Give me today's production summary" },
 		{ label: '📦 Lot 412 Status', text: 'Which step is lot 412 in?' },
-		{ label: '➡️ Move 412 Next', text: 'Move lot 412 to the next step' }
+		{ label: '➡️ Move 412 Next', text: 'Move lot 412 to the next step' },
+		{ label: '🧭 Open Inventory', text: 'Open the inventory page' }
 	];
 
 	const chatTimeline = $derived.by(() => {
@@ -229,6 +231,16 @@
 							toastTimer = setTimeout(() => {
 								mutationToast = '';
 							}, 5000);
+						}
+					}
+					if (evt.navigateTo) {
+						const navAnchor = /** @type {HTMLAnchorElement | null} */ (
+							document.querySelector(`nav a[href="${evt.navigateTo}"]`)
+						);
+						if (navAnchor) {
+							navAnchor.click();
+						} else {
+							await goto(evt.navigateTo);
 						}
 					}
 					if (evt.isMutation) {

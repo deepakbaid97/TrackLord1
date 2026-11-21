@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,7 +40,12 @@ def get_last_mutation() -> Dict[str, Any]:
     return _last_mutation
 
 
-def _record_mutation(action: str, summary: str, is_mutation: bool = True) -> None:
+def _record_mutation(
+    action: str,
+    summary: str,
+    is_mutation: bool = True,
+    navigate_to: Optional[str] = None,
+) -> None:
     now = time.time()
     if _event_log and now <= _event_log[-1]["timestamp"]:
         now = _event_log[-1]["timestamp"] + 0.0001
@@ -48,6 +54,7 @@ def _record_mutation(action: str, summary: str, is_mutation: bool = True) -> Non
         "action": action,
         "summary": summary,
         "isMutation": is_mutation,
+        "navigateTo": navigate_to,
     }
     _last_mutation.update(entry)
     _event_log.append(entry)
@@ -172,6 +179,84 @@ TOOLS: List[Dict[str, Any]] = [
             "required": ["lotNumber", "materialNameOrLot", "quantityConsumed"],
         },
     },
+    {
+        "name": "create_production_lot",
+        "description": "Create a new production lot in TrackLord with an initial quantity, unit, starting step, and optional client.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lotNumber": {
+                    "type": "string",
+                    "description": "New unique production lot number (e.g. '501', 'LOT-501').",
+                },
+                "initialQuantity": {
+                    "type": "number",
+                    "description": "Initial quantity for the lot (e.g. 200).",
+                },
+                "unit": {
+                    "type": "string",
+                    "description": "Unit of measure: 'pieces', 'meters', 'kilograms', 'dozens', 'yards', or 'grams'. Defaults to 'pieces'.",
+                },
+                "initialStepName": {
+                    "type": "string",
+                    "description": "Optional starting manufacturing step name (e.g. 'Cutting'). Defaults to the first step in sequence.",
+                },
+                "clientName": {
+                    "type": "string",
+                    "description": "Optional client name (e.g. 'Z Square').",
+                },
+                "remarks": {
+                    "type": "string",
+                    "description": "Optional remarks.",
+                },
+            },
+            "required": ["lotNumber", "initialQuantity"],
+        },
+    },
+    {
+        "name": "reject_lot_items",
+        "description": "Log quality-control (QC) rejected or damaged items for a production lot at a manufacturing step.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lotNumber": {
+                    "type": "string",
+                    "description": "Production lot number (e.g. '412').",
+                },
+                "quantityRejected": {
+                    "type": "number",
+                    "description": "Quantity of items rejected.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for rejection (e.g. 'Fabric stain', 'Stitching defect').",
+                },
+                "stepName": {
+                    "type": "string",
+                    "description": "Optional step name where rejection occurred. Defaults to the lot's current active step.",
+                },
+                "targetStepName": {
+                    "type": "string",
+                    "description": "Optional target step name if items are returned for rework.",
+                },
+            },
+            "required": ["lotNumber", "quantityRejected"],
+        },
+    },
+    {
+        "name": "navigate_ui",
+        "description": "Navigate the TrackLord web UI on the user's screen to a specific page (dashboard, lots, inventory, materials, steps, clients, or users).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "string",
+                    "description": "Target page name: 'dashboard', 'lots', 'inventory', 'materials', 'steps', 'clients', or 'users'.",
+                }
+            },
+            "required": ["page"],
+        },
+    },
 ]
 
 
@@ -186,6 +271,59 @@ _UNIT_MAP = {
     5: "yards",
     6: "grams",
 }
+
+_UNIT_NAME_TO_INT = {
+    "piece": 1,
+    "pieces": 1,
+    "pcs": 1,
+    "pc": 1,
+    "meter": 2,
+    "meters": 2,
+    "mtr": 2,
+    "m": 2,
+    "kilogram": 3,
+    "kilograms": 3,
+    "kg": 3,
+    "kgs": 3,
+    "kilo": 3,
+    "dozen": 4,
+    "dozens": 4,
+    "dz": 4,
+    "yard": 5,
+    "yards": 5,
+    "yd": 5,
+    "gram": 6,
+    "grams": 6,
+    "gm": 6,
+    "g": 6,
+}
+
+_PAGE_ROUTES = {
+    "dashboard": ("/dashboard", "Dashboard"),
+    "home": ("/dashboard", "Dashboard"),
+    "overview": ("/dashboard", "Dashboard"),
+    "lots": ("/lots", "Production Lots"),
+    "lot": ("/lots", "Production Lots"),
+    "productionlots": ("/lots", "Production Lots"),
+    "inventory": ("/inventory", "WIP Inventory"),
+    "wip": ("/inventory", "WIP Inventory"),
+    "materials": ("/materials", "Raw Materials"),
+    "material": ("/materials", "Raw Materials"),
+    "rawmaterials": ("/materials", "Raw Materials"),
+    "steps": ("/steps", "Manufacturing Steps"),
+    "step": ("/steps", "Manufacturing Steps"),
+    "clients": ("/clients", "Clients"),
+    "client": ("/clients", "Clients"),
+    "users": ("/users", "Users & Roles"),
+    "user": ("/users", "Users & Roles"),
+}
+
+
+def _parse_unit_int(unit_str: Any) -> int:
+    if isinstance(unit_str, int) and 1 <= unit_str <= 6:
+        return unit_str
+    cleaned = _NON_ALNUM.sub("", str(unit_str or "pieces").lower())
+    return _UNIT_NAME_TO_INT.get(cleaned, 1)
 
 
 def _unit_label(unit_val: Any) -> str:
@@ -550,6 +688,143 @@ async def _execute_tool(name: str, args: Dict[str, Any], auth_header: Optional[s
             "unit": mat_unit_name,
             "result": result,
         }
+
+    if name == "create_production_lot":
+        lot_number = str(args["lotNumber"]).strip()
+        initial_qty = float(args["initialQuantity"])
+        unit_int = _parse_unit_int(args.get("unit"))
+        unit_name = _unit_label(unit_int)
+
+        steps = await _api_request("GET", "/api/ManufacturingSteps", auth_header)
+        ordered_steps = sorted(
+            [s for s in (steps or []) if s.get("isActive", True)],
+            key=lambda s: s.get("sequenceOrder", 0),
+        )
+        initial_step = None
+        if args.get("initialStepName"):
+            initial_step = _match_by_name_or_number(steps, str(args["initialStepName"]), ["name", "id"])
+        if not initial_step and ordered_steps:
+            initial_step = ordered_steps[0]
+        if not initial_step:
+            return {"error": "No manufacturing steps found to initialize the lot."}
+
+        client_id = None
+        client_name = args.get("clientName")
+        if client_name:
+            try:
+                clients = await _api_request("GET", "/api/Clients", auth_header)
+                matched_client = _match_by_name_or_number(clients or [], str(client_name), ["name", "id"])
+                if matched_client:
+                    client_id = matched_client.get("id")
+                    client_name = matched_client.get("name")
+            except Exception:
+                pass
+
+        payload = {
+            "lotNumber": lot_number,
+            "itemId": str(uuid.uuid4()),
+            "initialQuantity": initial_qty,
+            "unit": unit_int,
+            "initialStepId": initial_step["id"],
+            "creationDate": _utc_now_z(),
+            "createdBy": "TrackLord Voice Copilot",
+            "remarks": args.get("remarks") or "Created via TrackLord Voice Copilot",
+            "clientId": client_id,
+            "clientName": client_name,
+        }
+        result = await _api_request("POST", "/api/ProductionLots", auth_header, payload)
+        _record_mutation(
+            "create_production_lot",
+            f"Created Lot #{lot_number} ({initial_qty} {unit_name}) at {initial_step.get('name')}"
+            + (f" for {client_name}" if client_name else ""),
+            is_mutation=True,
+        )
+        return {
+            "success": True,
+            "lotNumber": lot_number,
+            "initialQuantity": initial_qty,
+            "unit": unit_name,
+            "initialStep": initial_step.get("name"),
+            "clientName": client_name,
+            "result": result,
+        }
+
+    if name == "reject_lot_items":
+        lot_query = str(args["lotNumber"])
+        qty_rejected = float(args["quantityRejected"])
+        reason = str(args.get("reason") or "QC Rejection via Voice Copilot").strip()
+
+        lots = await _api_request("GET", "/api/ProductionLots", auth_header)
+        lot = _match_by_name_or_number(lots, lot_query, ["lotNumber", "id"])
+        if not lot:
+            return {"error": f"Production lot '{lot_query}' not found.", "didYouMean": _suggest_lots(lots, lot_query)}
+
+        steps = await _api_request("GET", "/api/ManufacturingSteps", auth_header)
+        active_wips = await _get_active_wips(lot["id"], auth_header)
+
+        step_id = None
+        step_name = None
+        if args.get("stepName"):
+            matched_step = _match_by_name_or_number(steps, str(args["stepName"]), ["name", "id"])
+            if matched_step:
+                step_id = matched_step["id"]
+                step_name = matched_step.get("name")
+        if not step_id and active_wips:
+            step_id = active_wips[0].get("stepId") or active_wips[0].get("manufacturingStepId")
+            step_name = active_wips[0].get("stepName")
+        if not step_id:
+            return {"error": f"No active WIP step found for lot '{lot.get('lotNumber')}'."}
+
+        target_step_id = None
+        if args.get("targetStepName"):
+            t_step = _match_by_name_or_number(steps, str(args["targetStepName"]), ["name", "id"])
+            if t_step:
+                target_step_id = t_step["id"]
+
+        unit_name = _unit_label(lot.get("unit"))
+        payload = {
+            "stepId": step_id,
+            "targetStepId": target_step_id,
+            "quantityRejected": qty_rejected,
+            "reason": reason,
+            "rejectionDate": _utc_now_z(),
+            "clientId": lot.get("clientId"),
+            "createdBy": "TrackLord Voice Copilot",
+        }
+        result = await _api_request("POST", f"/api/ProductionLots/{lot['id']}/reject", auth_header, payload)
+        _record_mutation(
+            "reject_lot_items",
+            f"Rejected {qty_rejected} {unit_name} of Lot #{lot.get('lotNumber')} at {step_name or 'current step'} ({reason})",
+            is_mutation=True,
+        )
+        return {
+            "success": True,
+            "lotNumber": lot.get("lotNumber"),
+            "step": step_name,
+            "quantityRejected": qty_rejected,
+            "unit": unit_name,
+            "reason": reason,
+            "result": result,
+        }
+
+    if name == "navigate_ui":
+        raw_page = _NON_ALNUM.sub("", str(args.get("page") or "").lower())
+        route_info = _PAGE_ROUTES.get(raw_page)
+        if not route_info:
+            for k, v in _PAGE_ROUTES.items():
+                if k in raw_page or raw_page in k:
+                    route_info = v
+                    break
+        if not route_info:
+            return {"error": f"Unknown page '{args.get('page')}'. Available: dashboard, lots, inventory, materials, steps, clients, users."}
+        route_path, label = route_info
+        _record_mutation(
+            "navigate_ui",
+            f"Opened {label} page ({route_path})",
+            is_mutation=False,
+            navigate_to=route_path,
+        )
+        return {"success": True, "page": label, "route": route_path}
 
     raise ValueError(f"Unknown tool: {name}")
 
